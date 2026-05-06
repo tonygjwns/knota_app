@@ -4,6 +4,7 @@ import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { Users, BookOpen, TrendingUp, CheckCircle } from 'lucide-react';
+import DataImportPanel from '@/components/admin/DataImportPanel';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
@@ -78,6 +79,7 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">분석 대시보드</h1>
+      <DataImportPanel />
 
       {/* Stats cards */}
       {stats && (
