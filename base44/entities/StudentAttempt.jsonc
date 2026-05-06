@@ -1,0 +1,86 @@
+{
+  "name": "StudentAttempt",
+  "type": "object",
+  "properties": {
+    "student_id": {
+      "type": "string",
+      "description": "User ID of the student"
+    },
+    "student_email": {
+      "type": "string",
+      "description": "Email of the student"
+    },
+    "problem_id": {
+      "type": "string",
+      "description": "Problem ID from snapshot"
+    },
+    "problem_content": {
+      "type": "string",
+      "description": "Problem text (cached)"
+    },
+    "problem_domain": {
+      "type": "string",
+      "description": "Domain name"
+    },
+    "canvas_image_url": {
+      "type": "string",
+      "description": "Canvas drawing image URL"
+    },
+    "photo_url": {
+      "type": "string",
+      "description": "Uploaded photo URL"
+    },
+    "ocr_text": {
+      "type": "string",
+      "description": "Gemini OCR result markdown_text"
+    },
+    "ocr_corrected_text": {
+      "type": "string",
+      "description": "Student-corrected OCR text"
+    },
+    "claude_grade_json": {
+      "type": "string",
+      "description": "Full GradingOutput JSON string"
+    },
+    "score": {
+      "type": "number",
+      "description": "Score 0-100"
+    },
+    "correctness": {
+      "type": "string",
+      "enum": [
+        "correct",
+        "partial",
+        "wrong"
+      ],
+      "description": "Overall correctness"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "submitted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "duration_sec": {
+      "type": "number"
+    },
+    "admin_review_status": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "needs_correction",
+        "skipped"
+      ],
+      "description": "Admin review status"
+    },
+    "admin_review_note": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "student_id",
+    "problem_id"
+  ]
+}

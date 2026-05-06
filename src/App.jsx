@@ -5,43 +5,69 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
-// Add page imports here
+
+// Page imports
+import Home from './pages/Home';
+import ProblemSelect from './pages/ProblemSelect';
+import ProblemSolve from './pages/ProblemSolve';
+import ResultView from './pages/ResultView';
+import History from './pages/History';
+
+// Admin
+import AdminLayout from './pages/admin/AdminLayout';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminUsers from './pages/admin/AdminUsers';
+import AdminProblems from './pages/admin/AdminProblems';
+import AdminReview from './pages/admin/AdminReview';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
 
-  // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
+      <div className="fixed inset-0 flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center">
+            <span className="text-white font-bold text-xl">수</span>
+          </div>
+          <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+          <p className="text-muted-foreground text-sm">수학 학습을 불러오는 중...</p>
+        </div>
       </div>
     );
   }
 
-  // Handle authentication errors
   if (authError) {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
     } else if (authError.type === 'auth_required') {
-      // Redirect to login automatically
       navigateToLogin();
       return null;
     }
   }
 
-  // Render the main app
   return (
     <Routes>
-      {/* Add your page Route elements here */}
+      <Route path="/" element={<Home />} />
+      <Route path="/problems" element={<ProblemSelect />} />
+      <Route path="/problem/:id" element={<ProblemSolve />} />
+      <Route path="/result/:id" element={<ResultView />} />
+      <Route path="/history" element={<History />} />
+
+      {/* Admin routes */}
+      <Route path="/admin" element={<AdminLayout />}>
+        <Route index element={<AdminDashboard />} />
+        <Route path="users" element={<AdminUsers />} />
+        <Route path="problems" element={<AdminProblems />} />
+        <Route path="review" element={<AdminReview />} />
+      </Route>
+
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
 };
 
-
 function App() {
-
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>

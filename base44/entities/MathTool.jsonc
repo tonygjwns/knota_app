@@ -1,0 +1,38 @@
+{
+  "name": "MathTool",
+  "type": "object",
+  "properties": {
+    "tool_id": {
+      "type": "string",
+      "description": "Tool ID"
+    },
+    "name": {
+      "type": "string",
+      "description": "Tool name in Korean"
+    },
+    "name_en": {
+      "type": "string",
+      "description": "Tool name in English"
+    },
+    "goal": {
+      "type": "string",
+      "description": "Goal/purpose of this tool"
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed description"
+    },
+    "domain_ids": {
+      "type": "string",
+      "description": "Related domain IDs (JSON array)"
+    },
+    "problem_count": {
+      "type": "number",
+      "description": "Number of problems using this tool"
+    }
+  },
+  "required": [
+    "tool_id",
+    "name"
+  ]
+}

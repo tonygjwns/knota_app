@@ -1,0 +1,34 @@
+{
+  "name": "Domain",
+  "type": "object",
+  "properties": {
+    "domain_id": {
+      "type": "string",
+      "description": "Domain ID"
+    },
+    "name": {
+      "type": "string",
+      "description": "Korean domain name"
+    },
+    "name_en": {
+      "type": "string",
+      "description": "English domain name"
+    },
+    "achvmt_prefix_patterns": {
+      "type": "string",
+      "description": "Achievement standard prefix patterns (JSON array)"
+    },
+    "problem_count": {
+      "type": "number",
+      "description": "Number of problems in this domain"
+    },
+    "grade_range": {
+      "type": "string",
+      "description": "Grade range (e.g. '7-9')"
+    }
+  },
+  "required": [
+    "domain_id",
+    "name"
+  ]
+}
