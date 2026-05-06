@@ -23,7 +23,7 @@ import AdminProblems from './pages/admin/AdminProblems';
 import AdminReview from './pages/admin/AdminReview';
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user } = useAuth();
 
   if (isLoadingPublicSettings || isLoadingAuth) {
     return (
@@ -43,16 +43,15 @@ const AuthenticatedApp = () => {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
     } else if (authError.type === 'auth_required') {
-      // Landing page에서는 로그인 리다이렉트 발동 안 함
       if (window.location.pathname !== '/') {
         navigateToLogin();
+        return null;
       }
-      return null;
+      // '/' 는 fall through → Landing 렌더
     }
   }
 
   // Block non-approved users (admins bypass the check)
-  const { user } = useAuth();
   if (user && user.role !== 'admin') {
     const status = user.approval_status;
     if (status === 'pending' || status === 'rejected') {

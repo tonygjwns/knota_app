@@ -95,12 +95,6 @@ export const AuthProvider = ({ children }) => {
       setIsLoadingAuth(true);
       const currentUser = await base44.auth.me();
 
-      // Auto-set pending for brand-new users (no approval_status yet)
-      if (!currentUser.approval_status) {
-        await base44.auth.updateMe({ approval_status: 'pending' });
-        currentUser.approval_status = 'pending';
-      }
-
       setUser(currentUser);
       setIsAuthenticated(true);
       setIsLoadingAuth(false);

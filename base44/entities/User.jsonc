@@ -18,20 +18,48 @@
         "rejected"
       ],
       "default": "pending",
-      "description": "Admin approval status for this user"
+      "description": "Admin approval status for this user",
+      "rls": {
+        "write": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      }
     },
     "approved_by": {
       "type": "string",
-      "description": "Admin user ID who approved/rejected"
+      "description": "Admin user ID who approved/rejected",
+      "rls": {
+        "write": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      }
     },
     "approved_at": {
       "type": "string",
       "format": "date-time",
-      "description": "When the user was approved"
+      "description": "When the user was approved",
+      "rls": {
+        "write": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      }
     },
     "rejected_reason": {
       "type": "string",
-      "description": "Reason for rejection"
+      "description": "Reason for rejection",
+      "rls": {
+        "write": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      }
     }
   },
   "required": [
