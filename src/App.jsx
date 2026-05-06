@@ -5,6 +5,7 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
+import PendingApprovalScreen from '@/components/PendingApprovalScreen';
 
 // Page imports
 import Landing from './pages/Landing';
@@ -47,6 +48,15 @@ const AuthenticatedApp = () => {
         navigateToLogin();
       }
       return null;
+    }
+  }
+
+  // Block non-approved users (admins bypass the check)
+  const { user } = useAuth();
+  if (user && user.role !== 'admin') {
+    const status = user.approval_status;
+    if (status === 'pending' || status === 'rejected') {
+      return <PendingApprovalScreen user={user} />;
     }
   }
 
