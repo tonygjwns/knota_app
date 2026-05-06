@@ -1,0 +1,345 @@
+{
+  "snapshot_at": "2026-05-06T03:59:57.010899+00:00",
+  "source_db": "KNOTA RDS jaemin_math_tool_0423",
+  "format_rule": "row 수 ≤ 500 = JSON / row 수 > 500 = JSONL / row 수 = 0 = skip",
+  "tables": {
+    "achvmt_stds": {
+      "row_count": 311,
+      "columns": [
+        {
+          "name": "code",
+          "type": "character varying"
+        },
+        {
+          "name": "content",
+          "type": "text"
+        },
+        {
+          "name": "explanation",
+          "type": "text"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "format": "json",
+      "file": "achvmt_stds.json"
+    },
+    "agent_answer_records": {
+      "row_count": 510,
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer"
+        },
+        {
+          "name": "problem_id",
+          "type": "character varying"
+        },
+        {
+          "name": "answer",
+          "type": "text"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "format": "jsonl",
+      "file": "agent_answer_records.jsonl"
+    },
+    "alembic_version": {
+      "row_count": 1,
+      "columns": [
+        {
+          "name": "version_num",
+          "type": "character varying"
+        }
+      ],
+      "format": "json",
+      "file": "alembic_version.json"
+    },
+    "developed_problems": {
+      "row_count": 0,
+      "columns": [
+        {
+          "name": "pk",
+          "type": "integer"
+        },
+        {
+          "name": "id",
+          "type": "character varying"
+        },
+        {
+          "name": "tool_id",
+          "type": "character varying"
+        },
+        {
+          "name": "content",
+          "type": "jsonb"
+        },
+        {
+          "name": "proposed_answer",
+          "type": "character varying"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "format": "skip",
+      "file": null
+    },
+    "problem_tags": {
+      "row_count": 0,
+      "columns": [
+        {
+          "name": "problem_id",
+          "type": "character varying"
+        },
+        {
+          "name": "tag_id",
+          "type": "integer"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "format": "skip",
+      "file": null
+    },
+    "problems": {
+      "row_count": 511,
+      "columns": [
+        {
+          "name": "problem_id",
+          "type": "character varying"
+        },
+        {
+          "name": "content",
+          "type": "jsonb"
+        },
+        {
+          "name": "source",
+          "type": "character varying"
+        },
+        {
+          "name": "verified_answer",
+          "type": "character varying"
+        },
+        {
+          "name": "proposed_answer",
+          "type": "character varying"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "format": "jsonl",
+      "file": "problems.jsonl"
+    },
+    "tags": {
+      "row_count": 0,
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer"
+        },
+        {
+          "name": "name",
+          "type": "character varying"
+        },
+        {
+          "name": "explanation",
+          "type": "character varying"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "format": "skip",
+      "file": null
+    },
+    "tool_achvmt_std_code_matching_logs": {
+      "row_count": 0,
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer"
+        },
+        {
+          "name": "tool_id",
+          "type": "character varying"
+        },
+        {
+          "name": "achvmt_std_code",
+          "type": "character varying"
+        },
+        {
+          "name": "confidence",
+          "type": "integer"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "format": "skip",
+      "file": null
+    },
+    "tool_id_mapping": {
+      "row_count": 0,
+      "columns": [
+        {
+          "name": "old_uuid",
+          "type": "uuid"
+        },
+        {
+          "name": "new_id",
+          "type": "character varying"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "format": "skip",
+      "file": null
+    },
+    "tools": {
+      "row_count": 24,
+      "columns": [
+        {
+          "name": "id",
+          "type": "character varying"
+        },
+        {
+          "name": "name",
+          "type": "character varying"
+        },
+        {
+          "name": "goal",
+          "type": "text"
+        },
+        {
+          "name": "operation",
+          "type": "text"
+        },
+        {
+          "name": "precondition",
+          "type": "text"
+        },
+        {
+          "name": "achvmt_std_code",
+          "type": "character varying"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "format": "json",
+      "file": "tools.json"
+    },
+    "usage_records": {
+      "row_count": 2286,
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer"
+        },
+        {
+          "name": "problem_id",
+          "type": "character varying"
+        },
+        {
+          "name": "sequence_order",
+          "type": "integer"
+        },
+        {
+          "name": "tool_id",
+          "type": "character varying"
+        },
+        {
+          "name": "reason",
+          "type": "text"
+        },
+        {
+          "name": "application",
+          "type": "text"
+        },
+        {
+          "name": "appended_info",
+          "type": "text"
+        },
+        {
+          "name": "contribution",
+          "type": "integer"
+        },
+        {
+          "name": "discover_difficulty",
+          "type": "integer"
+        },
+        {
+          "name": "compute_difficulty",
+          "type": "integer"
+        },
+        {
+          "name": "is_created_tool",
+          "type": "boolean"
+        },
+        {
+          "name": "search_steps_back",
+          "type": "integer"
+        },
+        {
+          "name": "search_rank",
+          "type": "integer"
+        },
+        {
+          "name": "is_related_tool",
+          "type": "boolean"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "format": "jsonl",
+      "file": "usage_records.jsonl"
+    }
+  },
+  "finished_at": "2026-05-06T03:59:58.386137+00:00"
+}

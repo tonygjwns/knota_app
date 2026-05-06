@@ -29,3 +29,6 @@ dist-ssr
 
 .env
 .vite
+
+# Internal-only PRD notes (not for base44)
+prd/internal_notes.md
