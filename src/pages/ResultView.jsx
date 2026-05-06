@@ -12,27 +12,36 @@ import { Textarea } from '@/components/ui/textarea';
 import { ChevronDown, ChevronUp, AlertTriangle, ArrowLeft, RotateCcw, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 
-const GRADING_SYSTEM_PROMPT = `당신은 한국 K-12 수학 풀이 채점 전문가입니다.
+const REGRADE_PROMPT_TEMPLATE = (problemContent, correctedText) => `당신은 한국 K-12 수학 풀이 채점 전문가입니다.
+
+학생이 OCR 결과를 직접 수정한 버전으로 재채점합니다.
 
 ## 채점 원칙
-1. 부분점수 일관성
-2. 학생 친화 톤 — "틀렸어요" 금지. "이 부분 다시 살펴볼까요?" 사용
-3. 다른 풀이 인정
+1. 부분점수 일관성 — 비슷한 풀이는 비슷한 점수
+2. 학생 친화 톤 — 격려 + 정정. "틀렸어요" 같은 부정적 표현 금지. "이 부분 다시 살펴볼까요?" 형태로
+3. 별해 인정 — 다른 경로여도 정답 도달 시 정합으로 인정
+4. 오류 분류: calculation / conceptual / notation
+5. 할루시 방지 — 학생이 쓰지 않은 내용 추측 금지
+6. Actionable feedback — 어느 자리/왜를 명시
 
 ## 점수 기준
-- 100 = 완전 정답
-- 80-99 = 정답 + 사소한 오류
-- 60-79 = 정답 + 일부 누락
-- 40-59 = 일부 정합 + 정답 X
-- 0-39 = 오답
+- 100 = 정답 + 풀이 완전 + 표기 정합
+- 80-99 = 정답 + 풀이 정합 + 사소한 오류
+- 60-79 = 정답 도달 + 풀이 일부 누락
+- 40-59 = 풀이 일부 정합 + 정답 미도달
+- 20-39 = 풀이 일부 정합 + 다수 오류
+- 1-19 = 풀이 형식만 일부 정합
+- 0 = 풀이 없음 / 완전 오답
 
-JSON으로 응답:
-{
-  "score": 75, "correctness": "partial", "summary": "요약",
-  "step_feedback": [{"step_number":1,"student_step":"","status":"correct","comment":"","correction":null}],
-  "gap_locations": [], "error_locations": [], "alternative_solution": null,
-  "confidence": 90, "ocr_quality_concern": null
-}`;
+<problem>
+${problemContent || ''}
+</problem>
+
+<student_ocr_solution>
+${correctedText}
+</student_ocr_solution>
+
+위 학생 풀이를 GradingOutput JSON 스키마 양식으로 채점해 주세요.`;
 
 function StepCard({ step }) {
   const [open, setOpen] = useState(step.status !== 'correct');
@@ -127,34 +136,59 @@ export default function ResultView() {
     if (!attempt || !correctedText.trim()) return;
     setRegrading(true);
     try {
-      const gradingPrompt = `${GRADING_SYSTEM_PROMPT}
-
-<problem>
-${attempt.problem_content || ''}
-</problem>
-
-<student_ocr_solution>
-${correctedText}
-</student_ocr_solution>
-
-위 학생 풀이를 채점해 주세요. JSON으로 응답해 주세요.`;
-
       const result = await base44.integrations.Core.InvokeLLM({
-        prompt: gradingPrompt,
+        prompt: REGRADE_PROMPT_TEMPLATE(attempt.problem_content, correctedText),
         model: 'claude_sonnet_4_6',
         response_json_schema: {
           type: 'object',
           properties: {
-            score: { type: 'number' },
-            correctness: { type: 'string' },
+            schema_version: { type: 'string', enum: ['v1'] },
+            score: { type: 'integer', minimum: 0, maximum: 100 },
+            correctness: { type: 'string', enum: ['correct', 'partial', 'wrong'] },
             summary: { type: 'string' },
-            step_feedback: { type: 'array', items: { type: 'object' } },
-            gap_locations: { type: 'array', items: { type: 'object' } },
-            error_locations: { type: 'array', items: { type: 'object' } },
+            step_feedback: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  step_number: { type: 'integer', minimum: 1 },
+                  student_step: { type: 'string' },
+                  status: { type: 'string', enum: ['correct', 'partial', 'missing', 'wrong'] },
+                  comment: { type: 'string' },
+                  correction: { type: 'string' }
+                },
+                required: ['step_number', 'student_step', 'status', 'comment']
+              }
+            },
+            gap_locations: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  description: { type: 'string' },
+                  expected_step: { type: 'string' }
+                },
+                required: ['description', 'expected_step']
+              }
+            },
+            error_locations: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  description: { type: 'string' },
+                  student_wrote: { type: 'string' },
+                  correct_form: { type: 'string' },
+                  error_type: { type: 'string', enum: ['calculation', 'conceptual', 'notation'] }
+                },
+                required: ['description', 'student_wrote', 'correct_form', 'error_type']
+              }
+            },
             alternative_solution: { type: 'string' },
-            confidence: { type: 'number' },
+            confidence: { type: 'integer', minimum: 0, maximum: 100 },
             ocr_quality_concern: { type: 'string' }
-          }
+          },
+          required: ['schema_version', 'score', 'correctness', 'summary', 'step_feedback', 'gap_locations', 'error_locations', 'confidence']
         }
       });
 
@@ -226,7 +260,18 @@ ${correctedText}
         {grading?.ocr_quality_concern && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
             <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-            <p className="text-amber-800 text-sm">필기 인식에 의문이 있어요. 의도하신 풀이가 맞는지 확인해 주세요</p>
+            <div>
+              <p className="text-amber-800 text-sm font-medium">필기 인식에 의문이 있어요</p>
+              <p className="text-amber-700 text-sm mt-0.5">{grading.ocr_quality_concern}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Low confidence warning */}
+        {grading?.confidence !== undefined && grading.confidence < 70 && (
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex gap-3">
+            <AlertTriangle className="w-5 h-5 text-slate-400 flex-shrink-0 mt-0.5" />
+            <p className="text-slate-600 text-sm">채점 자신감이 낮아요 ({grading.confidence}점). 관리자가 검토할 거예요.</p>
           </div>
         )}
 

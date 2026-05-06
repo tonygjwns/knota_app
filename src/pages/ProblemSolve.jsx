@@ -33,47 +33,27 @@ const OCR_SYSTEM_PROMPT = `당신은 한국 K-12 수학 손글씨 풀이 OCR 전
   "notes": "특이사항 (있을 경우)"
 }`;
 
-const GRADING_SYSTEM_PROMPT = `당신은 한국 K-12 수학 풀이 채점 전문가입니다.
-
-학생의 풀이를 받아 채점합니다. 출력은 다음 JSON 형식으로 응답해 주세요.
-
-## 채점 원칙
-1. 부분점수 일관성
-2. 학생 친화 톤 — 격려 + 정정. "틀렸어요" 금지. "이 부분 다시 살펴볼까요?" 사용
-3. 다른 풀이 인정 — 다른 경로여도 정답 도달 시 인정
-4. 산수/개념/표기 오류 구분
-
-## 점수 기준
-- 100 = 완전 정답
-- 80-99 = 정답 + 사소한 오류
-- 60-79 = 정답 + 일부 누락
-- 40-59 = 일부 정합 + 정답 X
-- 20-39 = 일부 정합 + 다수 오류
-- 0-19 = 거의 오답
-
-## 출력 JSON 형식
-{
-  "score": 75,
-  "correctness": "partial",
-  "summary": "학생 친화적 요약 (한국어)",
-  "step_feedback": [
-    {
-      "step_number": 1,
-      "student_step": "학생이 쓴 단계",
-      "status": "correct",
-      "comment": "격려 코멘트",
-      "correction": null
-    }
-  ],
-  "gap_locations": [],
-  "error_locations": [],
-  "alternative_solution": null,
-  "confidence": 90,
-  "ocr_quality_concern": null
+function formatSolutionPath(solutionPath) {
+  if (!solutionPath || (Array.isArray(solutionPath) && solutionPath.length === 0)) {
+    return '(정답 풀이 path 없음)';
+  }
+  if (typeof solutionPath === 'string') {
+    try {
+      const parsed = JSON.parse(solutionPath);
+      if (Array.isArray(parsed)) return formatSolutionPath(parsed);
+    } catch {}
+    return solutionPath;
+  }
+  const sorted = [...solutionPath].sort((a, b) => (a.sequence_order ?? 0) - (b.sequence_order ?? 0));
+  return sorted.map((step, i) => {
+    const n = step.sequence_order ?? (i + 1);
+    const toolName = step.tool_name || step.tool_id || '(도구 미상)';
+    return `Step ${n}: 도구 = "${toolName}"
+  - 사유: ${step.reason || ''}
+  - 적용: ${step.application || ''}
+  - 결과: ${step.appended_info || ''}`;
+  }).join('\n\n');
 }
-
-톤: "잘 풀었어요!", "이 부분 다시 살펴볼까요?", "별해도 가능해요" 등 긍정적 표현 사용.
-금지: "틀렸어요", "X", "잘못했어요"`;
 
 export default function ProblemSolve() {
   const { id } = useParams();
@@ -206,7 +186,35 @@ ${OCR_SYSTEM_PROMPT}`;
       // Build grading prompt
       setStage('grading');
       const problemText = parseProblemText(problem.content);
-      const gradingPrompt = `${GRADING_SYSTEM_PROMPT}
+
+      const gradingPrompt = `당신은 한국 K-12 수학 풀이 채점 전문가입니다.
+
+학생의 손글씨 풀이(OCR 추출 결과)를 받아, problem + verified_answer + agent_solution + 정답 풀이 path와 비교해 채점합니다. 출력은 GradingOutput 스키마 JSON.
+
+## 채점 원칙
+1. 부분점수 일관성 — 비슷한 풀이는 비슷한 점수
+2. 학생 친화 톤 — 격려 + 정정. "틀렸어요" 같은 부정적 표현 금지. "이 부분 다시 살펴볼까요?" 형태로
+3. 별해 인정 — 학생 풀이가 verified_answer와 다른 경로여도 정답 도달 시 정합으로 인정
+4. 오류 분류:
+   - calculation = 산수/부호/정리 오류 (소소함 — 점수 약간 ↓)
+   - conceptual = 개념/공식 오류 (큼 — 점수 많이 ↓)
+   - notation = 표기 오류 (작음 — 점수 약간 ↓)
+5. 할루시 방지 — 학생이 쓰지 않은 내용 추측 금지. 확신 없으면 confidence ↓
+6. OCR 검증 — OCR 결과가 의심스러우면 ocr_quality_concern에 구체적 우려 텍스트 명시
+7. Actionable feedback — "다시 살펴봐요" 같은 모호한 말 금지. 어느 자리/왜를 step_feedback, gap_locations, error_locations에 명시
+
+## 점수 기준
+- 100 = 정답 + 풀이 완전 + 표기 정합
+- 80-99 = 정답 + 풀이 정합 + 사소한 오류 (산수/표기)
+- 60-79 = 정답 도달 + 풀이 일부 누락 (공백)
+- 40-59 = 풀이 일부 정합 + 정답 미도달
+- 20-39 = 풀이 일부 정합 + 다수 오류
+- 1-19 = 풀이 형식만 일부 정합
+- 0 = 풀이 없음 / 완전 오답
+
+## 톤
+정합 표현: "잘 풀었어요!", "여기까지 정합!", "이 부분 다시 살펴볼까요?", "별해도 가능해요"
+금지 표현: "틀렸어요", "X", "잘못했어요"
 
 <problem>
 ${problemText}
@@ -221,14 +229,14 @@ ${problem.agent_solution || '(agent 풀이 없음)'}
 </agent_solution>
 
 <correct_solution_path>
-${problem.solution_path || '(풀이 경로 없음)'}
+${formatSolutionPath(problem.solution_path)}
 </correct_solution_path>
 
 <student_ocr_solution>
 ${ocrText}
 </student_ocr_solution>
 
-위 학생 풀이를 채점해 주세요. JSON으로 응답해 주세요.`;
+위 학생 풀이를 GradingOutput JSON 스키마 양식으로 채점해 주세요.`;
 
       const gradeResult = await base44.integrations.Core.InvokeLLM({
         prompt: gradingPrompt,
@@ -236,20 +244,58 @@ ${ocrText}
         response_json_schema: {
           type: 'object',
           properties: {
-            score: { type: 'number' },
-            correctness: { type: 'string' },
-            summary: { type: 'string' },
-            step_feedback: { type: 'array', items: { type: 'object' } },
-            gap_locations: { type: 'array', items: { type: 'object' } },
-            error_locations: { type: 'array', items: { type: 'object' } },
+            schema_version: { type: 'string', enum: ['v1'] },
+            score: { type: 'integer', minimum: 0, maximum: 100 },
+            correctness: { type: 'string', enum: ['correct', 'partial', 'wrong'] },
+            summary: { type: 'string', description: '1-2 문장 한국어 격려+정정 요약. 해요체.' },
+            step_feedback: {
+              type: 'array',
+              description: '학생 풀이의 매 step별 피드백',
+              items: {
+                type: 'object',
+                properties: {
+                  step_number: { type: 'integer', minimum: 1 },
+                  student_step: { type: 'string' },
+                  status: { type: 'string', enum: ['correct', 'partial', 'missing', 'wrong'] },
+                  comment: { type: 'string' },
+                  correction: { type: 'string' }
+                },
+                required: ['step_number', 'student_step', 'status', 'comment']
+              }
+            },
+            gap_locations: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  description: { type: 'string' },
+                  expected_step: { type: 'string' }
+                },
+                required: ['description', 'expected_step']
+              }
+            },
+            error_locations: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  description: { type: 'string' },
+                  student_wrote: { type: 'string' },
+                  correct_form: { type: 'string' },
+                  error_type: { type: 'string', enum: ['calculation', 'conceptual', 'notation'] }
+                },
+                required: ['description', 'student_wrote', 'correct_form', 'error_type']
+              }
+            },
             alternative_solution: { type: 'string' },
-            confidence: { type: 'number' },
+            confidence: { type: 'integer', minimum: 0, maximum: 100 },
             ocr_quality_concern: { type: 'string' }
-          }
+          },
+          required: ['schema_version', 'score', 'correctness', 'summary', 'step_feedback', 'gap_locations', 'error_locations', 'confidence']
         }
       });
 
-      // Save attempt
+      // Save attempt — ocr_corrected_text는 학생이 직접 수정할 때만 저장 (기본 흐름은 null)
       const attempt = await base44.entities.StudentAttempt.create({
         student_id: user.id,
         student_email: user.email,
@@ -258,6 +304,7 @@ ${ocrText}
         problem_domain: problem.domain_name || '',
         [activeTab === 'canvas' ? 'canvas_image_url' : 'photo_url']: imageUrl,
         ocr_text: ocrText,
+        ocr_corrected_text: null,
         claude_grade_json: JSON.stringify(gradeResult),
         score: gradeResult?.score || 0,
         correctness: gradeResult?.correctness || 'wrong',
