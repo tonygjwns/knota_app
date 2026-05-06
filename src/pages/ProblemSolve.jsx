@@ -132,11 +132,16 @@ export default function ProblemSolve() {
         canvas.height = h;
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
         URL.revokeObjectURL(url);
-        canvas.toBlob(resolve, 'image/jpeg', 0.7);
+        canvas.toBlob((resultBlob) => {
+          const file = new File([resultBlob], 'solution.jpg', { type: 'image/jpeg' });
+          resolve(file);
+        }, 'image/jpeg', 0.7);
       };
       img.onerror = () => {
         URL.revokeObjectURL(url);
-        resolve(blob); // 압축 실패 시 원본 그대로 사용
+        // 압축 실패 시 원본을 File로 변환
+        const file = new File([blob], 'solution.jpg', { type: blob.type || 'image/jpeg' });
+        resolve(file);
       };
       img.src = url;
     });
