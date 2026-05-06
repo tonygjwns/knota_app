@@ -116,12 +116,13 @@ export default function ProblemSolve() {
 
   const compressImage = (blob) => {
     return new Promise((resolve) => {
-      const img = new Image();
       const url = URL.createObjectURL(blob);
+      const img = document.createElement('img');
       img.onload = () => {
         const canvas = document.createElement('canvas');
         const maxSize = 1280;
-        let w = img.width, h = img.height;
+        let w = img.naturalWidth || img.width;
+        let h = img.naturalHeight || img.height;
         if (w > maxSize || h > maxSize) {
           const ratio = Math.min(maxSize / w, maxSize / h);
           w = Math.round(w * ratio);
@@ -130,8 +131,12 @@ export default function ProblemSolve() {
         canvas.width = w;
         canvas.height = h;
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        canvas.toBlob(resolve, 'image/jpeg', 0.7);
         URL.revokeObjectURL(url);
+        canvas.toBlob(resolve, 'image/jpeg', 0.7);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(blob); // 압축 실패 시 원본 그대로 사용
       };
       img.src = url;
     });
