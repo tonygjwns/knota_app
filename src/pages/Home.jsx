@@ -33,7 +33,7 @@ export default function Home() {
     setLoading(true);
     try {
       const [problems, attempts] = await Promise.all([
-        base44.entities.Problem.list('-created_date', 100),
+        base44.entities.Problem.list('-created_date', 1000, 0),
         user ? base44.entities.StudentAttempt.filter({ student_id: user.id }, '-submitted_at', 5) : [],
       ]);
 

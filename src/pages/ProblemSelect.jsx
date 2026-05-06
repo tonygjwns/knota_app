@@ -43,8 +43,8 @@ export default function ProblemSelect() {
           setWrongAttempts(wrong);
         }
       } else {
-        // random
-        const p = await base44.entities.Problem.list('-created_date', 200);
+        // random — fetch all 511
+        const p = await base44.entities.Problem.list('-created_date', 1000, 0);
         setProblems(p);
       }
     } catch (err) {
@@ -63,14 +63,13 @@ export default function ProblemSelect() {
   const handleDomainSelect = async (domain) => {
     setLoading(true);
     try {
-      const all = await base44.entities.Problem.filter({ domain_id: domain.domain_id }, '-created_date', 100);
+      const all = await base44.entities.Problem.filter({ domain_id: domain.domain_id }, '-created_date', 1000, 0);
       if (all.length === 0) {
-        const allP = await base44.entities.Problem.list('-created_date', 200);
+        const allP = await base44.entities.Problem.list('-created_date', 1000, 0);
         if (allP.length > 0) navigate(`/problem/${allP[Math.floor(Math.random() * allP.length)].id}`);
         return;
       }
-      const idx = Math.floor(Math.random() * all.length);
-      navigate(`/problem/${all[idx].id}`);
+      navigate(`/problem/${all[Math.floor(Math.random() * all.length)].id}`);
     } finally {
       setLoading(false);
     }
@@ -79,7 +78,7 @@ export default function ProblemSelect() {
   const handleToolSelect = async (tool) => {
     setLoading(true);
     try {
-      const all = await base44.entities.Problem.list('-created_date', 200);
+      const all = await base44.entities.Problem.list('-created_date', 1000, 0);
       const filtered = all.filter(p => {
         try {
           const ids = JSON.parse(p.tool_ids || '[]');

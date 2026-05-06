@@ -8,33 +8,57 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Search, ChevronDown, ChevronUp } from 'lucide-react';
 
+const PAGE_SIZE = 50;
+
 export default function AdminProblems() {
   const [problems, setProblems] = useState([]);
   const [attempts, setAttempts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [search, setSearch] = useState('');
   const [domainFilter, setDomainFilter] = useState('all');
   const [domains, setDomains] = useState([]);
   const [expanded, setExpanded] = useState(null);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
 
   useEffect(() => {
-    loadData();
+    loadInitial();
   }, []);
 
-  const loadData = async () => {
+  const loadInitial = async () => {
     setLoading(true);
+    setPage(0);
     try {
       const [p, a, d] = await Promise.all([
-        base44.entities.Problem.list('-created_date', 100),
+        base44.entities.Problem.list('-created_date', PAGE_SIZE, 0),
         base44.entities.StudentAttempt.list('-submitted_at', 500),
         base44.entities.Domain.list('name', 30),
       ]);
       setProblems(p);
       setAttempts(a);
       setDomains(d);
+      setHasMore(p.length === PAGE_SIZE);
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadMore = async () => {
+    setLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const more = await base44.entities.Problem.list('-created_date', PAGE_SIZE, nextPage * PAGE_SIZE);
+      setProblems(prev => [...prev, ...more]);
+      setPage(nextPage);
+      setHasMore(more.length === PAGE_SIZE);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const handleDomainFilter = (val) => {
+    setDomainFilter(val);
   };
 
   const getProblemStats = (problemId) => {
@@ -68,7 +92,7 @@ export default function AdminProblems() {
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-bold">문제 목록</h1>
-        <p className="text-muted-foreground text-sm mt-1">{problems.length}개의 문제</p>
+        <p className="text-muted-foreground text-sm mt-1">{problems.length}개 로드됨{hasMore ? ' (전체 더 보기 가능)' : ' (전체)'}</p>
       </div>
 
       <div className="flex gap-2">
@@ -76,7 +100,7 @@ export default function AdminProblems() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input placeholder="문제 검색..." className="pl-10" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <Select value={domainFilter} onValueChange={setDomainFilter}>
+        <Select value={domainFilter} onValueChange={handleDomainFilter}>
           <SelectTrigger className="w-32">
             <SelectValue />
           </SelectTrigger>
@@ -136,8 +160,15 @@ export default function AdminProblems() {
             </Card>
           );
         })}
-        {filtered.length === 0 && (
+        {filtered.length === 0 && !hasMore && (
           <div className="text-center py-8 text-muted-foreground">검색 결과가 없어요</div>
+        )}
+        {hasMore && !search && domainFilter === 'all' && (
+          <div className="pt-2 flex justify-center">
+            <Button variant="outline" onClick={loadMore} disabled={loadingMore}>
+              {loadingMore ? '불러오는 중...' : `더 보기 (${problems.length}개 로드됨)`}
+            </Button>
+          </div>
         )}
       </div>
     </div>

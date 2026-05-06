@@ -16,29 +16,51 @@ const STATUS_CONFIG = {
 
 const FILTERS = ['전체', '승인 대기', '승인됨', '거절됨'];
 
+const PAGE_SIZE = 50;
+
 export default function AdminUsers() {
   const { user: me } = useAuth();
   const [users, setUsers] = useState([]);
   const [attempts, setAttempts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('전체');
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadInitial(); }, []);
 
-  const loadData = async () => {
+  const loadInitial = async () => {
     setLoading(true);
+    setPage(0);
     try {
       const [u, a] = await Promise.all([
-        base44.entities.User.list('-created_date', 200),
+        base44.entities.User.list('-created_date', PAGE_SIZE, 0),
         base44.entities.StudentAttempt.list('-submitted_at', 500),
       ]);
       setUsers(u);
       setAttempts(a);
+      setHasMore(u.length === PAGE_SIZE);
     } finally {
       setLoading(false);
     }
   };
+
+  const loadMore = async () => {
+    setLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const more = await base44.entities.User.list('-created_date', PAGE_SIZE, nextPage * PAGE_SIZE);
+      setUsers(prev => [...prev, ...more]);
+      setPage(nextPage);
+      setHasMore(more.length === PAGE_SIZE);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const loadData = loadInitial;
 
   const getUserStats = (userId) => {
     const ua = attempts.filter(a => a.student_id === userId);
@@ -97,7 +119,7 @@ export default function AdminUsers() {
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-bold">사용자 목록</h1>
-        <p className="text-muted-foreground text-sm mt-1">{users.length}명 전체</p>
+        <p className="text-muted-foreground text-sm mt-1">{users.length}명 로드됨{hasMore ? ' (전체 더 보기 가능)' : ''}</p>
       </div>
 
       {pendingCount > 0 && (
@@ -194,6 +216,13 @@ export default function AdminUsers() {
         })}
         {filtered.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">해당하는 사용자가 없어요</div>
+        )}
+        {hasMore && !search && filter === '전체' && (
+          <div className="pt-2 flex justify-center">
+            <Button variant="outline" onClick={loadMore} disabled={loadingMore}>
+              {loadingMore ? '불러오는 중...' : `더 보기 (${users.length}명 로드됨)`}
+            </Button>
+          </div>
         )}
       </div>
     </div>

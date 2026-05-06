@@ -53,8 +53,7 @@ const AuthenticatedApp = () => {
 
   // Block non-approved users (admins bypass the check)
   if (user && user.role !== 'admin') {
-    const status = user.approval_status;
-    if (status === 'pending' || status === 'rejected') {
+    if (user.approval_status !== 'approved') {
       return <PendingApprovalScreen user={user} />;
     }
   }
