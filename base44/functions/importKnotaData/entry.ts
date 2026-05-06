@@ -5,7 +5,7 @@ const REPO = 'tonygjwns/knota_app';
 const BRANCH = 'main';
 
 async function fetchGithubFile(path) {
-  const url = `https://raw.githubusercontent.com/${REPO}/${BRANCH}/${path}`;
+  const url = `https://raw.githubusercontent.com/${REPO}/${BRANCH}/data/${path}`;
   const res = await fetch(url, {
     headers: { Authorization: `token ${GITHUB_TOKEN}` }
   });
@@ -66,11 +66,11 @@ Deno.serve(async (req) => {
 
     // ── STEP 0: fetch all data files ──────────────────────────────────────
     const [toolsText, problemsText, agentAnswersText, usageText, achvmtText] = await Promise.all([
-      fetchGithubFile('data/tools.json'),
-      fetchGithubFile('data/problems.jsonl'),
-      fetchGithubFile('data/agent_answer_records.jsonl'),
-      fetchGithubFile('data/usage_records.jsonl'),
-      fetchGithubFile('data/achvmt_stds.json'),
+      fetchGithubFile('tools.json'),
+      fetchGithubFile('problems.jsonl'),
+      fetchGithubFile('agent_answer_records.jsonl'),
+      fetchGithubFile('usage_records.jsonl'),
+      fetchGithubFile('achvmt_stds.json'),
     ]);
 
     if (step === 'check') {
@@ -127,36 +127,33 @@ Deno.serve(async (req) => {
       base44.asServiceRole.entities.Domain.list('-created_date', 9999),
     ]);
 
-    // Delete in batches of 50
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+    // Delete one-by-one with delay
     async function deleteAll(entityName, items) {
-      const batchSize = 50;
-      for (let i = 0; i < items.length; i += batchSize) {
-        const batch = items.slice(i, i + batchSize);
-        await Promise.all(batch.map(item =>
-          base44.asServiceRole.entities[entityName].delete(item.id)
-        ));
+      for (let i = 0; i < items.length; i++) {
+        await base44.asServiceRole.entities[entityName].delete(items[i].id);
+        if ((i + 1) % 5 === 0) await sleep(1000);
       }
     }
 
-    await Promise.all([
-      deleteAll('Problem', existingProblems),
-      deleteAll('MathTool', existingTools),
-      deleteAll('Domain', existingDomains),
-    ]);
+    await deleteAll('Problem', existingProblems);
+    await deleteAll('MathTool', existingTools);
+    await deleteAll('Domain', existingDomains);
 
     // ── STEP 3: Create Domains ────────────────────────────────────────────
-    const domainEntities = await Promise.all(
-      Object.entries(DOMAIN_MAP).map(([prefix, info]) =>
-        base44.asServiceRole.entities.Domain.create({
-          domain_id: prefix,
-          name: info.name,
-          name_en: null,
-          achvmt_prefix_patterns: JSON.stringify([prefix]),
-          problem_count: 0,
-          grade_range: info.grade_range,
-        })
-      )
-    );
+    const domainEntities = [];
+    for (const [prefix, info] of Object.entries(DOMAIN_MAP)) {
+      const d = await base44.asServiceRole.entities.Domain.create({
+        domain_id: prefix,
+        name: info.name,
+        name_en: null,
+        achvmt_prefix_patterns: JSON.stringify([prefix]),
+        problem_count: 0,
+        grade_range: info.grade_range,
+      });
+      domainEntities.push(d);
+    }
     // domain_id → entity.id map
     const domainIdMap = new Map(); // prefix → DB id
     for (const d of domainEntities) {
@@ -164,19 +161,19 @@ Deno.serve(async (req) => {
     }
 
     // ── STEP 4: Create MathTools ──────────────────────────────────────────
-    const mathToolEntities = await Promise.all(
-      tools.map(t =>
-        base44.asServiceRole.entities.MathTool.create({
-          tool_id: t.id,
-          name: t.name,
-          name_en: null,
-          goal: t.goal || null,
-          description: [t.precondition, t.operation].filter(Boolean).join('\n\n') || t.operation || null,
-          domain_ids: null,
-          problem_count: 0,
-        })
-      )
-    );
+    const mathToolEntities = [];
+    for (const t of tools) {
+      const mt = await base44.asServiceRole.entities.MathTool.create({
+        tool_id: t.id,
+        name: t.name,
+        name_en: null,
+        goal: t.goal || null,
+        description: [t.precondition, t.operation].filter(Boolean).join('\n\n') || t.operation || null,
+        domain_ids: null,
+        problem_count: 0,
+      });
+      mathToolEntities.push(mt);
+    }
     // tool_id → entity.id
     const mathToolEntityMap = new Map(); // tool_id → DB id
     for (const mt of mathToolEntities) {
@@ -187,67 +184,62 @@ Deno.serve(async (req) => {
     const problemToolCount = new Map(); // tool_id → count
     const domainProblemCount = new Map(); // domain_id (prefix) → count
 
-    const BATCH = 20;
     const createdProblems = [];
 
-    for (let i = 0; i < problems.length; i += BATCH) {
-      const batch = problems.slice(i, i + BATCH);
-      const created = await Promise.all(batch.map(p => {
-        const steps = (usageMap.get(p.problem_id) || [])
-          .sort((a, b) => (a.sequence_order ?? 0) - (b.sequence_order ?? 0))
-          .map(u => ({
-            sequence_order: u.sequence_order,
-            tool_id: u.tool_id,
-            tool_name: toolNameMap.get(u.tool_id) || u.tool_id,
-            reason: u.reason || null,
-            application: u.application || null,
-            appended_info: u.appended_info || null,
-            contribution: u.contribution || null,
-            discover_difficulty: u.discover_difficulty ?? null,
-            compute_difficulty: u.compute_difficulty ?? null,
-          }));
+    for (let i = 0; i < problems.length; i++) {
+      const p = problems[i];
+      if (i > 0 && i % 10 === 0) await sleep(1000);
 
-        const uniqueToolIds = [...new Set(steps.map(s => s.tool_id).filter(Boolean))];
+      const steps = (usageMap.get(p.problem_id) || [])
+        .sort((a, b) => (a.sequence_order ?? 0) - (b.sequence_order ?? 0))
+        .map(u => ({
+          sequence_order: u.sequence_order,
+          tool_id: u.tool_id,
+          tool_name: toolNameMap.get(u.tool_id) || u.tool_id,
+          reason: u.reason || null,
+          application: u.application || null,
+          appended_info: u.appended_info || null,
+          contribution: u.contribution || null,
+          discover_difficulty: u.discover_difficulty ?? null,
+          compute_difficulty: u.compute_difficulty ?? null,
+        }));
 
-        // achvmt codes from tools
-        const achvmtCodes = [...new Set(
-          uniqueToolIds.map(tid => toolAchvmtMap.get(tid)).filter(Boolean)
-        )];
+      const uniqueToolIds = [...new Set(steps.map(s => s.tool_id).filter(Boolean))];
 
-        // domain from first achvmt code
-        const firstCode = (p.achvmt_std_codes?.[0]) || achvmtCodes[0] || null;
-        const prefix = firstCode ? extractPrefix(firstCode) : null;
-        const domainName = prefix ? DOMAIN_MAP[prefix]?.name || null : null;
+      const achvmtCodes = [...new Set(
+        uniqueToolIds.map(tid => toolAchvmtMap.get(tid)).filter(Boolean)
+      )];
 
-        // counts
-        if (prefix) {
-          domainProblemCount.set(prefix, (domainProblemCount.get(prefix) || 0) + 1);
-        }
-        for (const tid of uniqueToolIds) {
-          problemToolCount.set(tid, (problemToolCount.get(tid) || 0) + 1);
-        }
+      const firstCode = (p.achvmt_std_codes?.[0]) || achvmtCodes[0] || null;
+      const prefix = firstCode ? extractPrefix(firstCode) : null;
+      const domainName = prefix ? DOMAIN_MAP[prefix]?.name || null : null;
 
-        // difficulty: avg of discover_difficulty
-        const diffs = steps.map(s => s.discover_difficulty).filter(v => v != null);
-        const difficulty = diffs.length > 0
-          ? Math.round((diffs.reduce((a, b) => a + b, 0) / diffs.length) * 10) / 10
-          : null;
+      if (prefix) {
+        domainProblemCount.set(prefix, (domainProblemCount.get(prefix) || 0) + 1);
+      }
+      for (const tid of uniqueToolIds) {
+        problemToolCount.set(tid, (problemToolCount.get(tid) || 0) + 1);
+      }
 
-        return base44.asServiceRole.entities.Problem.create({
-          problem_id: p.problem_id,
-          source: p.source || null,
-          content: JSON.stringify(p.content),
-          verified_answer: p.verified_answer || null,
-          domain_id: prefix,
-          domain_name: domainName,
-          achvmt_std_codes: JSON.stringify(achvmtCodes),
-          tool_ids: JSON.stringify(uniqueToolIds),
-          agent_solution: agentMap.get(p.problem_id) || null,
-          solution_path: JSON.stringify(steps),
-          difficulty: difficulty,
-        });
-      }));
-      createdProblems.push(...created);
+      const diffs = steps.map(s => s.discover_difficulty).filter(v => v != null);
+      const difficulty = diffs.length > 0
+        ? Math.round((diffs.reduce((a, b) => a + b, 0) / diffs.length) * 10) / 10
+        : null;
+
+      const created = await base44.asServiceRole.entities.Problem.create({
+        problem_id: p.problem_id,
+        source: p.source || null,
+        content: JSON.stringify(p.content),
+        verified_answer: p.verified_answer || null,
+        domain_id: prefix,
+        domain_name: domainName,
+        achvmt_std_codes: JSON.stringify(achvmtCodes),
+        tool_ids: JSON.stringify(uniqueToolIds),
+        agent_solution: agentMap.get(p.problem_id) || null,
+        solution_path: JSON.stringify(steps),
+        difficulty: difficulty,
+      });
+      createdProblems.push(created);
     }
 
     // ── STEP 6: Update MathTool.domain_ids & problem_count ───────────────

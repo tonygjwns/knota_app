@@ -176,7 +176,7 @@ export default function ProblemSolve() {
 
 ${OCR_SYSTEM_PROMPT}`;
 
-      const ocrResult = await base44.integrations.Core.InvokeLLM({
+      const ocrRaw = await base44.integrations.Core.InvokeLLM({
         prompt: ocrPrompt,
         file_urls: [imageUrl],
         model: 'gemini_3_flash',
@@ -190,6 +190,7 @@ ${OCR_SYSTEM_PROMPT}`;
         }
       });
 
+      const ocrResult = ocrRaw?.response ?? ocrRaw;
       const ocrText = ocrResult?.markdown_text || '';
       if (!ocrText) throw new Error('OCR 결과가 없어요');
 
@@ -248,7 +249,7 @@ ${ocrText}
 
 위 학생 풀이를 GradingOutput JSON 스키마 양식으로 채점해 주세요.`;
 
-      const gradeResult = await base44.integrations.Core.InvokeLLM({
+      const gradeRaw = await base44.integrations.Core.InvokeLLM({
         prompt: gradingPrompt,
         model: 'claude_sonnet_4_6',
         response_json_schema: {
@@ -304,6 +305,8 @@ ${ocrText}
           required: ['schema_version', 'score', 'correctness', 'summary', 'step_feedback', 'gap_locations', 'error_locations', 'confidence']
         }
       });
+
+      const gradeResult = gradeRaw?.response ?? gradeRaw;
 
       // Save attempt — ocr_corrected_text는 학생이 직접 수정할 때만 저장 (기본 흐름은 null)
       const attempt = await base44.entities.StudentAttempt.create({
@@ -423,7 +426,7 @@ ${ocrText}
 
         {/* Submit */}
         <div className="flex gap-3 pt-2">
-          <Button variant="outline" className="flex-1 btn-touch" onClick={() => navigate('/')}>
+          <Button variant="outline" className="flex-1 btn-touch" onClick={() => navigate('/home')}>
             메인으로
           </Button>
           <Button className="flex-2 btn-touch flex-[2]" size="lg" onClick={handleSubmit}>

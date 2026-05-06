@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/lib/AuthContext';
 import { base44 } from '@/api/base44Client';
 import AppLayout from '@/components/AppLayout';
 import MathRenderer from '@/components/MathRenderer';
@@ -100,6 +101,7 @@ function StepCard({ step }) {
 export default function ResultView() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [attempt, setAttempt] = useState(null);
   const [loading, setLoading] = useState(true);
   const [grading, setGrading] = useState(null);
@@ -119,10 +121,17 @@ export default function ResultView() {
       const attempts = await base44.entities.StudentAttempt.filter({ id }, '-created_date', 1);
       if (attempts.length > 0) {
         const a = attempts[0];
+        // 보안: 본인 또는 admin만 접근 가능
+        if (user && a.student_id !== user.id && user.role !== 'admin') {
+          toast.error('이 결과를 볼 권한이 없어요');
+          navigate('/home');
+          return;
+        }
         setAttempt(a);
         if (a.claude_grade_json) {
           try {
-            setGrading(JSON.parse(a.claude_grade_json));
+            const parsed = JSON.parse(a.claude_grade_json);
+            setGrading(parsed?.response ?? parsed);
           } catch {}
         }
         setCorrectedText(a.ocr_corrected_text || a.ocr_text || '');
@@ -136,7 +145,7 @@ export default function ResultView() {
     if (!attempt || !correctedText.trim()) return;
     setRegrading(true);
     try {
-      const result = await base44.integrations.Core.InvokeLLM({
+      const resultRaw = await base44.integrations.Core.InvokeLLM({
         prompt: REGRADE_PROMPT_TEMPLATE(attempt.problem_content, correctedText),
         model: 'claude_sonnet_4_6',
         response_json_schema: {
@@ -192,6 +201,8 @@ export default function ResultView() {
         }
       });
 
+      const result = resultRaw?.response ?? resultRaw;
+
       // Update attempt
       await base44.entities.StudentAttempt.update(attempt.id, {
         ocr_corrected_text: correctedText,
@@ -237,7 +248,7 @@ export default function ResultView() {
       {regrading && <LoadingOverlay stage="grading" />}
       <div className="space-y-5 pb-8">
         {/* Back */}
-        <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="gap-2">
+        <Button variant="ghost" size="sm" onClick={() => navigate('/home')} className="gap-2">
           <ArrowLeft className="w-4 h-4" /> 홈으로
         </Button>
 
@@ -402,7 +413,7 @@ export default function ResultView() {
 
         {/* Action buttons */}
         <div className="grid grid-cols-3 gap-2 pt-2">
-          <Button variant="outline" size="sm" className="btn-touch" onClick={() => navigate('/')}>
+          <Button variant="outline" size="sm" className="btn-touch" onClick={() => navigate('/home')}>
             메인으로
           </Button>
           <Button variant="outline" size="sm" className="btn-touch"

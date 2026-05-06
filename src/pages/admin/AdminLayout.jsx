@@ -1,7 +1,9 @@
-import React from 'react';
-import { Link, useLocation, Outlet } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { Users, BookOpen, CheckSquare, BarChart2, ArrowLeft } from 'lucide-react';
+import { toast } from 'sonner';
 
 const ADMIN_NAV = [
   { path: '/admin', icon: BarChart2, label: '대시보드', exact: true },
@@ -12,12 +14,24 @@ const ADMIN_NAV = [
 
 export default function AdminLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, isLoadingAuth } = useAuth();
+
+  useEffect(() => {
+    if (!isLoadingAuth && user && user.role !== 'admin') {
+      toast.error('관리자 권한이 필요해요');
+      navigate('/home', { replace: true });
+    }
+  }, [user, isLoadingAuth, navigate]);
+
+  if (isLoadingAuth || !user) return null;
+  if (user.role !== 'admin') return null;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Admin top bar */}
       <header className="bg-slate-900 text-white px-4 py-3 flex items-center gap-3">
-        <Link to="/" className="p-1 rounded hover:bg-white/10 transition-colors">
+        <Link to="/home" className="p-1 rounded hover:bg-white/10 transition-colors">
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center">

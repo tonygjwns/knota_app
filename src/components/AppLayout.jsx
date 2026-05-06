@@ -5,7 +5,7 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 
 const NAV_ITEMS = [
-  { path: '/', icon: Home, label: '홈' },
+  { path: '/home', icon: Home, label: '홈' },
   { path: '/problems', icon: BookOpen, label: '문제' },
   { path: '/history', icon: History, label: '내 기록' },
 ];
@@ -26,15 +26,22 @@ export default function AppLayout({ children }) {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Top bar (mobile) */}
       <header className="sticky top-0 z-40 bg-card/95 backdrop-blur-sm border-b border-border px-4 py-3 flex items-center justify-between md:hidden">
-        <Link to="/" className="flex items-center gap-2">
+        <Link to="/home" className="flex items-center gap-2">
           <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
             <span className="text-white text-sm font-bold">수</span>
           </div>
           <span className="font-bold text-foreground text-lg">수학 학습</span>
         </Link>
-        <button onClick={() => setMenuOpen(o => !o)} className="p-2 rounded-lg hover:bg-muted btn-touch">
-          {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
+        <div className="flex items-center gap-2">
+          {user && (
+            <span className="text-xs text-muted-foreground font-medium truncate max-w-[80px]">
+              {user.full_name || user.email?.split('@')[0]}
+            </span>
+          )}
+          <button onClick={() => setMenuOpen(o => !o)} className="p-2 rounded-lg hover:bg-muted btn-touch">
+            {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
       </header>
 
       {/* Mobile menu overlay */}
@@ -81,7 +88,7 @@ export default function AppLayout({ children }) {
       <div className="flex flex-1">
         {/* Sidebar (desktop) */}
         <aside className="hidden md:flex w-64 flex-col border-r border-border bg-card sticky top-0 h-screen p-5 gap-2">
-          <Link to="/" className="flex items-center gap-3 mb-6 px-2">
+          <Link to="/home" className="flex items-center gap-3 mb-6 px-2">
             <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
               <span className="text-white font-bold text-lg">수</span>
             </div>
@@ -101,7 +108,7 @@ export default function AppLayout({ children }) {
           <nav className="flex flex-col gap-1 flex-1">
             {allItems.map(item => {
               const active = location.pathname === item.path || 
-                (item.path !== '/' && location.pathname.startsWith(item.path));
+                (item.path !== '/home' && location.pathname.startsWith(item.path));
               return (
                 <Link key={item.path} to={item.path}
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
@@ -133,7 +140,7 @@ export default function AppLayout({ children }) {
         <div className="flex items-center justify-around px-2 py-2">
           {allItems.map(item => {
             const active = location.pathname === item.path ||
-              (item.path !== '/' && location.pathname.startsWith(item.path));
+              (item.path !== '/home' && location.pathname.startsWith(item.path));
             return (
               <Link key={item.path} to={item.path}
                     className={`flex flex-col items-center gap-0.5 px-4 py-2 rounded-xl btn-touch transition-colors ${

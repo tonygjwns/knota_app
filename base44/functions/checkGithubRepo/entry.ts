@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
     const repoInfo = await repoRes.json();
 
     // List all contents including subdirs
-    const rootRes = await fetch('https://api.github.com/repos/tonygjwns/knota_app/contents/src', {
+    const rootRes = await fetch('https://api.github.com/repos/tonygjwns/knota_app/contents/data', {
       headers: {
         Authorization: `token ${GITHUB_TOKEN}`,
         Accept: 'application/vnd.github.v3+json',

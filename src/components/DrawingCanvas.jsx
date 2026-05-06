@@ -1,11 +1,13 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Undo2, Trash2, Pencil } from 'lucide-react';
+import { Undo2, Trash2, Pencil, Eraser } from 'lucide-react';
 
 export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penSize = 3 }) {
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [history, setHistory] = useState([]);
+  const [tool, setTool] = useState('pen'); // 'pen' | 'eraser'
+  const [eraserSize] = useState(20);
   const lastPos = useRef(null);
 
   const getPos = (e, canvas) => {
@@ -33,11 +35,13 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
     lastPos.current = pos;
     setIsDrawing(true);
     const ctx = canvas.getContext('2d');
-    ctx.beginPath();
-    ctx.arc(pos.x, pos.y, penSize / 2, 0, Math.PI * 2);
-    ctx.fillStyle = penColor;
-    ctx.fill();
-  }, [penColor, penSize, saveState]);
+    if (tool === 'pen') {
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, penSize / 2, 0, Math.PI * 2);
+      ctx.fillStyle = penColor;
+      ctx.fill();
+    }
+  }, [penColor, penSize, tool, saveState]);
 
   const draw = useCallback((e) => {
     if (!isDrawing) return;
@@ -48,13 +52,23 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
     ctx.beginPath();
     ctx.moveTo(lastPos.current.x, lastPos.current.y);
     ctx.lineTo(pos.x, pos.y);
-    ctx.strokeStyle = penColor;
-    ctx.lineWidth = penSize;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
+    if (tool === 'eraser') {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.strokeStyle = 'rgba(0,0,0,1)';
+      ctx.lineWidth = eraserSize;
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = penColor;
+      ctx.lineWidth = penSize;
+    }
     ctx.stroke();
+    if (tool === 'eraser') {
+      ctx.globalCompositeOperation = 'source-over';
+    }
     lastPos.current = pos;
-  }, [isDrawing, penColor, penSize]);
+  }, [isDrawing, penColor, penSize, tool, eraserSize]);
 
   const stopDraw = useCallback(() => {
     setIsDrawing(false);
@@ -107,9 +121,30 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
   }, []);
 
   const isEmpty = history.length === 0;
+  const cursorClass = tool === 'eraser' ? 'cursor-cell' : 'drawing-canvas';
 
   return (
     <div className="flex flex-col gap-3">
+      {/* Tool toggle */}
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant={tool === 'pen' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setTool('pen')}
+          className="flex-1 btn-touch">
+          <Pencil className="w-4 h-4 mr-1" /> 펜
+        </Button>
+        <Button
+          type="button"
+          variant={tool === 'eraser' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setTool('eraser')}
+          className="flex-1 btn-touch">
+          <Eraser className="w-4 h-4 mr-1" /> 지우개
+        </Button>
+      </div>
+
       <div className="relative bg-white border-2 border-dashed border-border rounded-xl overflow-hidden"
            style={{ minHeight: 280 }}>
         {isEmpty && (
@@ -120,7 +155,7 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
         )}
         <canvas
           ref={canvasRef}
-          className="drawing-canvas w-full"
+          className={`${cursorClass} w-full`}
           style={{ height: 280, display: 'block' }}
           onMouseDown={startDraw}
           onMouseMove={draw}
@@ -131,6 +166,7 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
           onTouchEnd={stopDraw}
         />
       </div>
+
       <div className="flex gap-2">
         <Button type="button" variant="outline" size="sm" onClick={undo} disabled={history.length === 0}
                 className="btn-touch flex-1">

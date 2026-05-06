@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 
 // Page imports
+import Landing from './pages/Landing';
 import Home from './pages/Home';
 import ProblemSelect from './pages/ProblemSelect';
 import ProblemSolve from './pages/ProblemSolve';
@@ -41,14 +42,18 @@ const AuthenticatedApp = () => {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
     } else if (authError.type === 'auth_required') {
-      navigateToLogin();
+      // Landing page에서는 로그인 리다이렉트 발동 안 함
+      if (window.location.pathname !== '/') {
+        navigateToLogin();
+      }
       return null;
     }
   }
 
   return (
     <Routes>
-      <Route path="/" element={<Home />} />
+      <Route path="/" element={<Landing />} />
+      <Route path="/home" element={<Home />} />
       <Route path="/problems" element={<ProblemSelect />} />
       <Route path="/problem/:id" element={<ProblemSolve />} />
       <Route path="/result/:id" element={<ResultView />} />
