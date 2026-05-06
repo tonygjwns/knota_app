@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import PaginationBar from '@/components/ui/PaginationBar';
 import { Search, User, Clock, CheckCircle, XCircle, ShieldCheck } from 'lucide-react';
 
 const STATUS_CONFIG = {
@@ -15,6 +16,7 @@ const STATUS_CONFIG = {
 };
 
 const FILTERS = ['전체', '승인 대기', '승인됨', '거절됨'];
+const FILTER_STATUS = { '승인 대기': 'pending', '승인됨': 'approved', '거절됨': 'rejected' };
 
 const PAGE_SIZE = 50;
 
@@ -23,44 +25,73 @@ export default function AdminUsers() {
   const [users, setUsers] = useState([]);
   const [attempts, setAttempts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [pageLoading, setPageLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('전체');
   const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
+  const [pendingCount, setPendingCount] = useState(0);
+  const topRef = useRef(null);
 
   useEffect(() => { loadInitial(); }, []);
 
   const loadInitial = async () => {
     setLoading(true);
-    setPage(0);
     try {
-      const [u, a] = await Promise.all([
+      const [firstPage, allUsers, a] = await Promise.all([
         base44.entities.User.list('-created_date', PAGE_SIZE, 0),
+        base44.entities.User.list('-created_date', 1000, 0), // for total + pending count
         base44.entities.StudentAttempt.list('-submitted_at', 500),
       ]);
-      setUsers(u);
+      setUsers(firstPage);
+      setTotalCount(allUsers.length);
+      setPendingCount(allUsers.filter(u => u.approval_status === 'pending').length);
       setAttempts(a);
-      setHasMore(u.length === PAGE_SIZE);
+      setPage(0);
     } finally {
       setLoading(false);
     }
   };
 
-  const loadMore = async () => {
-    setLoadingMore(true);
+  const loadPage = async (newPage, currentFilter) => {
+    setPageLoading(true);
     try {
-      const nextPage = page + 1;
-      const more = await base44.entities.User.list('-created_date', PAGE_SIZE, nextPage * PAGE_SIZE);
-      setUsers(prev => [...prev, ...more]);
-      setPage(nextPage);
-      setHasMore(more.length === PAGE_SIZE);
+      const statusKey = FILTER_STATUS[currentFilter];
+      const data = statusKey
+        ? await base44.entities.User.filter({ approval_status: statusKey }, '-created_date', PAGE_SIZE, newPage * PAGE_SIZE)
+        : await base44.entities.User.list('-created_date', PAGE_SIZE, newPage * PAGE_SIZE);
+      setUsers(data);
+      setPage(newPage);
+      topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } finally {
-      setLoadingMore(false);
+      setPageLoading(false);
     }
   };
 
-  const loadData = loadInitial;
+  const handleFilterChange = async (newFilter) => {
+    setFilter(newFilter);
+    setPage(0);
+    setPageLoading(true);
+    try {
+      const statusKey = FILTER_STATUS[newFilter];
+      if (statusKey) {
+        const all = await base44.entities.User.filter({ approval_status: statusKey }, '-created_date', 1000, 0);
+        setTotalCount(all.length);
+        setUsers(all.slice(0, PAGE_SIZE));
+      } else {
+        // 전체
+        const [firstPage, allUsers] = await Promise.all([
+          base44.entities.User.list('-created_date', PAGE_SIZE, 0),
+          base44.entities.User.list('-created_date', 1000, 0),
+        ]);
+        setUsers(firstPage);
+        setTotalCount(allUsers.length);
+        setPendingCount(allUsers.filter(u => u.approval_status === 'pending').length);
+      }
+    } finally {
+      setPageLoading(false);
+    }
+  };
 
   const getUserStats = (userId) => {
     const ua = attempts.filter(a => a.student_id === userId);
@@ -77,7 +108,7 @@ export default function AdminUsers() {
       approved_at: new Date().toISOString(),
       rejected_reason: '',
     });
-    loadData();
+    loadInitial();
   };
 
   const handleReject = async (u) => {
@@ -89,12 +120,10 @@ export default function AdminUsers() {
       approved_at: new Date().toISOString(),
       rejected_reason: reason,
     });
-    loadData();
+    loadInitial();
   };
 
-  const pendingCount = users.filter(u => u.approval_status === 'pending').length;
-
-  // Sort: pending first, then by created_date desc
+  // Search is client-side within current page
   const sorted = [...users].sort((a, b) => {
     const ap = a.approval_status === 'pending' ? 0 : 1;
     const bp = b.approval_status === 'pending' ? 0 : 1;
@@ -102,24 +131,20 @@ export default function AdminUsers() {
     return new Date(b.created_date) - new Date(a.created_date);
   });
 
-  const filtered = sorted.filter(u => {
-    const q = search.toLowerCase();
-    const matchSearch = !q || (u.full_name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q);
-    const matchFilter =
-      filter === '전체' ? true :
-      filter === '승인 대기' ? u.approval_status === 'pending' :
-      filter === '승인됨' ? u.approval_status === 'approved' :
-      filter === '거절됨' ? u.approval_status === 'rejected' : true;
-    return matchSearch && matchFilter;
-  });
+  const filtered = search
+    ? sorted.filter(u => {
+        const q = search.toLowerCase();
+        return (u.full_name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q);
+      })
+    : sorted;
 
   if (loading) return <InlineLoader message="사용자 목록 불러오는 중..." />;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5" ref={topRef}>
       <div>
         <h1 className="text-2xl font-bold">사용자 목록</h1>
-        <p className="text-muted-foreground text-sm mt-1">{users.length}명 로드됨{hasMore ? ' (전체 더 보기 가능)' : ''}</p>
+        <p className="text-muted-foreground text-sm mt-1">총 {totalCount.toLocaleString()}명의 사용자</p>
       </div>
 
       {pendingCount > 0 && (
@@ -136,7 +161,7 @@ export default function AdminUsers() {
         {FILTERS.map(f => (
           <button
             key={f}
-            onClick={() => setFilter(f)}
+            onClick={() => handleFilterChange(f)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               filter === f
                 ? 'bg-primary text-primary-foreground'
@@ -151,14 +176,18 @@ export default function AdminUsers() {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
-          placeholder="이름 또는 이메일 검색..."
+          placeholder="현재 페이지에서 검색..."
           className="pl-10"
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
       </div>
 
-      <div className="space-y-2">
+      {search && (
+        <p className="text-xs text-muted-foreground -mt-3">현재 페이지({users.length}명)에서만 검색됩니다.</p>
+      )}
+
+      <div className="space-y-2" style={{ opacity: pageLoading ? 0.5 : 1, transition: 'opacity 0.15s' }}>
         {filtered.map(u => {
           const stats = getUserStats(u.id);
           const isAdmin = u.role === 'admin';
@@ -196,7 +225,6 @@ export default function AdminUsers() {
                 </div>
               </div>
 
-              {/* Action buttons — not shown for admins or self */}
               {!isAdmin && u.id !== me?.id && (
                 <div className="flex gap-2 mt-2 pt-2 border-t border-border">
                   {u.approval_status !== 'approved' && (
@@ -217,14 +245,17 @@ export default function AdminUsers() {
         {filtered.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">해당하는 사용자가 없어요</div>
         )}
-        {hasMore && !search && filter === '전체' && (
-          <div className="pt-2 flex justify-center">
-            <Button variant="outline" onClick={loadMore} disabled={loadingMore}>
-              {loadingMore ? '불러오는 중...' : `더 보기 (${users.length}명 로드됨)`}
-            </Button>
-          </div>
-        )}
       </div>
+
+      {!search && (
+        <PaginationBar
+          page={page}
+          totalCount={totalCount}
+          pageSize={PAGE_SIZE}
+          onPage={(p) => loadPage(p, filter)}
+          loading={pageLoading}
+        />
+      )}
     </div>
   );
 }

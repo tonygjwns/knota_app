@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import MathRenderer from '@/components/MathRenderer';
@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import PaginationBar from '@/components/ui/PaginationBar';
 import { Search, ChevronDown, ChevronUp } from 'lucide-react';
 
 const PAGE_SIZE = 50;
@@ -13,14 +14,15 @@ const PAGE_SIZE = 50;
 export default function AdminProblems() {
   const [problems, setProblems] = useState([]);
   const [attempts, setAttempts] = useState([]);
+  const [domains, setDomains] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [pageLoading, setPageLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [domainFilter, setDomainFilter] = useState('all');
-  const [domains, setDomains] = useState([]);
   const [expanded, setExpanded] = useState(null);
   const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
+  const topRef = useRef(null);
 
   useEffect(() => {
     loadInitial();
@@ -28,37 +30,62 @@ export default function AdminProblems() {
 
   const loadInitial = async () => {
     setLoading(true);
-    setPage(0);
     try {
-      const [p, a, d] = await Promise.all([
+      // Fetch first page + total count (via max-limit fetch for IDs) + supporting data in parallel
+      const [firstPage, allIds, a, d] = await Promise.all([
         base44.entities.Problem.list('-created_date', PAGE_SIZE, 0),
+        base44.entities.Problem.list('-created_date', 1000, 0), // for total count
         base44.entities.StudentAttempt.list('-submitted_at', 500),
         base44.entities.Domain.list('name', 30),
       ]);
-      setProblems(p);
+      setProblems(firstPage);
+      setTotalCount(allIds.length);
       setAttempts(a);
       setDomains(d);
-      setHasMore(p.length === PAGE_SIZE);
+      setPage(0);
     } finally {
       setLoading(false);
     }
   };
 
-  const loadMore = async () => {
-    setLoadingMore(true);
+  const loadPage = async (newPage, domainId) => {
+    setPageLoading(true);
+    setExpanded(null);
     try {
-      const nextPage = page + 1;
-      const more = await base44.entities.Problem.list('-created_date', PAGE_SIZE, nextPage * PAGE_SIZE);
-      setProblems(prev => [...prev, ...more]);
-      setPage(nextPage);
-      setHasMore(more.length === PAGE_SIZE);
+      const filter = domainId && domainId !== 'all' ? { domain_id: domainId } : null;
+      const data = filter
+        ? await base44.entities.Problem.filter(filter, '-created_date', PAGE_SIZE, newPage * PAGE_SIZE)
+        : await base44.entities.Problem.list('-created_date', PAGE_SIZE, newPage * PAGE_SIZE);
+      setProblems(data);
+      setPage(newPage);
+      topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } finally {
-      setLoadingMore(false);
+      setPageLoading(false);
     }
   };
 
-  const handleDomainFilter = (val) => {
+  const handleDomainFilter = async (val) => {
     setDomainFilter(val);
+    setPage(0);
+    setPageLoading(true);
+    setExpanded(null);
+    try {
+      if (val === 'all') {
+        // Reuse cached total from initial load — refetch page 0
+        const data = await base44.entities.Problem.list('-created_date', PAGE_SIZE, 0);
+        setProblems(data);
+        // Restore total from full fetch
+        const allIds = await base44.entities.Problem.list('-created_date', 1000, 0);
+        setTotalCount(allIds.length);
+      } else {
+        // Count by fetching all IDs for this domain
+        const all = await base44.entities.Problem.filter({ domain_id: val }, '-created_date', 1000, 0);
+        setTotalCount(all.length);
+        setProblems(all.slice(0, PAGE_SIZE));
+      }
+    } finally {
+      setPageLoading(false);
+    }
   };
 
   const getProblemStats = (problemId) => {
@@ -78,27 +105,33 @@ export default function AdminProblems() {
     }
   };
 
-  const filtered = problems.filter(p => {
-    const q = search.toLowerCase();
-    const text = parseProblemText(p.content).toLowerCase();
-    const matchSearch = !search || text.includes(q) || (p.domain_name || '').toLowerCase().includes(q);
-    const matchDomain = domainFilter === 'all' || p.domain_id === domainFilter;
-    return matchSearch && matchDomain;
-  });
+  // Search is client-side within current page
+  const filtered = search
+    ? problems.filter(p => {
+        const q = search.toLowerCase();
+        const text = parseProblemText(p.content).toLowerCase();
+        return text.includes(q) || (p.domain_name || '').toLowerCase().includes(q);
+      })
+    : problems;
 
   if (loading) return <InlineLoader message="문제 목록 불러오는 중..." />;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5" ref={topRef}>
       <div>
         <h1 className="text-2xl font-bold">문제 목록</h1>
-        <p className="text-muted-foreground text-sm mt-1">{problems.length}개 로드됨{hasMore ? ' (전체 더 보기 가능)' : ' (전체)'}</p>
+        <p className="text-muted-foreground text-sm mt-1">총 {totalCount.toLocaleString()}개의 문제</p>
       </div>
 
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder="문제 검색..." className="pl-10" value={search} onChange={e => setSearch(e.target.value)} />
+          <Input
+            placeholder="현재 페이지에서 검색..."
+            className="pl-10"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
         </div>
         <Select value={domainFilter} onValueChange={handleDomainFilter}>
           <SelectTrigger className="w-32">
@@ -111,7 +144,13 @@ export default function AdminProblems() {
         </Select>
       </div>
 
-      <div className="space-y-2">
+      {search && (
+        <p className="text-xs text-muted-foreground -mt-3">
+          현재 페이지({problems.length}개)에서만 검색됩니다. 전체 검색은 페이지를 이동하세요.
+        </p>
+      )}
+
+      <div className="space-y-2" style={{ opacity: pageLoading ? 0.5 : 1, transition: 'opacity 0.15s' }}>
         {filtered.map(p => {
           const stats = getProblemStats(p.id);
           const text = parseProblemText(p.content);
@@ -160,17 +199,20 @@ export default function AdminProblems() {
             </Card>
           );
         })}
-        {filtered.length === 0 && !hasMore && (
+        {filtered.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">검색 결과가 없어요</div>
         )}
-        {hasMore && !search && domainFilter === 'all' && (
-          <div className="pt-2 flex justify-center">
-            <Button variant="outline" onClick={loadMore} disabled={loadingMore}>
-              {loadingMore ? '불러오는 중...' : `더 보기 (${problems.length}개 로드됨)`}
-            </Button>
-          </div>
-        )}
       </div>
+
+      {!search && (
+        <PaginationBar
+          page={page}
+          totalCount={totalCount}
+          pageSize={PAGE_SIZE}
+          onPage={(p) => loadPage(p, domainFilter)}
+          loading={pageLoading}
+        />
+      )}
     </div>
   );
 }
