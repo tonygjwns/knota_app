@@ -49,28 +49,41 @@ function AcademyModal({ academy, allUsers, onSave, onClose }) {
           <Input value={name} onChange={e => setName(e.target.value)} placeholder="예: 수학의 정석 학원" />
         </div>
         <div>
-          <label className="text-xs font-medium block mb-1">학원장 (admin/teacher 중 선택)</label>
+          <label className="text-xs font-medium block mb-1">학원장 (선택 — admin/teacher 중)</label>
           {selectedOwner && (
             <div className="flex items-center gap-2 mb-1 px-3 py-2 bg-primary/10 rounded-lg text-sm">
-              <span className="font-medium">{selectedOwner.full_name}</span>
-              <span className="text-muted-foreground text-xs">{selectedOwner.email}</span>
+              <span className="font-medium">{selectedOwner.full_name || selectedOwner.email}</span>
+              <span className="text-muted-foreground text-xs">— {selectedOwner.role}</span>
               <button onClick={() => setOwnerId('')} className="ml-auto"><X className="w-4 h-4" /></button>
             </div>
           )}
           <Input
             value={ownerSearch}
             onChange={e => setOwnerSearch(e.target.value)}
-            placeholder="이름 또는 이메일 검색..."
+            placeholder="이름 또는 이메일로 검색..."
           />
           {ownerSearch && (
-            <div className="mt-1 bg-card border border-border rounded-lg overflow-hidden max-h-40 overflow-y-auto">
+            <div className="mt-1 bg-card border border-border rounded-lg overflow-hidden max-h-44 overflow-y-auto">
               {filtered.length === 0 && <p className="p-3 text-xs text-muted-foreground">결과 없음</p>}
               {filtered.map(u => (
                 <button key={u.id}
                   onClick={() => { setOwnerId(u.id); setOwnerSearch(''); }}
-                  className="w-full text-left px-3 py-2 hover:bg-muted text-sm flex gap-2">
-                  <span className="font-medium">{u.full_name}</span>
-                  <span className="text-muted-foreground text-xs">{u.email}</span>
+                  className="w-full text-left px-3 py-2 hover:bg-muted text-sm flex items-center gap-2">
+                  <span className="font-medium flex-1">{u.full_name || u.email}</span>
+                  <span className="text-muted-foreground text-xs">{u.role}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {!ownerSearch && !selectedOwner && (
+            <div className="mt-1 bg-card border border-border rounded-lg overflow-hidden max-h-44 overflow-y-auto">
+              {eligibleOwners.length === 0 && <p className="p-3 text-xs text-muted-foreground">admin/teacher 없음</p>}
+              {eligibleOwners.map(u => (
+                <button key={u.id}
+                  onClick={() => setOwnerId(u.id)}
+                  className="w-full text-left px-3 py-2 hover:bg-muted text-sm flex items-center gap-2">
+                  <span className="font-medium flex-1">{u.full_name || u.email}</span>
+                  <span className="text-muted-foreground text-xs">{u.role}</span>
                 </button>
               ))}
             </div>
@@ -90,22 +103,30 @@ function AcademyModal({ academy, allUsers, onSave, onClose }) {
 // ── ClassModal ─────────────────────────────────────────────────────────────
 function ClassModal({ cls, academyId, teachers, onSave, onClose }) {
   const [name, setName] = useState(cls?.name || '');
-  const [teacherId, setTeacherId] = useState(cls?.teacher_id || '');
+  const [mainTeacherId, setMainTeacherId] = useState(cls?.main_teacher_id || '');
+  const [assistantIds, setAssistantIds] = useState(cls?.assistant_teacher_ids || []);
   const [gradeRange, setGradeRange] = useState(cls?.grade_range || '');
-  const [teacherSearch, setTeacherSearch] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Only role='teacher'
   const onlyTeachers = teachers.filter(u => u.role === 'teacher');
-  const filtered = teacherSearch
-    ? onlyTeachers.filter(u => (u.full_name + u.email).toLowerCase().includes(teacherSearch.toLowerCase()))
-    : onlyTeachers;
-  const selectedTeacher = onlyTeachers.find(u => u.id === teacherId);
+  const getTeacherLabel = (u) => `${u.full_name || u.email}`;
+
+  const toggleAssistant = (id) => {
+    setAssistantIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
 
   const handleSave = async () => {
-    if (!name.trim() || !teacherId) return;
+    if (!name.trim()) return;
     setSaving(true);
-    await onSave({ name: name.trim(), academy_id: academyId, teacher_id: teacherId, grade_range: gradeRange });
+    await onSave({
+      name: name.trim(),
+      academy_id: academyId,
+      main_teacher_id: mainTeacherId || null,
+      assistant_teacher_ids: assistantIds,
+      grade_range: gradeRange,
+    });
     setSaving(false);
   };
 
@@ -121,35 +142,41 @@ function ClassModal({ cls, academyId, teachers, onSave, onClose }) {
           <Input value={gradeRange} onChange={e => setGradeRange(e.target.value)} placeholder="예: 중3" />
         </div>
         <div>
-          <label className="text-xs font-medium block mb-1">담당 강사 (teacher) *</label>
-          {selectedTeacher && (
-            <div className="flex items-center gap-2 mb-1 px-3 py-2 bg-primary/10 rounded-lg text-sm">
-              <span className="font-medium">{selectedTeacher.full_name}</span>
-              <button onClick={() => setTeacherId('')} className="ml-auto"><X className="w-4 h-4" /></button>
-            </div>
-          )}
-          <Input
-            value={teacherSearch}
-            onChange={e => setTeacherSearch(e.target.value)}
-            placeholder="강사 이름 검색..."
-          />
-          {teacherSearch && (
-            <div className="mt-1 bg-card border border-border rounded-lg overflow-hidden max-h-40 overflow-y-auto">
-              {filtered.length === 0 && <p className="p-3 text-xs text-muted-foreground">강사(teacher) 없음</p>}
-              {filtered.map(u => (
-                <button key={u.id}
-                  onClick={() => { setTeacherId(u.id); setTeacherSearch(''); }}
-                  className="w-full text-left px-3 py-2 hover:bg-muted text-sm flex gap-2">
-                  <span className="font-medium">{u.full_name}</span>
-                  <span className="text-muted-foreground text-xs">{u.email}</span>
-                </button>
-              ))}
-            </div>
-          )}
+          <label className="text-xs font-medium block mb-1">담당 강사 (선택)</label>
+          <select
+            value={mainTeacherId}
+            onChange={e => setMainTeacherId(e.target.value)}
+            className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
+          >
+            <option value="">— 미배정 —</option>
+            {onlyTeachers.map(u => (
+              <option key={u.id} value={u.id}>{getTeacherLabel(u)}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-medium block mb-1">보조 강사 (복수 선택 가능)</label>
+          <div className="border border-border rounded-lg overflow-hidden max-h-36 overflow-y-auto">
+            {onlyTeachers.length === 0 && (
+              <p className="p-3 text-xs text-muted-foreground">등록된 강사가 없어요</p>
+            )}
+            {onlyTeachers.map(u => (
+              <label key={u.id} className="flex items-center gap-2 px-3 py-2 hover:bg-muted cursor-pointer text-sm">
+                <input
+                  type="checkbox"
+                  checked={assistantIds.includes(u.id)}
+                  onChange={() => toggleAssistant(u.id)}
+                  disabled={u.id === mainTeacherId}
+                  className="rounded"
+                />
+                <span className={u.id === mainTeacherId ? 'text-muted-foreground line-through' : ''}>{getTeacherLabel(u)}</span>
+              </label>
+            ))}
+          </div>
         </div>
       </div>
       <div className="flex gap-2 pt-2">
-        <Button className="flex-1" onClick={handleSave} disabled={saving || !name.trim() || !teacherId}>
+        <Button className="flex-1" onClick={handleSave} disabled={saving || !name.trim()}>
           {saving ? '저장 중...' : '저장'}
         </Button>
         <Button variant="outline" onClick={onClose}>취소</Button>
@@ -166,8 +193,8 @@ export default function AdminAcademies() {
   const [users, setUsers] = useState([]);
   const [selectedAcademy, setSelectedAcademy] = useState(null);
   const [expandedClass, setExpandedClass] = useState(null);
-  const [academyModal, setAcademyModal] = useState(null); // null | 'new' | academy object
-  const [classModal, setClassModal] = useState(null);     // null | 'new' | class object
+  const [academyModal, setAcademyModal] = useState(null);
+  const [classModal, setClassModal] = useState(null);
 
   useEffect(() => { loadAll(); }, []);
 
@@ -191,9 +218,9 @@ export default function AdminAcademies() {
   const teachers = users.filter(u => u.role === 'teacher');
 
   const getUserName = (id) => {
-    if (!id) return '강사 미배정';
+    if (!id) return null;
     const u = users.find(u => u.id === id);
-    return u ? (u.full_name || u.email) : '강사 미배정';
+    return u ? (u.full_name || u.email) : null;
   };
 
   const getClassStudentCount = (classId) => users.filter(u => u.class_id === classId && u.role === 'student').length;
@@ -282,14 +309,10 @@ export default function AdminAcademies() {
                   </div>
                 </div>
                 <div className="flex gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
-                  <button
-                    onClick={() => setAcademyModal(a)}
-                    className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground">
+                  <button onClick={() => setAcademyModal(a)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground">
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
-                  <button
-                    onClick={() => deleteAcademy(a)}
-                    className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-500">
+                  <button onClick={() => deleteAcademy(a)} className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-500">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                   <ChevronRight className={`w-4 h-4 text-muted-foreground self-center transition-transform ${selectedAcademy?.id === a.id ? 'rotate-90' : ''}`} />
@@ -325,59 +348,71 @@ export default function AdminAcademies() {
             </Card>
           )}
 
-          {academyClasses.map(cls => (
-            <Card key={cls.id} className="overflow-hidden">
-              <div
-                className="p-4 flex items-start justify-between gap-2 cursor-pointer hover:bg-muted/30"
-                onClick={() => setExpandedClass(prev => prev === cls.id ? null : cls.id)}
-              >
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className="w-9 h-9 bg-secondary rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Users className="w-5 h-5 text-secondary-foreground" />
+          {academyClasses.map(cls => {
+            const mainTeacherName = getUserName(cls.main_teacher_id);
+            const assistantNames = (cls.assistant_teacher_ids || [])
+              .map(id => getUserName(id)).filter(Boolean);
+            return (
+              <Card key={cls.id} className="overflow-hidden">
+                <div
+                  className="p-4 flex items-start justify-between gap-2 cursor-pointer hover:bg-muted/30"
+                  onClick={() => setExpandedClass(prev => prev === cls.id ? null : cls.id)}
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="w-9 h-9 bg-secondary rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Users className="w-5 h-5 text-secondary-foreground" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">{cls.name}</p>
+                      {mainTeacherName ? (
+                        <p className="text-xs text-muted-foreground">담당: {mainTeacherName}</p>
+                      ) : (
+                        <p className="text-xs text-amber-600 font-medium">담당 미배정</p>
+                      )}
+                      {assistantNames.length > 0 && (
+                        <p className="text-xs text-muted-foreground">보조: {assistantNames.join(', ')}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        {cls.grade_range && `${cls.grade_range} · `}학생 {getClassStudentCount(cls.id)}명
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-semibold">{cls.name}</p>
-                    <p className="text-xs text-muted-foreground">담당: {getUserName(cls.teacher_id)}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {cls.grade_range && `${cls.grade_range} · `}학생 {getClassStudentCount(cls.id)}명
-                    </p>
+                  <div className="flex gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
+                    <button onClick={() => setClassModal(cls)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground">
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={() => deleteClass(cls)} className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-500">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                    <ChevronRight className={`w-4 h-4 text-muted-foreground self-center transition-transform ${expandedClass === cls.id ? 'rotate-90' : ''}`} />
                   </div>
                 </div>
-                <div className="flex gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
-                  <button onClick={() => setClassModal(cls)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground">
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                  <button onClick={() => deleteClass(cls)} className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-500">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                  <ChevronRight className={`w-4 h-4 text-muted-foreground self-center transition-transform ${expandedClass === cls.id ? 'rotate-90' : ''}`} />
-                </div>
-              </div>
 
-              {expandedClass === cls.id && (
-                <div className="border-t border-border bg-muted/20 p-3">
-                  {getClassStudents(cls.id).length === 0
-                    ? <p className="text-xs text-muted-foreground text-center py-2">배정된 학생이 없어요</p>
-                    : (
-                      <div className="space-y-1.5">
-                        {getClassStudents(cls.id).map(s => (
-                          <div key={s.id} className="flex items-center gap-2 px-2 py-1.5 bg-card rounded-lg">
-                            <div className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center text-xs font-bold text-primary">
-                              {(s.full_name || s.email)?.[0]?.toUpperCase()}
+                {expandedClass === cls.id && (
+                  <div className="border-t border-border bg-muted/20 p-3">
+                    {getClassStudents(cls.id).length === 0
+                      ? <p className="text-xs text-muted-foreground text-center py-2">배정된 학생이 없어요</p>
+                      : (
+                        <div className="space-y-1.5">
+                          {getClassStudents(cls.id).map(s => (
+                            <div key={s.id} className="flex items-center gap-2 px-2 py-1.5 bg-card rounded-lg">
+                              <div className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center text-xs font-bold text-primary">
+                                {(s.full_name || s.email)?.[0]?.toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="text-xs font-medium">{s.full_name || '(이름 없음)'}</p>
+                                <p className="text-xs text-muted-foreground">{s.email}</p>
+                              </div>
                             </div>
-                            <div>
-                              <p className="text-xs font-medium">{s.full_name || '(이름 없음)'}</p>
-                              <p className="text-xs text-muted-foreground">{s.email}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )
-                  }
-                </div>
-              )}
-            </Card>
-          ))}
+                          ))}
+                        </div>
+                      )
+                    }
+                  </div>
+                )}
+              </Card>
+            );
+          })}
         </div>
       </div>
 

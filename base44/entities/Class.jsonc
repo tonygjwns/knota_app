@@ -10,9 +10,16 @@
       "type": "string",
       "description": "Academy.id"
     },
-    "teacher_id": {
+    "main_teacher_id": {
       "type": "string",
-      "description": "\ub2f4\ub2f9 \uac15\uc0ac User.id"
+      "description": "\ub2f4\ub2f9 \uac15\uc0ac User.id (\uc120\ud0dd)"
+    },
+    "assistant_teacher_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "\ubcf4\uc870 \uac15\uc0ac user.id \ubc30\uc5f4"
     },
     "grade_range": {
       "type": "string",
@@ -21,7 +28,6 @@
   },
   "required": [
     "name",
-    "academy_id",
-    "teacher_id"
+    "academy_id"
   ]
 }

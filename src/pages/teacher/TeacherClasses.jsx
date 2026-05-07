@@ -12,6 +12,7 @@ export default function TeacherClasses() {
   const [loading, setLoading] = useState(true);
   const [myClasses, setMyClasses] = useState([]);
   const [academies, setAcademies] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
   const [studentCounts, setStudentCounts] = useState({});
 
   useEffect(() => { loadData(); }, [user]);
@@ -20,25 +21,33 @@ export default function TeacherClasses() {
     if (!user) return;
     setLoading(true);
 
-    const [allClasses, acad, allUsers] = await Promise.all([
+    const [allClasses, acad, users] = await Promise.all([
       base44.entities.Class.list('name', 500),
       base44.entities.Academy.list('name', 200),
       base44.entities.User.list('-created_date', 1000),
     ]);
 
-    const mine = allClasses.filter(c => c.teacher_id === user.id);
+    const mine = allClasses.filter(c =>
+      c.main_teacher_id === user.id ||
+      (c.assistant_teacher_ids || []).includes(user.id)
+    );
     setMyClasses(mine);
     setAcademies(acad);
+    setAllUsers(users);
 
     const counts = {};
     mine.forEach(c => {
-      counts[c.id] = allUsers.filter(u => u.class_id === c.id).length;
+      counts[c.id] = users.filter(u => u.class_id === c.id).length;
     });
     setStudentCounts(counts);
     setLoading(false);
   };
 
   const getAcademyName = (id) => academies.find(a => a.id === id)?.name || '—';
+  const getUserName = (id) => {
+    const u = allUsers.find(u => u.id === id);
+    return u ? (u.full_name || u.email) : null;
+  };
 
   if (loading) return <InlineLoader message="학급 목록 불러오는 중..." />;
 
@@ -74,6 +83,16 @@ export default function TeacherClasses() {
                 <div>
                   <p className="font-semibold">{cls.name}</p>
                   <p className="text-xs text-muted-foreground">{getAcademyName(cls.academy_id)}</p>
+                  {getUserName(cls.main_teacher_id) ? (
+                    <p className="text-xs text-muted-foreground">담당: {getUserName(cls.main_teacher_id)}</p>
+                  ) : (
+                    <p className="text-xs text-amber-600">담당 미배정</p>
+                  )}
+                  {(cls.assistant_teacher_ids || []).length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      보조: {cls.assistant_teacher_ids.map(id => getUserName(id)).filter(Boolean).join(', ')}
+                    </p>
+                  )}
                   <div className="flex items-center gap-3 mt-0.5">
                     {cls.grade_range && <span className="text-xs text-muted-foreground">{cls.grade_range}</span>}
                     <span className="text-xs text-muted-foreground flex items-center gap-1">

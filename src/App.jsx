@@ -19,6 +19,8 @@ import History from './pages/History';
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/AdminUsers';
+import AdminTeachers from './pages/admin/AdminTeachers';
+import AdminStudents from './pages/admin/AdminStudents';
 import AdminProblems from './pages/admin/AdminProblems';
 import AdminReview from './pages/admin/AdminReview';
 import AdminAcademies from './pages/admin/AdminAcademies';
@@ -76,6 +78,8 @@ const AuthenticatedApp = () => {
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<AdminDashboard />} />
         <Route path="users" element={<AdminUsers />} />
+        <Route path="teachers" element={<AdminTeachers />} />
+        <Route path="students" element={<AdminStudents />} />
         <Route path="problems" element={<AdminProblems />} />
         <Route path="review" element={<AdminReview />} />
         <Route path="academies" element={<AdminAcademies />} />

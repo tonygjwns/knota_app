@@ -28,7 +28,10 @@ export default function TeacherStudents() {
     setLoading(true);
 
     const allClasses = await base44.entities.Class.list('name', 500);
-    const mine = allClasses.filter(c => c.teacher_id === user.id);
+    const mine = allClasses.filter(c =>
+      c.main_teacher_id === user.id ||
+      (c.assistant_teacher_ids || []).includes(user.id)
+    );
     setMyClasses(mine);
 
     if (mine.length === 0) { setLoading(false); return; }
