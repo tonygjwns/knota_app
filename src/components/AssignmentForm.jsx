@@ -32,17 +32,18 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Search, X, RotateCcw } from 'lucide-react';
 import { InlineLoader } from '@/components/LoadingOverlay';
 
-export default function AssignmentForm({ classId, onSave, onClose, assignment }) {
+export default function AssignmentForm({ classId, onSave, onClose, assignment, preselectedToolId }) {
   const [title, setTitle] = useState(assignment?.title || '');
   const [description, setDescription] = useState(assignment?.description || '');
   const [deadline, setDeadline] = useState(assignment?.deadline || '');
+  const [tempDeadline, setTempDeadline] = useState(assignment?.deadline || '');
   const initialProblemIds = assignment ? JSON.parse(assignment.problem_ids || '[]') : [];
   const [selectedProblems, setSelectedProblems] = useState(initialProblemIds);
-  const [selectionTab, setSelectionTab] = useState('tool');
+  const [selectionTab, setSelectionTab] = useState(preselectedToolId ? 'tool' : 'tool');
   const [saving, setSaving] = useState(false);
 
   // 도구별 출제
-  const [selectedTool, setSelectedTool] = useState('');
+  const [selectedTool, setSelectedTool] = useState(preselectedToolId || '');
   const [toolCount, setToolCount] = useState(10);
   const [toolPreview, setToolPreview] = useState([]);
   const [selectedToolPreviewIds, setSelectedToolPreviewIds] = useState(new Set());
@@ -62,6 +63,12 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment })
   const [allProblems, setAllProblems] = useState([]);
   const [problemsLoading, setProblemsLoading] = useState(true);
 
+  // Sync tempDeadline with external deadline changes
+  useEffect(() => setTempDeadline(deadline), [deadline]);
+
+  // Sync tempDeadline with external deadline changes
+  useEffect(() => setTempDeadline(deadline), [deadline]);
+
   // 초기화: 도구, 단원, 문제 로드
   React.useEffect(() => {
     const init = async () => {
@@ -76,9 +83,14 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment })
       setToolsLoading(false);
       setDomainsLoading(false);
       setProblemsLoading(false);
+      
+      // Auto-select tool if preselected
+      if (preselectedToolId && toolsData.length > 0) {
+        setSelectedTool(preselectedToolId);
+      }
     };
     init();
-  }, []);
+  }, [preselectedToolId]);
 
   // 도구별 미리보기 재생성
   const regenerateToolPreview = React.useCallback(() => {
@@ -232,12 +244,38 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment })
 
           <div>
             <label className="block text-sm font-semibold mb-2">마감일 (선택)</label>
-            <Input
-              type="datetime-local"
-              value={deadline}
-              onChange={e => setDeadline(e.target.value)}
-              className="w-full"
-            />
+            <div className="flex gap-2">
+              <Input
+                type="datetime-local"
+                value={tempDeadline}
+                onChange={e => setTempDeadline(e.target.value)}
+                className="flex-1"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!tempDeadline || tempDeadline === deadline}
+                onClick={() => setDeadline(tempDeadline)}
+              >
+                확인
+              </Button>
+              {deadline && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setDeadline(''); setTempDeadline(''); }}
+                >
+                  지우기
+                </Button>
+              )}
+            </div>
+            {deadline && (
+              <p className="text-xs text-emerald-600 mt-1">
+                ✓ 마감일: {new Date(deadline).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </p>
+            )}
           </div>
 
           {/* 문제 선택 */}

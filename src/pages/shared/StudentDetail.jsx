@@ -18,6 +18,7 @@ export default function StudentDetail() {
   const [attempts, setAttempts] = useState([]);
   const [weakTools, setWeakTools] = useState([]);
   const [strongTools, setStrongTools] = useState([]);
+  const [remediationHistory, setRemediationHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sortKey, setSortKey] = useState('submitted_at');
@@ -38,6 +39,7 @@ export default function StudentDetail() {
         setAttempts(data.attempts || []);
         setWeakTools(data.weak_tools || []);
         setStrongTools(data.strong_tools || []);
+        setRemediationHistory(data.remediation_history || []);
       } catch (e) {
         console.error('StudentDetail load error:', e);
         toast.error(e.message || '데이터를 불러오지 못해요');
@@ -145,6 +147,38 @@ export default function StudentDetail() {
                   <span>시도 {tool.attempts}회</span>
                   <span>•</span>
                   <span>정답 {tool.correct_count}회</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* 보강 이력 */}
+      {remediationHistory.length > 0 && (
+        <Card className="p-4 border-primary/30">
+          <h2 className="font-semibold text-sm mb-3 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-primary" />
+            🎯 매듭 보강 이력
+          </h2>
+          <div className="space-y-2">
+            {remediationHistory.map(rec => (
+              <div key={rec.tool_id} className="bg-primary/5 rounded-lg p-3 border border-primary/10">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="font-medium text-sm">{rec.tool_name}</p>
+                  <span className={`text-sm font-bold ${rec.improvement > 0 ? 'text-emerald-600' : rec.improvement < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+                    {rec.improvement > 0 ? '+' : ''}{rec.improvement}점
+                  </span>
+                </div>
+                <div className="flex gap-1 text-xs text-muted-foreground mb-1">
+                  <span>보강 {rec.retry_count + rec.practice_count}회</span>
+                  <span>•</span>
+                  <span>재풀이 {rec.retry_count}회</span>
+                  <span>•</span>
+                  <span>유사 문제 {rec.practice_count * 3}개</span>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  보강 전 {rec.before_avg}점 → 후 {rec.after_avg}점
                 </div>
               </div>
             ))}

@@ -1,12 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTeacher } from '@/lib/TeacherContext';
+import { base44 } from '@/api/base44Client';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { Users, BookOpen, Target, TrendingUp } from 'lucide-react';
+import { Users, BookOpen, Target, TrendingUp, Plus } from 'lucide-react';
+import AssignmentForm from '@/components/AssignmentForm';
 
 export default function TeacherDashboard() {
   const { data, loading, error } = useTeacher();
+  const [selectedToolForAssignment, setSelectedToolForAssignment] = useState(null);
+  const [showAssignmentForm, setShowAssignmentForm] = useState(false);
 
   if (loading) return <InlineLoader message="대시보드 불러오는 중..." />;
 
@@ -70,13 +75,20 @@ export default function TeacherDashboard() {
               <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11 }} />
               <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11 }} />
               <Tooltip formatter={(v) => [`${v}점`, '평균 점수']} />
-              <Bar dataKey="avg_score" radius={[0, 4, 4, 0]}>
+              <Bar dataKey="avg_score" radius={[0, 4, 4, 0]} onClick={(data) => {
+                const tool = weak_tools.find(t => t.name === data.name);
+                if (tool) {
+                  setSelectedToolForAssignment(tool.tool_id);
+                  setShowAssignmentForm(true);
+                }
+              }} style={{ cursor: 'pointer' }}>
                 {weak_tools.map((entry, i) => (
                   <Cell key={i} fill={entry.avg_score < 50 ? '#ef4444' : entry.avg_score < 70 ? '#f59e0b' : '#10b981'} />
                 ))}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+          <p className="text-xs text-muted-foreground mt-2">막대를 클릭하면 해당 매듭으로 숙제를 출제할 수 있어요</p>
         </Card>
       )}
 
@@ -96,6 +108,23 @@ export default function TeacherDashboard() {
 
       {attempts_summary.total === 0 && (
         <Card className="p-8 text-center text-muted-foreground text-sm">학생들의 제출 데이터가 없어요</Card>
+      )}
+
+      {/* Assignment Form Modal */}
+      {showAssignmentForm && (
+        <AssignmentForm
+          classId={my_classes[0]?.id}
+          onSave={async (data) => {
+            await base44.entities.Assignment.create(data);
+            setShowAssignmentForm(false);
+            setSelectedToolForAssignment(null);
+          }}
+          onClose={() => {
+            setShowAssignmentForm(false);
+            setSelectedToolForAssignment(null);
+          }}
+          preselectedToolId={selectedToolForAssignment}
+        />
       )}
     </div>
   );

@@ -167,6 +167,8 @@ function ProblemHub() {
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showClosed, setShowClosed] = useState(false);
+  const [recommendedProblems, setRecommendedProblems] = useState([]);
+  const [recsLoading, setRecsLoading] = useState(true);
 
   useEffect(() => {
     const loadAssignments = async () => {
@@ -187,6 +189,97 @@ function ProblemHub() {
       }
     };
     loadAssignments();
+  }, [user]);
+
+  // Load recommended problems (bookmarked + weak tools)
+  useEffect(() => {
+    const loadRecs = async () => {
+      if (!user) {
+        setRecsLoading(false);
+        return;
+      }
+      try {
+        const [bookmarks, allAttempts, allProblems, allTools] = await Promise.all([
+          base44.entities.BookmarkedTool.filter({ student_id: user.id }),
+          base44.entities.StudentAttempt.filter({ student_id: user.id }, '-submitted_at', 500),
+          base44.entities.Problem.list('-created_date', 1000, 0),
+          base44.entities.MathTool.list('name', 100),
+        ]);
+
+        // Build problem map
+        const problemMap = new Map(allProblems.map(p => [p.id, p]));
+        const toolMap = new Map(allTools.map(t => [t.tool_id, t]));
+
+        // Calculate weak tools
+        const masteryMap = new Map();
+        allAttempts.forEach(attempt => {
+          const problem = problemMap.get(attempt.problem_id);
+          if (!problem) return;
+          let toolIds = [];
+          if (attempt.claude_grade_json) {
+            try {
+              const g = JSON.parse(attempt.claude_grade_json);
+              const grading = g?.response ?? g;
+              const errorToolIds = (grading?.error_locations || []).map(e => e.tool_id).filter(Boolean);
+              if (errorToolIds.length > 0) toolIds = [...new Set(errorToolIds)];
+            } catch {}
+          }
+          if (toolIds.length === 0 && problem.tool_ids) {
+            try {
+              const parsed = JSON.parse(problem.tool_ids);
+              if (Array.isArray(parsed)) toolIds = parsed.filter(Boolean);
+            } catch {}
+          }
+          toolIds.forEach(toolId => {
+            if (!masteryMap.has(toolId)) masteryMap.set(toolId, { attempts: 0, scores: [] });
+            const entry = masteryMap.get(toolId);
+            entry.attempts += 1;
+            entry.scores.push(attempt.score || 0);
+          });
+        });
+
+        // Weak tools (avg_score < 70, attempts >= 3)
+        const weakToolIds = [];
+        masteryMap.forEach((entry, toolId) => {
+          if (entry.attempts >= 3) {
+            const avg = entry.scores.reduce((s, x) => s + x, 0) / entry.scores.length;
+            if (avg < 70) weakToolIds.push(toolId);
+          }
+        });
+
+        // Combine bookmarked + weak tools (bookmarked first)
+        const recommendedToolIds = [
+          ...new Set([
+            ...bookmarks.map(b => b.tool_id),
+            ...weakToolIds.slice(0, 5)
+          ])
+        ];
+
+        // Pick 1-2 problems per recommended tool
+        const recProblems = [];
+        recommendedToolIds.slice(0, 3).forEach(toolId => {
+          const toolProblems = allProblems.filter(p => {
+            try {
+              const ids = JSON.parse(p.tool_ids || '[]');
+              return ids.includes(toolId);
+            } catch { return false; }
+          });
+          if (toolProblems.length > 0) {
+            const shuffled = toolProblems.sort(() => Math.random() - 0.5);
+            recProblems.push(...shuffled.slice(0, 2));
+          }
+        });
+
+        // Fallback: random problems if no recommendations
+        const finalRecs = recProblems.length > 0 ? recProblems : allProblems.slice(0, 5);
+        setRecommendedProblems(finalRecs);
+      } catch (e) {
+        console.error('Failed to load recommendations:', e);
+      } finally {
+        setRecsLoading(false);
+      }
+    };
+    loadRecs();
   }, [user]);
 
   return (
@@ -241,10 +334,34 @@ function ProblemHub() {
         {/* 오늘의 추천 */}
         <section className="space-y-2">
           <h2 className="text-base font-semibold text-foreground">오늘의 추천</h2>
-          <ComingSoonCard
-            title="추천 문제 준비 중"
-            desc="곧 매듭별 약점 보강 추천이 추가돼요"
-          />
+          {recsLoading ? (
+            <div className="text-center py-6"><InlineLoader message="추천 문제 불러오는 중..." /></div>
+          ) : recommendedProblems.length === 0 ? (
+            <ComingSoonCard
+              title="추천 문제 준비 중"
+              desc="더 많은 문제를 풀면 추천이 생겨요"
+            />
+          ) : (
+            <div className="space-y-2">
+              {recommendedProblems.slice(0, 5).map(problem => (
+                <Link key={problem.id} to={`/problem/${problem.id}`}>
+                  <Card className="p-4 card-hover cursor-pointer">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm text-foreground line-clamp-2">
+                          {problem.content ? (problem.content.length > 100 ? problem.content.substring(0, 100) + '...' : problem.content) : `문제 #${problem.id}`}
+                        </p>
+                        {problem.domain_name && (
+                          <p className="text-xs text-muted-foreground mt-1">{problem.domain_name}</p>
+                        )}
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    </div>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* 진단 평가 */}

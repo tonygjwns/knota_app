@@ -168,6 +168,7 @@ export default function ResultView() {
   const [regrading, setRegrading] = useState(false);
   const [showAlt, setShowAlt] = useState(false);
   const [tooltipTool, setTooltipTool] = useState(null); // tool entity for tooltip modal
+  const [dismissedRemediation, setDismissedRemediation] = useState(false);
 
   useEffect(() => {
     loadAttempt();
@@ -515,7 +516,7 @@ export default function ResultView() {
         </div>
 
         {/* 매듭 보강 권유 카드 — remediation 중이 아니면 표시 */}
-        {(attempt.correctness === 'partial' || attempt.correctness === 'wrong') && weakToolIds.length > 0 && attempt.attempt_type !== 'remediation_retry' && attempt.attempt_type !== 'remediation_practice' && (
+        {(attempt.correctness === 'partial' || attempt.correctness === 'wrong') && weakToolIds.length > 0 && attempt.attempt_type !== 'remediation_retry' && attempt.attempt_type !== 'remediation_practice' && !dismissedRemediation && (
           <Card className="p-4 border-primary/30 bg-primary/5">
             <div className="flex items-start gap-3 mb-3">
               <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
@@ -544,7 +545,7 @@ export default function ResultView() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => {}}
+                onClick={() => setDismissedRemediation(true)}
               >
                 그냥 넘어가기
               </Button>

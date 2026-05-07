@@ -89,7 +89,48 @@ Deno.serve(async (req) => {
     const strong_tools = buildList([...masteryArr].filter(([_,e]) => e.avg_score >= 70)
       .sort((a,b) => b[1].avg_score - a[1].avg_score)).slice(0, 5);
 
-    return Response.json({ student: target, attempts, weak_tools, strong_tools });
+    // Remediation history 계산
+    const remediationMap = new Map();
+    attempts.forEach(attempt => {
+      if (attempt.attempt_type === 'remediation_retry' || attempt.attempt_type === 'remediation_practice') {
+        const tid = attempt.target_tool_id;
+        if (!tid) return;
+        if (!remediationMap.has(tid)) {
+          remediationMap.set(tid, { retry_count: 0, practice_count: 0, before_scores: [], after_scores: [] });
+        }
+        const entry = remediationMap.get(tid);
+        if (attempt.attempt_type === 'remediation_retry') {
+          entry.retry_count += 1;
+          // parent_attempt 의 score 를 before 로
+          if (attempt.parent_attempt_id) {
+            const parent = attempts.find(a => a.id === attempt.parent_attempt_id);
+            if (parent) entry.before_scores.push(parent.score || 0);
+          }
+        } else if (attempt.attempt_type === 'remediation_practice') {
+          entry.practice_count += 1;
+          entry.after_scores.push(attempt.score || 0);
+        }
+      }
+    });
+
+    const remediation_history = [...remediationMap.entries()].map(([tid, entry]) => ({
+      tool_id: tid,
+      tool_name: toolNameMap.get(tid)?.name || tid,
+      retry_count: entry.retry_count,
+      practice_count: entry.practice_count,
+      before_avg: entry.before_scores.length > 0
+        ? Math.round(entry.before_scores.reduce((s, x) => s + x, 0) / entry.before_scores.length)
+        : 0,
+      after_avg: entry.after_scores.length > 0
+        ? Math.round(entry.after_scores.reduce((s, x) => s + x, 0) / entry.after_scores.length)
+        : 0,
+      improvement: entry.after_scores.length > 0 && entry.before_scores.length > 0
+        ? Math.round(entry.after_scores.reduce((s, x) => s + x, 0) / entry.after_scores.length -
+                   entry.before_scores.reduce((s, x) => s + x, 0) / entry.before_scores.length)
+        : 0
+    })).filter(r => r.retry_count > 0 || r.practice_count > 0);
+
+    return Response.json({ student: target, attempts, weak_tools, strong_tools, remediation_history });
   } catch (e) {
     return Response.json({ error: e.message, stack: e.stack }, { status: 500 });
   }
