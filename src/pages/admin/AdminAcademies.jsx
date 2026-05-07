@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -187,6 +188,7 @@ function ClassModal({ cls, academyId, teachers, onSave, onClose }) {
 
 // ── Main Page ──────────────────────────────────────────────────────────────
 export default function AdminAcademies() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [academies, setAcademies] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -395,7 +397,9 @@ export default function AdminAcademies() {
                       : (
                         <div className="space-y-1.5">
                           {getClassStudents(cls.id).map(s => (
-                            <div key={s.id} className="flex items-center gap-2 px-2 py-1.5 bg-card rounded-lg">
+                            <div key={s.id}
+                              className="flex items-center gap-2 px-2 py-1.5 bg-card rounded-lg cursor-pointer hover:bg-primary/5 transition-colors"
+                              onClick={() => navigate(`/admin/students/${s.id}`)}>
                               <div className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center text-xs font-bold text-primary">
                                 {(s.full_name || s.email)?.[0]?.toUpperCase()}
                               </div>

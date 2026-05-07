@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -77,6 +78,7 @@ function StudentManageModal({ target, allAcademies, allClasses, onSave, onClose 
 
 export default function AdminStudents() {
   const { user: me } = useAuth();
+  const navigate = useNavigate();
   const [students, setStudents] = useState([]);
   const [attempts, setAttempts] = useState([]);
   const [academies, setAcademies] = useState([]);
@@ -187,7 +189,8 @@ export default function AdminStudents() {
           const academyName = getAcademyName(u.academy_id);
           const className = getClassName(u.class_id);
           return (
-            <Card key={u.id} className="p-4">
+            <Card key={u.id} className="p-4 cursor-pointer hover:bg-muted/30 transition-colors"
+              onClick={() => navigate(`/admin/students/${u.id}`)}>
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
@@ -213,14 +216,14 @@ export default function AdminStudents() {
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-border">
-                <Button size="sm" className="gap-1 w-full" disabled={u.approval_status === 'approved'} onClick={() => handleApprove(u)}>
+                <Button size="sm" className="gap-1 w-full" disabled={u.approval_status === 'approved'} onClick={(e) => { e.stopPropagation(); handleApprove(u); }}>
                   <CheckCircle className="w-3.5 h-3.5" /> 승인
                 </Button>
                 <Button size="sm" variant="outline" className="gap-1 w-full text-red-600 border-red-200 hover:bg-red-50"
-                  disabled={u.approval_status === 'rejected'} onClick={() => handleReject(u)}>
+                  disabled={u.approval_status === 'rejected'} onClick={(e) => { e.stopPropagation(); handleReject(u); }}>
                   <XCircle className="w-3.5 h-3.5" /> 거절
                 </Button>
-                <Button size="sm" variant="outline" className="gap-1 w-full" onClick={() => setManageTarget(u)}>관리</Button>
+                <Button size="sm" variant="outline" className="gap-1 w-full" onClick={(e) => { e.stopPropagation(); setManageTarget(u); }}>관리</Button>
               </div>
             </Card>
           );

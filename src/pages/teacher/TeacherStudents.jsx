@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTeacher } from '@/lib/TeacherContext';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
@@ -6,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Search, User } from 'lucide-react';
 
 export default function TeacherStudents() {
+  const navigate = useNavigate();
   const { myClasses, students, attempts, loading } = useTeacher();
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState(
@@ -72,7 +74,8 @@ export default function TeacherStudents() {
         {filtered.map(u => {
           const stats = getStats(u.id);
           return (
-            <Card key={u.id} className="p-4">
+            <Card key={u.id} className="p-4 cursor-pointer hover:bg-muted/30 transition-colors"
+              onClick={() => navigate(`/teacher/students/${u.id}`)}>
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div className="w-10 h-10 bg-violet-100 rounded-full flex items-center justify-center flex-shrink-0">

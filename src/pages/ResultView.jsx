@@ -257,7 +257,7 @@ export default function ResultView() {
   };
 
   const handleNextProblem = async () => {
-    const problems = await base44.entities.Problem.list('-created_date', 100);
+    const problems = await base44.entities.Problem.list('-created_date', 1000, 0);
     if (problems.length > 0) {
       const idx = Math.floor(Math.random() * problems.length);
       navigate(`/problem/${problems[idx].id}`);

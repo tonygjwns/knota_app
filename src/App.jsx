@@ -29,6 +29,8 @@ import TeacherDashboard from './pages/teacher/TeacherDashboard';
 import TeacherStudents from './pages/teacher/TeacherStudents';
 import TeacherClasses from './pages/teacher/TeacherClasses';
 import Profile from './pages/Profile';
+import StudentDetail from './pages/shared/StudentDetail';
+import ProblemDetail from './pages/shared/ProblemDetail';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user } = useAuth();
@@ -82,7 +84,9 @@ const AuthenticatedApp = () => {
         <Route path="users" element={<AdminUsers />} />
         <Route path="teachers" element={<AdminTeachers />} />
         <Route path="students" element={<AdminStudents />} />
+        <Route path="students/:userId" element={<StudentDetail mode="admin" />} />
         <Route path="problems" element={<AdminProblems />} />
+        <Route path="problems/:problemId" element={<ProblemDetail mode="admin" />} />
         <Route path="review" element={<AdminReview />} />
         <Route path="academies" element={<AdminAcademies />} />
       </Route>
@@ -91,7 +95,9 @@ const AuthenticatedApp = () => {
       <Route path="/teacher" element={<TeacherLayout />}>
         <Route index element={<TeacherDashboard />} />
         <Route path="students" element={<TeacherStudents />} />
+        <Route path="students/:userId" element={<StudentDetail mode="teacher" />} />
         <Route path="classes" element={<TeacherClasses />} />
+        <Route path="problems/:problemId" element={<ProblemDetail mode="teacher" />} />
       </Route>
 
       <Route path="*" element={<PageNotFound />} />

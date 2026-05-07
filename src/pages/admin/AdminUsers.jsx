@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { InlineLoader } from '@/components/LoadingOverlay';
@@ -112,6 +113,7 @@ function UserManageModal({ target, allAcademies, allClasses, onSave, onClose }) 
 // ── Main Page ──────────────────────────────────────────────────────────────
 export default function AdminUsers() {
   const { user: me } = useAuth();
+  const navigate = useNavigate();
   const [users, setUsers] = useState([]);
   const [attempts, setAttempts] = useState([]);
   const [academies, setAcademies] = useState([]);
@@ -280,7 +282,8 @@ export default function AdminUsers() {
           const isSelf = u.id === me?.id;
 
           return (
-            <Card key={u.id} className="p-4 gap-3">
+            <Card key={u.id} className="p-4 gap-3 cursor-pointer hover:bg-muted/30 transition-colors"
+              onClick={() => u.role === 'student' && navigate(`/admin/students/${u.id}`)}>
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
@@ -320,7 +323,7 @@ export default function AdminUsers() {
                     size="sm"
                     className="gap-1 w-full"
                     disabled={u.approval_status === 'approved'}
-                    onClick={() => handleApprove(u)}
+                    onClick={(e) => { e.stopPropagation(); handleApprove(u); }}
                   >
                     <CheckCircle className="w-3.5 h-3.5" /> 승인
                   </Button>
@@ -329,7 +332,7 @@ export default function AdminUsers() {
                     variant="outline"
                     className="gap-1 w-full text-red-600 border-red-200 hover:bg-red-50"
                     disabled={u.approval_status === 'rejected'}
-                    onClick={() => handleReject(u)}
+                    onClick={(e) => { e.stopPropagation(); handleReject(u); }}
                   >
                     <XCircle className="w-3.5 h-3.5" /> 거절
                   </Button>
@@ -337,7 +340,7 @@ export default function AdminUsers() {
                     size="sm"
                     variant="outline"
                     className="gap-1 w-full"
-                    onClick={() => setManageTarget(u)}
+                    onClick={(e) => { e.stopPropagation(); setManageTarget(u); }}
                   >
                     <Settings className="w-3.5 h-3.5" /> 관리
                   </Button>

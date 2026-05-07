@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import MathRenderer from '@/components/MathRenderer';
@@ -12,6 +13,7 @@ import { Search, ChevronDown, ChevronUp } from 'lucide-react';
 const PAGE_SIZE = 50;
 
 export default function AdminProblems() {
+  const navigate = useNavigate();
   const [problems, setProblems] = useState([]);
   const [attempts, setAttempts] = useState([]);
   const [domains, setDomains] = useState([]);
@@ -194,6 +196,13 @@ export default function AdminProblems() {
                       <MathRenderer content={p.verified_answer} className="text-sm" />
                     </div>
                   )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="mt-3 w-full gap-1"
+                    onClick={() => navigate(`/admin/problems/${p.id}`)}>
+                    이 문제 학생 풀이 보기 →
+                  </Button>
                 </div>
               )}
             </Card>

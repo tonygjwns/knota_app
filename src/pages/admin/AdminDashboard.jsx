@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
@@ -8,6 +9,7 @@ import DataImportPanel from '@/components/admin/DataImportPanel';
 import { aggregateToolMastery, topWeakTools } from '@/lib/toolMastery';
 
 export default function AdminDashboard() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [domainData, setDomainData] = useState([]);
   const [hardestProblems, setHardestProblems] = useState([]);
@@ -196,7 +198,9 @@ export default function AdminDashboard() {
           <h2 className="text-lg font-semibold mb-4">가장 어려운 문제</h2>
           <div className="space-y-3">
             {hardestProblems.map((p, i) => (
-              <div key={p.problem_id} className="flex items-center justify-between gap-3">
+              <div key={p.problem_id}
+                className="flex items-center justify-between gap-3 cursor-pointer hover:bg-muted/50 rounded-xl p-2 -mx-2 transition-colors"
+                onClick={() => navigate(`/admin/problems/${p.problem_id}`)}>
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <span className="text-lg font-bold text-muted-foreground w-6">{i + 1}</span>
                   <div className="flex-1 min-w-0">

@@ -236,7 +236,7 @@ export default function History() {
             </div>
             <p className="font-semibold text-lg text-foreground">아직 푼 문제가 없어요</p>
             <p className="text-muted-foreground mt-2">첫 문제를 풀어볼까요?</p>
-            <Button className="mt-4" onClick={() => navigate('/')}>문제 풀러 가기</Button>
+            <Button className="mt-4" onClick={() => navigate('/problems')}>문제 풀러 가기</Button>
           </div>
         ) : (
           <div className="space-y-2">
