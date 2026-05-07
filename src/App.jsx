@@ -34,6 +34,10 @@ import StudentAssignment from './pages/StudentAssignment';
 import Profile from './pages/Profile';
 import StudentDetail from './pages/shared/StudentDetail';
 import ProblemDetail from './pages/shared/ProblemDetail';
+import RemediationRetry from './pages/remediation/RemediationRetry';
+import RemediationLesson from './pages/remediation/RemediationLesson';
+import RemediationPractice from './pages/remediation/RemediationPractice';
+import RemediationComplete from './pages/remediation/RemediationComplete';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user } = useAuth();
@@ -81,6 +85,10 @@ const AuthenticatedApp = () => {
       <Route path="/history" element={<History />} />
       <Route path="/assignment/:assignmentId" element={<StudentAssignment />} />
       <Route path="/profile" element={<Profile />} />
+      <Route path="/remediation/:attemptId/retry" element={<RemediationRetry />} />
+      <Route path="/remediation/:attemptId/lesson" element={<RemediationLesson />} />
+      <Route path="/remediation/:attemptId/practice/:practiceIdx" element={<RemediationPractice />} />
+      <Route path="/remediation/:attemptId/complete" element={<RemediationComplete />} />
 
       {/* Admin routes */}
       <Route path="/admin" element={<AdminLayout />}>

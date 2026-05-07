@@ -514,8 +514,8 @@ export default function ResultView() {
           )}
         </div>
 
-        {/* 매듭 보강 권유 카드 */}
-        {(attempt.correctness === 'partial' || attempt.correctness === 'wrong') && weakToolIds.length > 0 && (
+        {/* 매듭 보강 권유 카드 — remediation 중이 아니면 표시 */}
+        {(attempt.correctness === 'partial' || attempt.correctness === 'wrong') && weakToolIds.length > 0 && attempt.attempt_type !== 'remediation_retry' && attempt.attempt_type !== 'remediation_practice' && (
           <Card className="p-4 border-primary/30 bg-primary/5">
             <div className="flex items-start gap-3 mb-3">
               <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
@@ -552,25 +552,55 @@ export default function ResultView() {
           </Card>
         )}
 
-        {/* Action buttons */}
-        <div className="grid grid-cols-2 gap-2 pt-2">
-          <Button variant="outline" size="sm" className="btn-touch" onClick={() => navigate('/home')}>
-            메인으로
+        {/* Remediation flow buttons */}
+        {attempt.attempt_type === 'remediation_retry' && (
+          <div className="pt-2">
+            {attempt.correctness === 'correct' ? (
+              <Button size="lg" className="w-full" onClick={() => navigate(`/remediation/${attempt.parent_attempt_id}/practice/0`)}>
+                매듭 보강 계속하기 (단계 3)
+              </Button>
+            ) : (
+              <Button size="lg" className="w-full" onClick={() => navigate(`/remediation/${attempt.parent_attempt_id}/lesson`)}>
+                매듭 학습하기 (단계 2)
+              </Button>
+            )}
+          </div>
+        )}
+
+        {attempt.attempt_type === 'remediation_practice' && (
+          <div className="pt-2">
+            <Button size="lg" className="w-full" onClick={() => {
+              const parentAttemptId = attempt.parent_attempt_id;
+              navigate(`/remediation/${parentAttemptId}/complete`);
+            }}>
+              🎉 보강 완료!
+            </Button>
+          </div>
+        )}
+
+        {/* Regular action buttons */}
+        {attempt.attempt_type !== 'remediation_retry' && attempt.attempt_type !== 'remediation_practice' && (
+          <div className="grid grid-cols-2 gap-2 pt-2">
+            <Button variant="outline" size="sm" className="btn-touch" onClick={() => navigate('/home')}>
+              메인으로
+            </Button>
+            {attempt.assignment_id ? (
+              <Button size="sm" className="btn-touch" onClick={() => navigate(`/assignment/${attempt.assignment_id}`)}>
+                <ArrowLeft className="w-4 h-4 mr-1" /> 숙제로 돌아가기
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" className="btn-touch"
+                      onClick={() => navigate(`/problem/${attempt.problem_id}`)}>
+                <RotateCcw className="w-4 h-4 mr-1" /> 다시 풀기
+              </Button>
+            )}
+          </div>
+        )}
+        {attempt.attempt_type !== 'remediation_retry' && attempt.attempt_type !== 'remediation_practice' && (
+          <Button size="sm" className="btn-touch w-full mt-2" onClick={handleNextProblem}>
+            {attempt.assignment_id ? '다음 문제 (숙제)' : '다음 문제'} <ChevronRight className="w-4 h-4 ml-1" />
           </Button>
-          {attempt.assignment_id ? (
-            <Button size="sm" className="btn-touch" onClick={() => navigate(`/assignment/${attempt.assignment_id}`)}>
-              <ArrowLeft className="w-4 h-4 mr-1" /> 숙제로 돌아가기
-            </Button>
-          ) : (
-            <Button variant="outline" size="sm" className="btn-touch"
-                    onClick={() => navigate(`/problem/${attempt.problem_id}`)}>
-              <RotateCcw className="w-4 h-4 mr-1" /> 다시 풀기
-            </Button>
-          )}
-        </div>
-        <Button size="sm" className="btn-touch w-full mt-2" onClick={handleNextProblem}>
-          {attempt.assignment_id ? '다음 문제 (숙제)' : '다음 문제'} <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
+        )}
       </div>
     </AppLayout>
   );

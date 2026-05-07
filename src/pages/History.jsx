@@ -9,7 +9,9 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, ChevronRight, BookOpen, TrendingDown, TrendingUp } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Slider } from '@/components/ui/slider';
+import { Search, ChevronRight, BookOpen, TrendingDown, TrendingUp, ClipboardList } from 'lucide-react';
 import { aggregateToolMastery, topWeakTools, topStrongTools } from '@/lib/toolMastery';
 
 const PAGE_SIZE = 20;
@@ -48,11 +50,20 @@ export default function History() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
-  const [filters, setFilters] = useState({ sort: 'recent', correctness: 'all', search: '' });
+  const [filters, setFilters] = useState({ 
+    sort: 'recent', 
+    correctness: 'all', 
+    search: '',
+    tab: 'all', // all | homework | practice
+    scoreRange: [0, 100],
+    domain: 'all'
+  });
   const [stats, setStats] = useState(null);
   const [weakTools, setWeakTools] = useState([]);
   const [strongTools, setStrongTools] = useState([]);
   const [masteryLoading, setMasteryLoading] = useState(true);
+  const [domains, setDomains] = useState([]);
+  const [expandedDates, setExpandedDates] = useState({ today: true, yesterday: true });
 
   // Load overall stats + mastery once on mount
   useEffect(() => {
@@ -60,10 +71,11 @@ export default function History() {
     (async () => {
       setMasteryLoading(true);
       try {
-        const [allAttempts, allProblems, allTools] = await Promise.all([
+        const [allAttempts, allProblems, allTools, allDomains] = await Promise.all([
           base44.entities.StudentAttempt.filter({ student_id: user.id }, '-submitted_at', 1000, 0),
           base44.entities.Problem.list('-created_date', 1000, 0),
           base44.entities.MathTool.list('name', 100),
+          base44.entities.Domain.list('name', 50),
         ]);
 
         if (allAttempts.length === 0) {
@@ -80,6 +92,7 @@ export default function History() {
         // Build maps
         const problemMap = new Map(allProblems.map(p => [p.id, p]));
         const toolNameMap = new Map(allTools.map(t => [t.tool_id, t]));
+        setDomains(allDomains);
 
         const masteryMap = aggregateToolMastery(allAttempts, problemMap);
         setWeakTools(topWeakTools(masteryMap, toolNameMap, 5, 3));
@@ -92,7 +105,7 @@ export default function History() {
 
   useEffect(() => {
     loadAttempts(0, true);
-  }, [filters.sort, filters.correctness]);
+  }, [filters.sort, filters.correctness, filters.tab, filters.scoreRange, filters.domain]);
 
   const loadAttempts = async (pageNum = 0, reset = false) => {
     if (!user) return;
@@ -117,13 +130,47 @@ export default function History() {
     if (!loading && hasMore) loadAttempts(page + 1, false);
   };
 
-  const filtered = filters.search
-    ? attempts.filter(a => {
-        const q = filters.search.toLowerCase();
-        return (a.problem_content || '').toLowerCase().includes(q) ||
-               (a.problem_domain || '').toLowerCase().includes(q);
-      })
-    : attempts;
+  // Tab + score + domain filter
+  const filtered = attempts.filter(a => {
+    if (filters.tab === 'homework' && !a.assignment_id) return false;
+    if (filters.tab === 'practice' && a.assignment_id) return false;
+    if ((a.score || 0) < filters.scoreRange[0] || (a.score || 0) > filters.scoreRange[1]) return false;
+    if (filters.domain !== 'all' && a.problem_domain !== filters.domain) return false;
+    if (filters.search) {
+      const q = filters.search.toLowerCase();
+      return (a.problem_content || '').toLowerCase().includes(q) ||
+             (a.problem_domain || '').toLowerCase().includes(q);
+    }
+    return true;
+  });
+
+  // Date grouping
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+  const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+  const grouped = {
+    today: [],
+    yesterday: [],
+    thisWeek: [],
+    thisMonth: [],
+    older: []
+  };
+
+  filtered.forEach(a => {
+    const d = new Date(a.submitted_at);
+    if (d >= today) grouped.today.push(a);
+    else if (d >= yesterday) grouped.yesterday.push(a);
+    else if (d >= weekAgo) grouped.thisWeek.push(a);
+    else if (d >= monthAgo) grouped.thisMonth.push(a);
+    else grouped.older.push(a);
+  });
+
+  const toggleDateGroup = (group) => {
+    setExpandedDates(prev => ({ ...prev, [group]: !prev[group] }));
+  };
 
   const parseProblemText = (content) => {
     try {
@@ -195,6 +242,15 @@ export default function History() {
           </div>
         )}
 
+        {/* Tabs */}
+        <Tabs value={filters.tab} onValueChange={v => setFilters(f => ({ ...f, tab: v }))}>
+          <TabsList className="grid grid-cols-3">
+            <TabsTrigger value="all">모든 풀이</TabsTrigger>
+            <TabsTrigger value="homework">숙제 풀이</TabsTrigger>
+            <TabsTrigger value="practice">자유 풀이</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
         {/* Filters */}
         <div className="space-y-3">
           <div className="relative">
@@ -206,16 +262,16 @@ export default function History() {
               onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Select value={filters.sort} onValueChange={v => setFilters(f => ({ ...f, sort: v }))}>
-              <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="flex-1 min-w-[120px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="recent">최근 순</SelectItem>
                 <SelectItem value="score">점수 순</SelectItem>
               </SelectContent>
             </Select>
             <Select value={filters.correctness} onValueChange={v => setFilters(f => ({ ...f, correctness: v }))}>
-              <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="flex-1 min-w-[120px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">전체</SelectItem>
                 <SelectItem value="correct">정답</SelectItem>
@@ -223,6 +279,41 @@ export default function History() {
                 <SelectItem value="wrong">오답</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={filters.domain} onValueChange={v => setFilters(f => ({ ...f, domain: v }))}>
+              <SelectTrigger className="flex-1 min-w-[120px]"><SelectValue placeholder="도메인" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">전체 도메인</SelectItem>
+                {domains.map(d => (
+                  <SelectItem key={d.domain_id} value={d.name}>{d.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>점수 범위</span>
+              <span>{filters.scoreRange[0]} - {filters.scoreRange[1]}</span>
+            </div>
+            <div className="px-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={filters.scoreRange[0]}
+                  onChange={e => setFilters(f => ({ ...f, scoreRange: [+e.target.value, f.scoreRange[1]] }))}
+                  className="flex-1"
+                />
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={filters.scoreRange[1]}
+                  onChange={e => setFilters(f => ({ ...f, scoreRange: [f.scoreRange[0], +e.target.value] }))}
+                  className="flex-1"
+                />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -239,38 +330,70 @@ export default function History() {
             <Button className="mt-4" onClick={() => navigate('/problems')}>문제 풀러 가기</Button>
           </div>
         ) : (
-          <div className="space-y-2">
-            {filtered.map(attempt => {
-              const color = getScoreColor(attempt.score || 0);
-              const colorMap = { correct: 'border-l-emerald-400', partial: 'border-l-amber-400', wrong: 'border-l-red-400' };
-              const text = parseProblemText(attempt.problem_content || '');
+          <div className="space-y-4">
+            {Object.entries(grouped).map(([groupKey, items]) => {
+              if (items.length === 0) return null;
+              const isExpanded = expandedDates[groupKey];
+              const labels = {
+                today: '오늘',
+                yesterday: '어제',
+                thisWeek: '이번 주',
+                thisMonth: '이번 달',
+                older: '그 이전'
+              };
               return (
-                <Link key={attempt.id} to={`/result/${attempt.id}`}>
-                  <Card className={`p-4 card-hover border-l-4 ${colorMap[color]} flex items-center gap-3`}>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground line-clamp-2">
-                        {text.slice(0, 80) || `문제 #${attempt.problem_id}`}
-                        {text.length > 80 ? '...' : ''}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        {attempt.problem_domain && (
-                          <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                            {attempt.problem_domain}
-                          </span>
-                        )}
-                        <span className="text-xs text-muted-foreground">
-                          {attempt.submitted_at
-                            ? new Date(attempt.submitted_at).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })
-                            : ''}
-                        </span>
-                      </div>
+                <div key={groupKey}>
+                  <button
+                    onClick={() => toggleDateGroup(groupKey)}
+                    className="flex items-center justify-between w-full mb-2 text-sm font-semibold text-foreground"
+                  >
+                    <span>{labels[groupKey]} ({items.length})</span>
+                    <ChevronRight className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                  </button>
+                  {isExpanded && (
+                    <div className="space-y-2">
+                      {items.map(attempt => {
+                        const color = getScoreColor(attempt.score || 0);
+                        const colorMap = { correct: 'border-l-emerald-400', partial: 'border-l-amber-400', wrong: 'border-l-red-400' };
+                        const text = parseProblemText(attempt.problem_content || '');
+                        return (
+                          <Link key={attempt.id} to={`/result/${attempt.id}`}>
+                            <Card className={`p-4 card-hover border-l-4 ${colorMap[color]} flex items-center gap-3`}>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-foreground line-clamp-2">
+                                  {text.slice(0, 80) || `문제 #${attempt.problem_id}`}
+                                  {text.length > 80 ? '...' : ''}
+                                </p>
+                                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                  {attempt.assignment_id && (
+                                    <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full flex items-center gap-1">
+                                      <ClipboardList className="w-3 h-3" />
+                                      숙제
+                                    </span>
+                                  )}
+                                  {attempt.problem_domain && (
+                                    <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                      {attempt.problem_domain}
+                                    </span>
+                                  )}
+                                  <span className="text-xs text-muted-foreground">
+                                    {attempt.submitted_at
+                                      ? new Date(attempt.submitted_at).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                                      : ''}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <ScoreBadge score={attempt.score || 0} size="sm" />
+                                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                              </div>
+                            </Card>
+                          </Link>
+                        );
+                      })}
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <ScoreBadge score={attempt.score || 0} size="sm" />
-                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                    </div>
-                  </Card>
-                </Link>
+                  )}
+                </div>
               );
             })}
             {hasMore && (

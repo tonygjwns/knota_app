@@ -61,6 +61,7 @@ export default function ProblemSolve() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const assignmentId = searchParams.get('assignment_id');
+  const remediationFor = searchParams.get('remediation_for');
 
   const [problem, setProblem] = useState(null);
   const [loading, setLoading] = useState(true);
