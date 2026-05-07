@@ -81,15 +81,7 @@ export default function Home() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">{greeting}</h1>
           <p className="text-muted-foreground mt-1">오늘도 열심히 해볼까요? 💪</p>
-          {orgLabel.length > 0 && (
-            <div className="flex flex-col gap-1 mt-2">
-              {orgLabel.map((label, i) => (
-                <span key={i} className="inline-block text-xs bg-primary/10 text-primary px-3 py-1 rounded-full font-medium w-fit">
-                  {label}
-                </span>
-              ))}
-            </div>
-          )}
+
         </div>
 
         {/* Today's problem */}
