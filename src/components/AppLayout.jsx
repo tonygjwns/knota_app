@@ -113,12 +113,9 @@ export default function AppLayout({ children }) {
         {/* Sidebar (desktop) */}
         <aside className="hidden md:flex w-64 flex-col border-r border-border bg-card sticky top-0 h-screen p-5 gap-2">
           {/* 상단 헤더: 로고 + 아바타 드롭다운 */}
-          {/* 사이드바 상단: 로고 + 아바타 */}
-          <div className="flex items-center justify-between mb-6 px-2">
+          {/* 사이드바 상단: 앱 이름 */}
+          <div className="mb-6 px-2">
             <Link to={isAdmin ? '/admin' : isTeacher ? '/teacher' : '/home'} className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
-                <span className="text-white font-bold text-lg">수</span>
-              </div>
               <div>
                 <p className="font-bold text-foreground">
                   {isAdmin ? '관리자' : (user?.full_name || '수학 학습')}
@@ -161,10 +158,6 @@ export default function AppLayout({ children }) {
                 <span className="font-medium text-sm">강사 패널</span>
               </Link>
             )}
-            <button onClick={() => base44.auth.logout('/')}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted text-muted-foreground transition-colors text-sm">
-              로그아웃
-            </button>
           </div>
         </aside>
 
