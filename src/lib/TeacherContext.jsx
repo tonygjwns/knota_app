@@ -1,84 +1,42 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useAuth } from '@/lib/AuthContext';
+import { useAuth } from './AuthContext';
 
 const TeacherContext = createContext(null);
 
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5분
+
 export function TeacherProvider({ children }) {
   const { user } = useAuth();
-  const [myClasses, setMyClasses] = useState([]);
-  const [students, setStudents] = useState([]);
-  const [attempts, setAttempts] = useState([]);
-  const [academies, setAcademies] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const loadedAtRef = useRef(null);
 
-  const load = useCallback(async () => {
-    if (!user) return;
+  const load = useCallback(async (force = false) => {
+    if (!user || (user.role !== 'teacher' && user.role !== 'admin')) return;
+    // TTL 캐시: 5분 내 재진입 시 스킵 (force 아닌 경우)
+    if (!force && data && loadedAtRef.current) {
+      const age = Date.now() - loadedAtRef.current;
+      if (age < CACHE_TTL_MS) return;
+    }
     setLoading(true);
-
-    // Step 1: fetch only my classes (small table — filter client-side is fine)
-    const [allClasses, acad] = await Promise.all([
-      base44.entities.Class.list('name', 500),
-      base44.entities.Academy.list('name', 200),
-    ]);
-
-    const mine = allClasses.filter(c =>
-      c.main_teacher_id === user.id ||
-      (c.assistant_teacher_ids || []).includes(user.id)
-    );
-    setMyClasses(mine);
-    setAcademies(acad);
-
-    if (mine.length === 0) {
-      setStudents([]);
-      setAttempts([]);
+    setError(null);
+    try {
+      const res = await base44.functions.invoke('teacherSummary', {});
+      setData(res.data);
+      loadedAtRef.current = Date.now();
+    } catch (e) {
+      setError(e.message || '데이터를 불러오지 못했어요');
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const myClassIds = mine.map(c => c.id);
-
-    // Step 2: fetch only students in my classes using filter (one class at a time if needed)
-    // base44 filter supports single value — fetch per class and merge
-    const studentFetches = myClassIds.map(cid =>
-      base44.entities.User.filter({ class_id: cid }, '-created_date', 200)
-    );
-    const studentArrays = await Promise.all(studentFetches);
-    const myStudents = studentArrays.flat();
-    // deduplicate by id
-    const seen = new Set();
-    const uniqueStudents = myStudents.filter(u => seen.has(u.id) ? false : seen.add(u.id));
-    setStudents(uniqueStudents);
-
-    if (uniqueStudents.length === 0) {
-      setAttempts([]);
-      setLoading(false);
-      return;
-    }
-
-    // Step 3: fetch attempts per student (batched in parallel, up to 20 at a time)
-    const studentIds = uniqueStudents.map(u => u.id);
-    const BATCH = 20;
-    const batches = [];
-    for (let i = 0; i < studentIds.length; i += BATCH) {
-      batches.push(studentIds.slice(i, i + BATCH));
-    }
-    const attemptArrays = await Promise.all(
-      batches.map(batch =>
-        Promise.all(batch.map(sid =>
-          base44.entities.StudentAttempt.filter({ student_id: sid }, '-submitted_at', 200)
-        ))
-      )
-    );
-    const allAttempts = attemptArrays.flat(2);
-    setAttempts(allAttempts);
-    setLoading(false);
-  }, [user]);
+  }, [user?.id]);
 
   useEffect(() => { load(); }, [load]);
 
   return (
-    <TeacherContext.Provider value={{ myClasses, students, attempts, academies, loading, reload: load }}>
+    <TeacherContext.Provider value={{ data, loading, error, refresh: () => load(true) }}>
       {children}
     </TeacherContext.Provider>
   );

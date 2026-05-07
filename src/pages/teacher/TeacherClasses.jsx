@@ -6,15 +6,15 @@ import { Card } from '@/components/ui/card';
 import { BookOpen, Users, ChevronRight } from 'lucide-react';
 
 export default function TeacherClasses() {
-  const { myClasses, students, academies, loading } = useTeacher();
+  const { data, loading } = useTeacher();
   const navigate = useNavigate();
 
-  const getAcademyName = (id) => academies.find(a => a.id === id)?.name || '—';
-  const getStudentCount = (classId) => students.filter(u => u.class_id === classId).length;
-
   if (loading) return <InlineLoader message="학급 목록 불러오는 중..." />;
+  if (!data) return <InlineLoader message="초기화 중..." />;
 
-  if (myClasses.length === 0) {
+  const { my_classes } = data;
+
+  if (my_classes.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
         <BookOpen className="w-12 h-12 text-muted-foreground opacity-30" />
@@ -28,11 +28,11 @@ export default function TeacherClasses() {
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-bold">내 학급</h1>
-        <p className="text-muted-foreground text-sm mt-1">담당 학급 {myClasses.length}개</p>
+        <p className="text-muted-foreground text-sm mt-1">담당 학급 {my_classes.length}개</p>
       </div>
 
       <div className="space-y-3">
-        {myClasses.map(cls => (
+        {my_classes.map(cls => (
           <Card
             key={cls.id}
             onClick={() => navigate(`/teacher/students?class_id=${cls.id}`)}
@@ -45,10 +45,10 @@ export default function TeacherClasses() {
                 </div>
                 <div>
                   <p className="font-semibold">{cls.name}</p>
-                  <p className="text-xs text-muted-foreground">{getAcademyName(cls.academy_id)}</p>
+                  <p className="text-xs text-muted-foreground">{cls.academy_name}</p>
                   {cls.grade_range && <p className="text-xs text-muted-foreground">{cls.grade_range}</p>}
                   <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                    <Users className="w-3 h-3" /> {getStudentCount(cls.id)}명
+                    <Users className="w-3 h-3" /> {cls.student_count}명
                   </span>
                 </div>
               </div>
