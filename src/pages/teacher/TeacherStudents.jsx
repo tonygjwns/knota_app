@@ -1,54 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
-import { useAuth } from '@/lib/AuthContext';
+import React, { useState } from 'react';
+import { useTeacher } from '@/lib/TeacherContext';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Search, User } from 'lucide-react';
 
 export default function TeacherStudents() {
-  const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [myClasses, setMyClasses] = useState([]);
-  const [students, setStudents] = useState([]);
-  const [attempts, setAttempts] = useState([]);
+  const { myClasses, students, attempts, loading } = useTeacher();
   const [search, setSearch] = useState('');
-  const [classFilter, setClassFilter] = useState('all');
-
-  // Read ?class_id= from URL
-  const urlClassId = new URLSearchParams(window.location.search).get('class_id');
-
-  useEffect(() => {
-    if (urlClassId) setClassFilter(urlClassId);
-    loadData();
-  }, [user]);
-
-  const loadData = async () => {
-    if (!user) return;
-    setLoading(true);
-
-    const allClasses = await base44.entities.Class.list('name', 500);
-    const mine = allClasses.filter(c =>
-      c.main_teacher_id === user.id ||
-      (c.assistant_teacher_ids || []).includes(user.id)
-    );
-    setMyClasses(mine);
-
-    if (mine.length === 0) { setLoading(false); return; }
-
-    const myClassIds = new Set(mine.map(c => c.id));
-    const [allUsers, allAttempts] = await Promise.all([
-      base44.entities.User.list('-created_date', 1000),
-      base44.entities.StudentAttempt.list('-submitted_at', 1000),
-    ]);
-
-    const myStudents = allUsers.filter(u => u.class_id && myClassIds.has(u.class_id));
-    setStudents(myStudents);
-
-    const studentIds = new Set(myStudents.map(u => u.id));
-    setAttempts(allAttempts.filter(a => studentIds.has(a.student_id)));
-    setLoading(false);
-  };
+  const [classFilter, setClassFilter] = useState(
+    new URLSearchParams(window.location.search).get('class_id') || 'all'
+  );
 
   const getStats = (userId) => {
     const ua = attempts.filter(a => a.student_id === userId);
@@ -84,7 +46,6 @@ export default function TeacherStudents() {
         <p className="text-muted-foreground text-sm mt-1">담당 학급의 학생 {students.length}명</p>
       </div>
 
-      {/* Class filter */}
       <div className="flex gap-2 flex-wrap">
         <button
           onClick={() => setClassFilter('all')}

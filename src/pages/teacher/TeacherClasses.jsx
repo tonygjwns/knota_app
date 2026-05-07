@@ -1,53 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
-import { useAuth } from '@/lib/AuthContext';
+import React from 'react';
+import { useTeacher } from '@/lib/TeacherContext';
 import { useNavigate } from 'react-router-dom';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
 import { BookOpen, Users, ChevronRight } from 'lucide-react';
 
 export default function TeacherClasses() {
-  const { user } = useAuth();
+  const { myClasses, students, academies, loading } = useTeacher();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [myClasses, setMyClasses] = useState([]);
-  const [academies, setAcademies] = useState([]);
-  const [allUsers, setAllUsers] = useState([]);
-  const [studentCounts, setStudentCounts] = useState({});
-
-  useEffect(() => { loadData(); }, [user]);
-
-  const loadData = async () => {
-    if (!user) return;
-    setLoading(true);
-
-    const [allClasses, acad, users] = await Promise.all([
-      base44.entities.Class.list('name', 500),
-      base44.entities.Academy.list('name', 200),
-      base44.entities.User.list('-created_date', 1000),
-    ]);
-
-    const mine = allClasses.filter(c =>
-      c.main_teacher_id === user.id ||
-      (c.assistant_teacher_ids || []).includes(user.id)
-    );
-    setMyClasses(mine);
-    setAcademies(acad);
-    setAllUsers(users);
-
-    const counts = {};
-    mine.forEach(c => {
-      counts[c.id] = users.filter(u => u.class_id === c.id).length;
-    });
-    setStudentCounts(counts);
-    setLoading(false);
-  };
 
   const getAcademyName = (id) => academies.find(a => a.id === id)?.name || '—';
-  const getUserName = (id) => {
-    const u = allUsers.find(u => u.id === id);
-    return u ? (u.full_name || u.email) : null;
-  };
+  const getStudentCount = (classId) => students.filter(u => u.class_id === classId).length;
 
   if (loading) return <InlineLoader message="학급 목록 불러오는 중..." />;
 
@@ -83,22 +46,10 @@ export default function TeacherClasses() {
                 <div>
                   <p className="font-semibold">{cls.name}</p>
                   <p className="text-xs text-muted-foreground">{getAcademyName(cls.academy_id)}</p>
-                  {getUserName(cls.main_teacher_id) ? (
-                    <p className="text-xs text-muted-foreground">담당: {getUserName(cls.main_teacher_id)}</p>
-                  ) : (
-                    <p className="text-xs text-amber-600">담당 미배정</p>
-                  )}
-                  {(cls.assistant_teacher_ids || []).length > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      보조: {cls.assistant_teacher_ids.map(id => getUserName(id)).filter(Boolean).join(', ')}
-                    </p>
-                  )}
-                  <div className="flex items-center gap-3 mt-0.5">
-                    {cls.grade_range && <span className="text-xs text-muted-foreground">{cls.grade_range}</span>}
-                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Users className="w-3 h-3" /> {studentCounts[cls.id] || 0}명
-                    </span>
-                  </div>
+                  {cls.grade_range && <p className="text-xs text-muted-foreground">{cls.grade_range}</p>}
+                  <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                    <Users className="w-3 h-3" /> {getStudentCount(cls.id)}명
+                  </span>
                 </div>
               </div>
               <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />

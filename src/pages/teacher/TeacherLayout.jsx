@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { base44 } from '@/api/base44Client';
 import { BarChart2, Users, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
+import { TeacherProvider } from '@/lib/TeacherContext';
 
 const TEACHER_NAV = [
   { path: '/teacher', icon: BarChart2, label: '대시보드', exact: true },
@@ -99,7 +100,9 @@ export default function TeacherLayout() {
         </div>
 
         <main className="flex-1 overflow-auto p-6 pb-20 md:pb-6">
-          <Outlet />
+          <TeacherProvider>
+            <Outlet />
+          </TeacherProvider>
         </main>
       </div>
     </div>

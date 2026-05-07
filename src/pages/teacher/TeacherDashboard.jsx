@@ -1,73 +1,57 @@
-import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
-import { useAuth } from '@/lib/AuthContext';
+import React from 'react';
+import { useTeacher } from '@/lib/TeacherContext';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
 import { aggregateToolMastery, topWeakTools } from '@/lib/toolMastery';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Users, BookOpen, Target, TrendingUp } from 'lucide-react';
+import { base44 } from '@/api/base44Client';
+import { useState, useEffect } from 'react';
 
 export default function TeacherDashboard() {
-  const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [myClasses, setMyClasses] = useState([]);
-  const [students, setStudents] = useState([]);
-  const [attempts, setAttempts] = useState([]);
+  const { myClasses, students, attempts, loading } = useTeacher();
   const [weakTools, setWeakTools] = useState([]);
   const [toolDist, setToolDist] = useState([]);
 
-  useEffect(() => { loadData(); }, [user]);
+  useEffect(() => {
+    if (loading || attempts.length === 0) return;
 
-  const loadData = async () => {
-    if (!user) return;
-    setLoading(true);
+    const buildCharts = async () => {
+      const allTools = await base44.entities.MathTool.list('name', 100);
+      const toolNameMap = new Map(allTools.map(t => [t.tool_id, t]));
 
-    const allClasses = await base44.entities.Class.list('name', 500);
-    const mine = allClasses.filter(c =>
-      c.main_teacher_id === user.id ||
-      (c.assistant_teacher_ids || []).includes(user.id)
-    );
-    setMyClasses(mine);
+      // attempts already have problem_domain cached, but for mastery we need tool_ids from problem
+      // Use problem_id to look up tool — aggregate from attempt.problem_id via problems
+      // Minimal fetch: only distinct problem IDs referenced in attempts
+      const problemIds = [...new Set(attempts.map(a => a.problem_id).filter(Boolean))];
+      // Fetch problems in parallel batches of 50
+      const BATCH = 50;
+      const problemBatches = [];
+      for (let i = 0; i < problemIds.length; i += BATCH) {
+        problemBatches.push(problemIds.slice(i, i + BATCH));
+      }
+      const problemResults = await Promise.all(
+        problemBatches.map(batch =>
+          Promise.all(batch.map(pid => base44.entities.Problem.filter({ problem_id: pid }, '-created_date', 1)))
+        )
+      );
+      const allProblems = problemResults.flat(2);
+      const problemMap = new Map(allProblems.map(p => [p.id, p]));
 
-    if (mine.length === 0) { setLoading(false); return; }
+      const masteryMap = aggregateToolMastery(attempts, problemMap);
+      const allToolsList = await Promise.resolve(allTools); // already fetched
+      setWeakTools(topWeakTools(masteryMap, toolNameMap, 8, 2));
 
-    const myClassIds = new Set(mine.map(c => c.id));
-    const allUsers = await base44.entities.User.list('-created_date', 1000);
-    const myStudents = allUsers.filter(u => u.class_id && myClassIds.has(u.class_id));
-    setStudents(myStudents);
+      const dist = [];
+      masteryMap.forEach((entry, toolId) => {
+        const tool = toolNameMap.get(toolId);
+        dist.push({ name: tool?.name || toolId, attempts: entry.attempts, avg_score: entry.avg_score });
+      });
+      setToolDist(dist.sort((a, b) => b.attempts - a.attempts).slice(0, 10));
+    };
 
-    if (myStudents.length === 0) { setLoading(false); return; }
-
-    const studentIds = new Set(myStudents.map(u => u.id));
-    const [allAttempts, allTools] = await Promise.all([
-      base44.entities.StudentAttempt.list('-submitted_at', 1000),
-      base44.entities.MathTool.list('name', 100),
-    ]);
-
-    const myAttempts = allAttempts.filter(a => studentIds.has(a.student_id));
-    setAttempts(myAttempts);
-
-    // For mastery we need problem→tool mapping; fetch problems only if there are attempts
-    let problemMap = new Map();
-    if (myAttempts.length > 0) {
-      const allProblems = await base44.entities.Problem.list('-created_date', 1000);
-      problemMap = new Map(allProblems.map(p => [p.id, p]));
-    }
-    const toolNameMap = new Map(allTools.map(t => [t.tool_id, t]));
-    const masteryMap = aggregateToolMastery(myAttempts, problemMap);
-
-    setWeakTools(topWeakTools(masteryMap, toolNameMap, 8, 2));
-
-    // Tool distribution (top 10 by attempts)
-    const dist = [];
-    masteryMap.forEach((entry, toolId) => {
-      const tool = toolNameMap.get(toolId);
-      dist.push({ name: tool?.name || toolId, attempts: entry.attempts, avg_score: entry.avg_score });
-    });
-    setToolDist(dist.sort((a, b) => b.attempts - a.attempts).slice(0, 10));
-
-    setLoading(false);
-  };
+    buildCharts();
+  }, [loading, attempts]);
 
   if (loading) return <InlineLoader message="대시보드 불러오는 중..." />;
 
@@ -96,7 +80,6 @@ export default function TeacherDashboard() {
         <p className="text-muted-foreground text-sm mt-1">내 학급 학생들의 학습 현황이에요</p>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { Icon: BookOpen, label: '담당 학급', value: myClasses.length, unit: '개', color: 'text-violet-600' },
@@ -114,7 +97,6 @@ export default function TeacherDashboard() {
         ))}
       </div>
 
-      {/* Weak tools chart */}
       {weakTools.length > 0 && (
         <Card className="p-4">
           <h2 className="font-semibold text-sm mb-4">매듭별 약점 (평균 점수 낮은 순)</h2>
@@ -133,7 +115,6 @@ export default function TeacherDashboard() {
         </Card>
       )}
 
-      {/* Tool usage distribution */}
       {toolDist.length > 0 && (
         <Card className="p-4">
           <h2 className="font-semibold text-sm mb-4">매듭별 시도 분포 (Top 10)</h2>
@@ -148,7 +129,7 @@ export default function TeacherDashboard() {
         </Card>
       )}
 
-      {attempts.length === 0 && (
+      {totalAttempts === 0 && (
         <Card className="p-8 text-center text-muted-foreground text-sm">학생들의 제출 데이터가 없어요</Card>
       )}
     </div>
