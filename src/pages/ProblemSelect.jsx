@@ -129,6 +129,12 @@ export default function ProblemSelect() {
   const [searchParams] = useSearchParams();
   const mode = searchParams.get('mode');
 
+  useEffect(() => {
+    if (!user) return;
+    if (user.role === 'admin') { navigate('/admin', { replace: true }); return; }
+    if (user.role === 'teacher') { navigate('/teacher', { replace: true }); }
+  }, [user]);
+
   // No mode → hub
   if (!mode) return <ProblemHub />;
 

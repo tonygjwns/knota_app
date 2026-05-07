@@ -39,6 +39,12 @@ export default function History() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [attempts, setAttempts] = useState([]);
+
+  useEffect(() => {
+    if (!user) return;
+    if (user.role === 'admin') { navigate('/admin', { replace: true }); return; }
+    if (user.role === 'teacher') { navigate('/teacher', { replace: true }); }
+  }, [user?.role]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);

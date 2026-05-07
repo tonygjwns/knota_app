@@ -95,10 +95,12 @@ function ClassModal({ cls, academyId, teachers, onSave, onClose }) {
   const [teacherSearch, setTeacherSearch] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Only role='teacher'
+  const onlyTeachers = teachers.filter(u => u.role === 'teacher');
   const filtered = teacherSearch
-    ? teachers.filter(u => (u.full_name + u.email).toLowerCase().includes(teacherSearch.toLowerCase()))
-    : teachers;
-  const selectedTeacher = teachers.find(u => u.id === teacherId);
+    ? onlyTeachers.filter(u => (u.full_name + u.email).toLowerCase().includes(teacherSearch.toLowerCase()))
+    : onlyTeachers;
+  const selectedTeacher = onlyTeachers.find(u => u.id === teacherId);
 
   const handleSave = async () => {
     if (!name.trim() || !teacherId) return;
@@ -189,12 +191,13 @@ export default function AdminAcademies() {
   const teachers = users.filter(u => u.role === 'teacher');
 
   const getUserName = (id) => {
+    if (!id) return '강사 미배정';
     const u = users.find(u => u.id === id);
-    return u ? (u.full_name || u.email) : '—';
+    return u ? (u.full_name || u.email) : '강사 미배정';
   };
 
-  const getClassStudentCount = (classId) => users.filter(u => u.class_id === classId).length;
-  const getClassStudents = (classId) => users.filter(u => u.class_id === classId);
+  const getClassStudentCount = (classId) => users.filter(u => u.class_id === classId && u.role === 'student').length;
+  const getClassStudents = (classId) => users.filter(u => u.class_id === classId && u.role === 'student');
   const getAcademyClassCount = (academyId) => classes.filter(c => c.academy_id === academyId).length;
 
   // CRUD

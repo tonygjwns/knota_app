@@ -5,7 +5,6 @@ import { Card } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import { Users, BookOpen, TrendingUp, CheckCircle } from 'lucide-react';
 import DataImportPanel from '@/components/admin/DataImportPanel';
-import DummyDataPanel from '@/components/admin/DummyDataPanel';
 import { aggregateToolMastery, topWeakTools } from '@/lib/toolMastery';
 
 export default function AdminDashboard() {
@@ -102,7 +101,6 @@ export default function AdminDashboard() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">분석 대시보드</h1>
       <DataImportPanel />
-      <DummyDataPanel />
 
       {/* Stats cards */}
       {stats && (

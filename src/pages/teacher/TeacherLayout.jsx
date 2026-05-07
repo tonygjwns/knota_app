@@ -16,19 +16,23 @@ export default function TeacherLayout() {
   const { user, isLoadingAuth } = useAuth();
 
   useEffect(() => {
-    if (!isLoadingAuth && user && user.role !== 'teacher' && user.role !== 'admin') {
+    if (isLoadingAuth || !user) return;
+    if (user.role === 'admin') {
+      toast.error('강사만 접근 가능해요');
+      navigate('/admin', { replace: true });
+    } else if (user.role !== 'teacher') {
       toast.error('강사 권한이 필요해요');
       navigate('/home', { replace: true });
     }
   }, [user, isLoadingAuth, navigate]);
 
   if (isLoadingAuth || !user) return null;
-  if (user.role !== 'teacher' && user.role !== 'admin') return null;
+  if (user.role !== 'teacher') return null;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="bg-violet-900 text-white px-4 py-3 flex items-center gap-3">
-        <Link to="/home" className="p-1 rounded hover:bg-white/10 transition-colors">
+        <Link to="/teacher" className="p-1 rounded hover:bg-white/10 transition-colors">
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div className="w-7 h-7 bg-violet-500 rounded-lg flex items-center justify-center">

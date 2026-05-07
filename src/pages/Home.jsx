@@ -21,10 +21,30 @@ export default function Home() {
   const navigate = useNavigate();
   const [todayProblem, setTodayProblem] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [orgLabel, setOrgLabel] = useState('');
 
   useEffect(() => {
+    if (!user) return;
+    // E-1: redirect non-students
+    if (user.role === 'admin') { navigate('/admin', { replace: true }); return; }
+    if (user.role === 'teacher') { navigate('/teacher', { replace: true }); return; }
     loadData();
-  }, []);
+    loadOrgInfo();
+  }, [user]);
+
+  const loadOrgInfo = async () => {
+    if (!user?.academy_id && !user?.class_id) return;
+    try {
+      const [academies, classesAll] = await Promise.all([
+        user.academy_id ? base44.entities.Academy.list('name', 200) : Promise.resolve([]),
+        user.class_id ? base44.entities.Class.list('name', 500) : Promise.resolve([]),
+      ]);
+      const academy = academies.find(a => a.id === user.academy_id);
+      const cls = classesAll.find(c => c.id === user.class_id);
+      const parts = [academy?.name, cls?.name].filter(Boolean);
+      if (parts.length > 0) setOrgLabel(parts.join(' · '));
+    } catch { /* silent */ }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -60,6 +80,11 @@ export default function Home() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">{greeting}</h1>
           <p className="text-muted-foreground mt-1">오늘도 열심히 해볼까요? 💪</p>
+          {orgLabel && (
+            <span className="inline-block mt-2 text-xs bg-primary/10 text-primary px-3 py-1 rounded-full font-medium">
+              {orgLabel}
+            </span>
+          )}
         </div>
 
         {/* Today's problem */}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Home, BookOpen, History, Settings, Menu, X, GraduationCap } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
@@ -15,7 +15,25 @@ export default function AppLayout({ children }) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const isTeacher = user?.role === 'teacher';
+  const isStudent = user?.role === 'student';
   const [menuOpen, setMenuOpen] = useState(false);
+  const [orgLabel, setOrgLabel] = useState('');
+
+  useEffect(() => {
+    if (!user?.academy_id && !user?.class_id) return;
+    (async () => {
+      try {
+        const [academies, classesAll] = await Promise.all([
+          user.academy_id ? base44.entities.Academy.list('name', 200) : Promise.resolve([]),
+          user.class_id ? base44.entities.Class.list('name', 500) : Promise.resolve([]),
+        ]);
+        const academy = academies.find(a => a.id === user.academy_id);
+        const cls = classesAll.find(c => c.id === user.class_id);
+        const parts = [academy?.name, cls?.name].filter(Boolean);
+        if (parts.length > 0) setOrgLabel(parts.join(' · '));
+      } catch { /* silent */ }
+    })();
+  }, [user?.academy_id, user?.class_id]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -57,7 +75,7 @@ export default function AppLayout({ children }) {
                 <p className="text-xs text-muted-foreground mt-0.5">{user.email}</p>
               </div>
             )}
-            {NAV_ITEMS.map(item => {
+            {isStudent && NAV_ITEMS.map(item => {
               const active = location.pathname === item.path;
               return (
                 <Link key={item.path} to={item.path}
@@ -78,7 +96,7 @@ export default function AppLayout({ children }) {
                   <span className="font-medium text-sm">관리자 패널</span>
                 </Link>
               )}
-              {(isAdmin || isTeacher) && (
+              {isTeacher && (
                 <Link to="/teacher" onClick={() => setMenuOpen(false)}
                   className="flex items-center gap-3 px-3 py-3 rounded-xl transition-colors btn-touch hover:bg-muted text-muted-foreground border border-border">
                   <GraduationCap className="w-5 h-5" />
@@ -97,13 +115,19 @@ export default function AppLayout({ children }) {
       <div className="flex flex-1">
         {/* Sidebar (desktop) */}
         <aside className="hidden md:flex w-64 flex-col border-r border-border bg-card sticky top-0 h-screen p-5 gap-2">
-          <Link to="/home" className="flex items-center gap-3 mb-6 px-2">
+          <Link to={isAdmin ? '/admin' : isTeacher ? '/teacher' : '/home'} className="flex items-center gap-3 mb-6 px-2">
             <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
               <span className="text-white font-bold text-lg">수</span>
             </div>
             <div>
-              <p className="font-bold text-foreground">수학 학습</p>
-              <p className="text-xs text-muted-foreground">K-12 수학</p>
+              <p className="font-bold text-foreground">
+                {isAdmin ? '관리자' : isTeacher
+                  ? (orgLabel ? `${orgLabel.split(' · ')[0]}` : '수학 학습')
+                  : '수학 학습'}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {isAdmin ? '관리자 패널' : isTeacher ? '강사' : (orgLabel || 'K-12 수학')}
+              </p>
             </div>
           </Link>
 
@@ -115,7 +139,7 @@ export default function AppLayout({ children }) {
           )}
 
           <nav className="flex flex-col gap-1 flex-1">
-            {NAV_ITEMS.map(item => {
+            {isStudent && NAV_ITEMS.map(item => {
               const active = location.pathname === item.path ||
                 (item.path !== '/home' && location.pathname.startsWith(item.path));
               return (
@@ -138,7 +162,7 @@ export default function AppLayout({ children }) {
                 <span className="font-medium text-sm">관리자 패널</span>
               </Link>
             )}
-            {(isAdmin || isTeacher) && (
+            {isTeacher && (
               <Link to="/teacher"
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors hover:bg-muted text-muted-foreground border border-border">
                 <GraduationCap className="w-5 h-5 flex-shrink-0" />
@@ -160,24 +184,26 @@ export default function AppLayout({ children }) {
         </main>
       </div>
 
-      {/* Bottom nav (mobile) — NAV_ITEMS only */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-card/95 backdrop-blur-sm border-t border-border safe-bottom">
-        <div className="flex items-center justify-around px-2 py-2">
-          {NAV_ITEMS.map(item => {
-            const active = location.pathname === item.path ||
-              (item.path !== '/home' && location.pathname.startsWith(item.path));
-            return (
-              <Link key={item.path} to={item.path}
-                    className={`flex flex-col items-center gap-0.5 px-4 py-2 rounded-xl btn-touch transition-colors ${
-                      active ? 'text-primary' : 'text-muted-foreground'
-                    }`}>
-                <item.icon className={`w-5 h-5 ${active ? 'fill-primary/20' : ''}`} />
-                <span className="text-xs font-medium">{item.label}</span>
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
+      {/* Bottom nav (mobile) — student only */}
+      {isStudent && (
+        <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-card/95 backdrop-blur-sm border-t border-border safe-bottom">
+          <div className="flex items-center justify-around px-2 py-2">
+            {NAV_ITEMS.map(item => {
+              const active = location.pathname === item.path ||
+                (item.path !== '/home' && location.pathname.startsWith(item.path));
+              return (
+                <Link key={item.path} to={item.path}
+                      className={`flex flex-col items-center gap-0.5 px-4 py-2 rounded-xl btn-touch transition-colors ${
+                        active ? 'text-primary' : 'text-muted-foreground'
+                      }`}>
+                  <item.icon className={`w-5 h-5 ${active ? 'fill-primary/20' : ''}`} />
+                  <span className="text-xs font-medium">{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+      )}
     </div>
   );
 }

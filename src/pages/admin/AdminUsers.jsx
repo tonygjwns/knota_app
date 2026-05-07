@@ -311,29 +311,36 @@ export default function AdminUsers() {
                     <p className="text-sm font-semibold">{stats.count}회</p>
                     <p className="text-xs text-muted-foreground">{stats.avg > 0 ? `평균 ${stats.avg}점` : '시도 없음'}</p>
                   </div>
-                  {!isSelf && (
-                    <button
-                      onClick={() => setManageTarget(u)}
-                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors px-2 py-1 rounded-lg hover:bg-muted"
-                    >
-                      <Settings className="w-3.5 h-3.5" /> 관리
-                    </button>
-                  )}
                 </div>
               </div>
 
               {!isAdmin && !isSelf && (
-                <div className="flex gap-2 mt-2 pt-2 border-t border-border">
-                  {u.approval_status !== 'approved' && (
-                    <Button size="sm" className="gap-1 flex-1" onClick={() => handleApprove(u)}>
-                      <CheckCircle className="w-3.5 h-3.5" /> 승인
-                    </Button>
-                  )}
-                  {u.approval_status !== 'rejected' && (
-                    <Button size="sm" variant="outline" className="gap-1 flex-1 text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleReject(u)}>
-                      <XCircle className="w-3.5 h-3.5" /> 거절
-                    </Button>
-                  )}
+                <div className="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-border">
+                  <Button
+                    size="sm"
+                    className="gap-1 w-full"
+                    disabled={u.approval_status === 'approved'}
+                    onClick={() => handleApprove(u)}
+                  >
+                    <CheckCircle className="w-3.5 h-3.5" /> 승인
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1 w-full text-red-600 border-red-200 hover:bg-red-50"
+                    disabled={u.approval_status === 'rejected'}
+                    onClick={() => handleReject(u)}
+                  >
+                    <XCircle className="w-3.5 h-3.5" /> 거절
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1 w-full"
+                    onClick={() => setManageTarget(u)}
+                  >
+                    <Settings className="w-3.5 h-3.5" /> 관리
+                  </Button>
                 </div>
               )}
             </Card>
