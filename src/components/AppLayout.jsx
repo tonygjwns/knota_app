@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, BookOpen, History, Settings, Menu, X } from 'lucide-react';
+import { Home, BookOpen, History, Settings, Menu, X, GraduationCap } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 
@@ -14,6 +14,7 @@ export default function AppLayout({ children }) {
   const location = useLocation();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const isTeacher = user?.role === 'teacher';
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -71,12 +72,17 @@ export default function AppLayout({ children }) {
             })}
             <div className="mt-auto flex flex-col gap-1">
               {isAdmin && (
-                <Link
-                  to="/admin"
-                  onClick={() => setMenuOpen(false)}
+                <Link to="/admin" onClick={() => setMenuOpen(false)}
                   className="flex items-center gap-3 px-3 py-3 rounded-xl transition-colors btn-touch hover:bg-muted text-muted-foreground border border-border">
                   <Settings className="w-5 h-5" />
                   <span className="font-medium text-sm">관리자 패널</span>
+                </Link>
+              )}
+              {(isAdmin || isTeacher) && (
+                <Link to="/teacher" onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-3 px-3 py-3 rounded-xl transition-colors btn-touch hover:bg-muted text-muted-foreground border border-border">
+                  <GraduationCap className="w-5 h-5" />
+                  <span className="font-medium text-sm">강사 패널</span>
                 </Link>
               )}
               <button onClick={() => base44.auth.logout('/')}
@@ -126,11 +132,17 @@ export default function AppLayout({ children }) {
 
           <div className="flex flex-col gap-1">
             {isAdmin && (
-              <Link
-                to="/admin"
+              <Link to="/admin"
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors hover:bg-muted text-muted-foreground border border-border">
                 <Settings className="w-5 h-5 flex-shrink-0" />
                 <span className="font-medium text-sm">관리자 패널</span>
+              </Link>
+            )}
+            {(isAdmin || isTeacher) && (
+              <Link to="/teacher"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors hover:bg-muted text-muted-foreground border border-border">
+                <GraduationCap className="w-5 h-5 flex-shrink-0" />
+                <span className="font-medium text-sm">강사 패널</span>
               </Link>
             )}
             <button onClick={() => base44.auth.logout('/')}

@@ -22,6 +22,10 @@ import AdminUsers from './pages/admin/AdminUsers';
 import AdminProblems from './pages/admin/AdminProblems';
 import AdminReview from './pages/admin/AdminReview';
 import AdminAcademies from './pages/admin/AdminAcademies';
+import TeacherLayout from './pages/teacher/TeacherLayout';
+import TeacherDashboard from './pages/teacher/TeacherDashboard';
+import TeacherStudents from './pages/teacher/TeacherStudents';
+import TeacherClasses from './pages/teacher/TeacherClasses';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user } = useAuth();
@@ -75,6 +79,13 @@ const AuthenticatedApp = () => {
         <Route path="problems" element={<AdminProblems />} />
         <Route path="review" element={<AdminReview />} />
         <Route path="academies" element={<AdminAcademies />} />
+      </Route>
+
+      {/* Teacher routes */}
+      <Route path="/teacher" element={<TeacherLayout />}>
+        <Route index element={<TeacherDashboard />} />
+        <Route path="students" element={<TeacherStudents />} />
+        <Route path="classes" element={<TeacherClasses />} />
       </Route>
 
       <Route path="*" element={<PageNotFound />} />
