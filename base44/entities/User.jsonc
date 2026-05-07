@@ -7,8 +7,10 @@
       "description": "The role of the user in the app",
       "enum": [
         "admin",
-        "user"
-      ]
+        "teacher",
+        "student"
+      ],
+      "default": "student"
     },
     "approval_status": {
       "type": "string",
@@ -53,6 +55,28 @@
     "rejected_reason": {
       "type": "string",
       "description": "Reason for rejection",
+      "rls": {
+        "write": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      }
+    },
+    "academy_id": {
+      "type": "string",
+      "description": "\uc18c\uc18d \ud559\uc6d0 ID",
+      "rls": {
+        "write": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      }
+    },
+    "class_id": {
+      "type": "string",
+      "description": "\uc18c\uc18d \ud559\uae09 ID",
       "rls": {
         "write": {
           "user_condition": {

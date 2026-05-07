@@ -21,6 +21,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminProblems from './pages/admin/AdminProblems';
 import AdminReview from './pages/admin/AdminReview';
+import AdminAcademies from './pages/admin/AdminAcademies';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user } = useAuth();
@@ -73,6 +74,7 @@ const AuthenticatedApp = () => {
         <Route path="users" element={<AdminUsers />} />
         <Route path="problems" element={<AdminProblems />} />
         <Route path="review" element={<AdminReview />} />
+        <Route path="academies" element={<AdminAcademies />} />
       </Route>
 
       <Route path="*" element={<PageNotFound />} />

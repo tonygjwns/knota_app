@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { Users, BookOpen, CheckSquare, BarChart2, ArrowLeft } from 'lucide-react';
+import { Users, BookOpen, CheckSquare, BarChart2, ArrowLeft, Building } from 'lucide-react';
 import { toast } from 'sonner';
 
 const ADMIN_NAV = [
@@ -10,6 +10,7 @@ const ADMIN_NAV = [
   { path: '/admin/users', icon: Users, label: '학생 목록' },
   { path: '/admin/problems', icon: BookOpen, label: '문제 목록' },
   { path: '/admin/review', icon: CheckSquare, label: '채점 검토' },
+  { path: '/admin/academies', icon: Building, label: '학원/학급' },
 ];
 
 export default function AdminLayout() {

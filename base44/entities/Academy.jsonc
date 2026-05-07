@@ -1,0 +1,21 @@
+{
+  "name": "Academy",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "\ud559\uc6d0\uba85"
+    },
+    "owner_id": {
+      "type": "string",
+      "description": "\ud559\uc6d0\uc7a5 user.id"
+    },
+    "join_code": {
+      "type": "string",
+      "description": "\ud559\uc0dd \uac00\uc785 \uc2dc \uc785\ub825 \uc591\uc2dd \ud559\uc6d0 \ucf54\ub4dc (\uc120\ud0dd)"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

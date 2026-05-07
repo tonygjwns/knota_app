@@ -1,0 +1,27 @@
+{
+  "name": "Class",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "\ud559\uae09\uba85 (\uc608: \uc9113-A\ubc18)"
+    },
+    "academy_id": {
+      "type": "string",
+      "description": "Academy.id"
+    },
+    "teacher_id": {
+      "type": "string",
+      "description": "\ub2f4\ub2f9 \uac15\uc0ac User.id"
+    },
+    "grade_range": {
+      "type": "string",
+      "description": "\ud559\ub144"
+    }
+  },
+  "required": [
+    "name",
+    "academy_id",
+    "teacher_id"
+  ]
+}
