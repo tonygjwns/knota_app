@@ -112,25 +112,24 @@ export default function AppLayout({ children }) {
       <div className="flex flex-1">
         {/* Sidebar (desktop) */}
         <aside className="hidden md:flex w-64 flex-col border-r border-border bg-card sticky top-0 h-screen p-5 gap-2">
-          <Link to={isAdmin ? '/admin' : isTeacher ? '/teacher' : '/home'} className="flex items-center gap-3 mb-6 px-2">
-            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold text-lg">수</span>
-            </div>
-            <div>
-              <p className="font-bold text-foreground">
-                {isAdmin ? '관리자' : (user?.full_name || '수학 학습')}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {isAdmin ? '관리자 패널' : isTeacher ? '강사' : (orgLabel || 'K-12 수학')}
-              </p>
-            </div>
-          </Link>
-
-          {user && (
-            <div className="mb-1">
-              <UserMenuDropdown orgLabel={orgLabel} />
-            </div>
-          )}
+          {/* 상단 헤더: 로고 + 아바타 드롭다운 */}
+          {/* 사이드바 상단: 로고 + 아바타 */}
+          <div className="flex items-center justify-between mb-6 px-2">
+            <Link to={isAdmin ? '/admin' : isTeacher ? '/teacher' : '/home'} className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
+                <span className="text-white font-bold text-lg">수</span>
+              </div>
+              <div>
+                <p className="font-bold text-foreground">
+                  {isAdmin ? '관리자' : (user?.full_name || '수학 학습')}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {isAdmin ? '관리자 패널' : isTeacher ? '강사' : (orgLabel || 'K-12 수학')}
+                </p>
+              </div>
+            </Link>
+            <UserMenuDropdown orgLabel={orgLabel} />
+          </div>
 
           <nav className="flex flex-col gap-1 flex-1">
             {isStudent && NAV_ITEMS.map(item => {
