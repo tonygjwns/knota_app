@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import PaginationBar from '@/components/ui/PaginationBar';
-import { Search, User, X, GraduationCap } from 'lucide-react';
+import { Search, X, GraduationCap, CheckCircle, XCircle, Clock } from 'lucide-react';
 
 const PAGE_SIZE = 50;
 
@@ -57,6 +57,12 @@ function TeacherManageModal({ target, allAcademies, onSave, onClose }) {
   );
 }
 
+const STATUS_CONFIG = {
+  pending:  { label: '승인 대기', color: 'bg-amber-100 text-amber-700 border-amber-200' },
+  approved: { label: '승인됨',   color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+  rejected: { label: '거절됨',   color: 'bg-red-100 text-red-700 border-red-200' },
+};
+
 export default function AdminTeachers() {
   const [teachers, setTeachers] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -65,6 +71,7 @@ export default function AdminTeachers() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [manageTarget, setManageTarget] = useState(null);
+  const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => { loadAll(); }, []);
 
@@ -75,7 +82,9 @@ export default function AdminTeachers() {
       base44.entities.Class.list('name', 500),
       base44.entities.Academy.list('name', 200),
     ]);
-    setTeachers(allUsers.filter(u => u.role === 'teacher'));
+    const t = allUsers.filter(u => u.role === 'teacher');
+    setTeachers(t);
+    setPendingCount(t.filter(u => u.approval_status === 'pending').length);
     setClasses(cls);
     setAcademies(acad);
     setLoading(false);
@@ -88,6 +97,19 @@ export default function AdminTeachers() {
     await base44.entities.User.update(userId, data);
     setManageTarget(null);
     await loadAll();
+  };
+
+  const handleApprove = async (u) => {
+    if (!confirm(`"${u.full_name || u.email}"을(를) 승인하시겠어요?`)) return;
+    await base44.entities.User.update(u.id, { approval_status: 'approved', approved_at: new Date().toISOString(), rejected_reason: '' });
+    loadAll();
+  };
+
+  const handleReject = async (u) => {
+    const reason = prompt(`거절 사유를 입력하세요 (${u.full_name || u.email})`);
+    if (reason === null) return;
+    await base44.entities.User.update(u.id, { approval_status: 'rejected', approved_at: new Date().toISOString(), rejected_reason: reason });
+    loadAll();
   };
 
   const filtered = teachers.filter(u => {
@@ -107,6 +129,13 @@ export default function AdminTeachers() {
         <p className="text-muted-foreground text-sm mt-1">총 {teachers.length}명의 강사</p>
       </div>
 
+      {pendingCount > 0 && (
+        <div className="p-4 border border-amber-200 bg-amber-50 rounded-xl flex items-center gap-3">
+          <Clock className="w-5 h-5 text-amber-500 flex-shrink-0" />
+          <p className="text-sm font-medium text-amber-700">승인 대기 중 <span className="font-bold">{pendingCount}명</span> — 검토가 필요해요</p>
+        </div>
+      )}
+
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input placeholder="이름 또는 이메일 검색..." className="pl-10" value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} />
@@ -116,6 +145,8 @@ export default function AdminTeachers() {
         {paginated.map(u => {
           const classCount = getClassCount(u.id);
           const academyName = getAcademyName(u.academy_id);
+          const status = u.approval_status || 'pending';
+          const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
           return (
             <Card key={u.id} className="p-4">
               <div className="flex items-center justify-between gap-3">
@@ -124,15 +155,30 @@ export default function AdminTeachers() {
                     <GraduationCap className="w-5 h-5 text-blue-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium">{u.full_name || '(이름 없음)'}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium">{u.full_name || '(이름 없음)'}</p>
+                      <span className={`text-xs px-2 py-0.5 rounded-full border ${cfg.color}`}>{cfg.label}</span>
+                    </div>
                     <p className="text-xs text-muted-foreground truncate">{u.email}</p>
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       {academyName && <span className="text-xs text-muted-foreground">{academyName}</span>}
                       <span className="text-xs text-muted-foreground">담당 학급 {classCount}개</span>
                     </div>
+                    {u.approval_status === 'rejected' && u.rejected_reason && (
+                      <p className="text-xs text-red-500 mt-0.5">사유: {u.rejected_reason}</p>
+                    )}
                   </div>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => setManageTarget(u)}>관리</Button>
+              </div>
+              <div className="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-border">
+                <Button size="sm" className="gap-1 w-full" disabled={u.approval_status === 'approved'} onClick={() => handleApprove(u)}>
+                  <CheckCircle className="w-3.5 h-3.5" /> 승인
+                </Button>
+                <Button size="sm" variant="outline" className="gap-1 w-full text-red-600 border-red-200 hover:bg-red-50"
+                  disabled={u.approval_status === 'rejected'} onClick={() => handleReject(u)}>
+                  <XCircle className="w-3.5 h-3.5" /> 거절
+                </Button>
+                <Button size="sm" variant="outline" className="gap-1 w-full" onClick={() => setManageTarget(u)}>관리</Button>
               </div>
             </Card>
           );

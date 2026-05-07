@@ -76,16 +76,16 @@ export default function AdminLayout() {
           </div>
         </aside>
 
-        {/* Mobile admin nav */}
+        {/* Mobile admin nav — split into 2 rows if too many items */}
         <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-slate-800 border-t border-slate-700">
-          <div className="flex items-center justify-around px-1 py-2">
+          <div className="flex items-center justify-around px-1 py-1.5 flex-wrap">
             {ADMIN_NAV.map(item => {
               const active = item.exact
                 ? location.pathname === item.path
                 : location.pathname.startsWith(item.path);
               return (
                 <Link key={item.path} to={item.path}
-                      className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg text-xs ${
+                      className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg text-xs min-w-[48px] ${
                         active ? 'text-primary' : 'text-slate-400'
                       }`}>
                   <item.icon className="w-4 h-4" />
@@ -94,8 +94,8 @@ export default function AdminLayout() {
               );
             })}
             <button onClick={() => base44.auth.logout('/')}
-              className="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg text-xs text-slate-400">
-              <span className="w-4 h-4 flex items-center justify-center">↩</span>
+              className="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg text-xs text-slate-400 min-w-[48px]">
+              <span className="w-4 h-4 flex items-center justify-center text-base leading-none">↩</span>
               <span className="text-[10px]">로그아웃</span>
             </button>
           </div>

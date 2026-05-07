@@ -39,16 +39,20 @@ export default function TeacherDashboard() {
     if (myStudents.length === 0) { setLoading(false); return; }
 
     const studentIds = new Set(myStudents.map(u => u.id));
-    const [allAttempts, allProblems, allTools] = await Promise.all([
+    const [allAttempts, allTools] = await Promise.all([
       base44.entities.StudentAttempt.list('-submitted_at', 1000),
-      base44.entities.Problem.list('-created_date', 1000),
       base44.entities.MathTool.list('name', 100),
     ]);
 
     const myAttempts = allAttempts.filter(a => studentIds.has(a.student_id));
     setAttempts(myAttempts);
 
-    const problemMap = new Map(allProblems.map(p => [p.id, p]));
+    // For mastery we need problem→tool mapping; fetch problems only if there are attempts
+    let problemMap = new Map();
+    if (myAttempts.length > 0) {
+      const allProblems = await base44.entities.Problem.list('-created_date', 1000);
+      problemMap = new Map(allProblems.map(p => [p.id, p]));
+    }
     const toolNameMap = new Map(allTools.map(t => [t.tool_id, t]));
     const masteryMap = aggregateToolMastery(myAttempts, problemMap);
 

@@ -21,7 +21,7 @@ export default function Home() {
   const navigate = useNavigate();
   const [todayProblem, setTodayProblem] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [orgLabel, setOrgLabel] = useState('');
+  const [orgLabel, setOrgLabel] = useState([]);
 
   useEffect(() => {
     if (!user) return;
@@ -41,8 +41,9 @@ export default function Home() {
       ]);
       const academy = academies.find(a => a.id === user.academy_id);
       const cls = classesAll.find(c => c.id === user.class_id);
+      // Store separately for two-line display
       const parts = [academy?.name, cls?.name].filter(Boolean);
-      if (parts.length > 0) setOrgLabel(parts.join(' · '));
+      if (parts.length > 0) setOrgLabel(parts);
     } catch { /* silent */ }
   };
 
@@ -80,10 +81,14 @@ export default function Home() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">{greeting}</h1>
           <p className="text-muted-foreground mt-1">오늘도 열심히 해볼까요? 💪</p>
-          {orgLabel && (
-            <span className="inline-block mt-2 text-xs bg-primary/10 text-primary px-3 py-1 rounded-full font-medium">
-              {orgLabel}
-            </span>
+          {orgLabel.length > 0 && (
+            <div className="flex flex-col gap-1 mt-2">
+              {orgLabel.map((label, i) => (
+                <span key={i} className="inline-block text-xs bg-primary/10 text-primary px-3 py-1 rounded-full font-medium w-fit">
+                  {label}
+                </span>
+              ))}
+            </div>
           )}
         </div>
 
