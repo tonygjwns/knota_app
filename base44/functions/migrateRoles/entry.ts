@@ -11,6 +11,16 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const dryRun = body.dry_run === true;
 
+    // 특정 유저 역할 변경 모드
+    if (body.set_role && body.user_id) {
+      const target = await base44.asServiceRole.entities.User.get(body.user_id);
+      if (!target) return Response.json({ error: 'User not found' }, { status: 404 });
+      if (!dryRun) {
+        await base44.asServiceRole.entities.User.update(body.user_id, { role: body.set_role });
+      }
+      return Response.json({ dry_run: dryRun, user_id: body.user_id, email: target.email, old_role: target.role, new_role: body.set_role });
+    }
+
     const allUsers = await base44.asServiceRole.entities.User.list('-created_date', 1000);
 
     const toMigrate = allUsers.filter(u => u.role === 'user' || !u.role);
