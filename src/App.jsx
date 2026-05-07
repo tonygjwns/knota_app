@@ -28,6 +28,7 @@ import TeacherLayout from './pages/teacher/TeacherLayout';
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
 import TeacherStudents from './pages/teacher/TeacherStudents';
 import TeacherClasses from './pages/teacher/TeacherClasses';
+import TeacherAssignments from './pages/teacher/TeacherAssignments';
 import Profile from './pages/Profile';
 import StudentDetail from './pages/shared/StudentDetail';
 import ProblemDetail from './pages/shared/ProblemDetail';
@@ -97,6 +98,7 @@ const AuthenticatedApp = () => {
         <Route path="students" element={<TeacherStudents />} />
         <Route path="students/:userId" element={<StudentDetail mode="teacher" />} />
         <Route path="classes" element={<TeacherClasses />} />
+        <Route path="assignments" element={<TeacherAssignments />} />
         <Route path="problems/:problemId" element={<ProblemDetail mode="teacher" />} />
       </Route>
 

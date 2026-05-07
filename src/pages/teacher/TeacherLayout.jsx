@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { base44 } from '@/api/base44Client';
-import { BarChart2, Users, BookOpen, RefreshCw } from 'lucide-react';
+import { BarChart2, Users, BookOpen, RefreshCw, ClipboardList } from 'lucide-react';
 import { toast } from 'sonner';
 import { TeacherProvider, useTeacher } from '@/lib/TeacherContext';
 
@@ -10,6 +10,7 @@ const TEACHER_NAV = [
   { path: '/teacher', icon: BarChart2, label: '대시보드', exact: true },
   { path: '/teacher/students', icon: Users, label: '내 학생들' },
   { path: '/teacher/classes', icon: BookOpen, label: '내 학급' },
+  { path: '/teacher/assignments', icon: ClipboardList, label: '숙제' },
 ];
 
 function RefreshButton() {

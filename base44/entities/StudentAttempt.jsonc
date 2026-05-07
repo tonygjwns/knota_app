@@ -77,6 +77,10 @@
     },
     "admin_review_note": {
       "type": "string"
+    },
+    "assignment_id": {
+      "type": "string",
+      "description": "\uc18c\uc18d \uc219\uc81c ID (\uc790\uc720 \ud480\uc774\ub294 null)"
     }
   },
   "required": [

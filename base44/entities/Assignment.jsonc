@@ -1,0 +1,50 @@
+{
+  "name": "Assignment",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "\uc219\uc81c \uc81c\ubaa9 (\uc608: 8\uc8fc\ucc28 - \uc774\ucc28\ubc29\uc815\uc2dd)"
+    },
+    "description": {
+      "type": "string",
+      "description": "\uc548\ub0b4 \uba54\uc2dc\uc9c0 (\uc120\ud0dd)"
+    },
+    "class_id": {
+      "type": "string",
+      "description": "\ub300\uc0c1 \ud559\uae09 Class.id"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "\ucd9c\uc81c \uac15\uc0ac User.id"
+    },
+    "problem_ids": {
+      "type": "string",
+      "description": "\ucd9c\uc81c\ub41c Problem entity id \ubc30\uc5f4\uc758 JSON \ubb38\uc790\uc5f4"
+    },
+    "deadline": {
+      "type": "string",
+      "format": "date-time",
+      "description": "\ub9c8\uac10\uc77c (\uc120\ud0dd)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "closed"
+      ],
+      "default": "active",
+      "description": "active=\uc9c4\ud589\uc911, closed=\ub9c8\uac10 (\uac15\uc0ac\uac00 \uc218\ub3d9 \ub9c8\uac10)"
+    },
+    "selection_criteria": {
+      "type": "string",
+      "description": "\ucd9c\uc81c \uae30\uc900 \uba54\ud0c0 (\uc608: '\ub3c4\uad6c: \ub4f1\uc2dd\uc758 \uac00\uac10\ubc95' / '\ub2e8\uc6d0: \ub2e4\ud56d\uc2dd'). \ud45c\uc2dc\uc6a9 JSON \ubb38\uc790\uc5f4"
+    }
+  },
+  "required": [
+    "title",
+    "class_id",
+    "created_by",
+    "problem_ids"
+  ]
+}
