@@ -28,6 +28,7 @@ import TeacherLayout from './pages/teacher/TeacherLayout';
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
 import TeacherStudents from './pages/teacher/TeacherStudents';
 import TeacherClasses from './pages/teacher/TeacherClasses';
+import Profile from './pages/Profile';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user } = useAuth();
@@ -73,6 +74,7 @@ const AuthenticatedApp = () => {
       <Route path="/problem/:id" element={<ProblemSolve />} />
       <Route path="/result/:id" element={<ResultView />} />
       <Route path="/history" element={<History />} />
+      <Route path="/profile" element={<Profile />} />
 
       {/* Admin routes */}
       <Route path="/admin" element={<AdminLayout />}>

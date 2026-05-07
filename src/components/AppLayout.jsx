@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Home, BookOpen, History, Settings, Menu, X, GraduationCap } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
+import UserMenuDropdown from '@/components/UserMenuDropdown';
 
 const NAV_ITEMS = [
   { path: '/home', icon: Home, label: '홈' },
@@ -46,11 +47,7 @@ export default function AppLayout({ children }) {
           <span className="font-bold text-foreground text-lg">수학 학습</span>
         </Link>
         <div className="flex items-center gap-2">
-          {user && (
-            <span className="text-xs text-muted-foreground font-medium truncate max-w-[80px]">
-              {user.full_name || user.email?.split('@')[0]}
-            </span>
-          )}
+          <UserMenuDropdown orgLabel={orgLabel} />
           <button onClick={() => setMenuOpen(o => !o)} className="p-2 rounded-lg hover:bg-muted btn-touch">
             {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
@@ -130,9 +127,8 @@ export default function AppLayout({ children }) {
           </Link>
 
           {user && (
-            <div className="px-3 py-3 bg-muted rounded-xl mb-3">
-              <p className="font-semibold text-sm text-foreground">{user.full_name || '학생'}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{user.email}</p>
+            <div className="mb-1">
+              <UserMenuDropdown orgLabel={orgLabel} />
             </div>
           )}
 

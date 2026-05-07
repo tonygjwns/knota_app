@@ -4,13 +4,13 @@
   "properties": {
     "role": {
       "type": "string",
-      "description": "The role of the user in the app",
       "enum": [
         "admin",
         "teacher",
         "student"
       ],
-      "default": "student"
+      "default": "student",
+      "description": "\uc0ac\uc6a9\uc790 \uc5ed\ud560"
     },
     "approval_status": {
       "type": "string",
@@ -20,73 +20,19 @@
         "rejected"
       ],
       "default": "pending",
-      "description": "Admin approval status for this user",
-      "rls": {
-        "write": {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      }
-    },
-    "approved_by": {
-      "type": "string",
-      "description": "Admin user ID who approved/rejected",
-      "rls": {
-        "write": {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      }
-    },
-    "approved_at": {
-      "type": "string",
-      "format": "date-time",
-      "description": "When the user was approved",
-      "rls": {
-        "write": {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      }
-    },
-    "rejected_reason": {
-      "type": "string",
-      "description": "Reason for rejection",
-      "rls": {
-        "write": {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      }
+      "description": "\uc2b9\uc778 \uc0c1\ud0dc"
     },
     "academy_id": {
       "type": "string",
-      "description": "\uc18c\uc18d \ud559\uc6d0 ID",
-      "rls": {
-        "write": {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      }
+      "description": "Academy.id"
     },
     "class_id": {
       "type": "string",
-      "description": "\uc18c\uc18d \ud559\uae09 ID",
-      "rls": {
-        "write": {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      }
+      "description": "Class.id"
+    },
+    "grade": {
+      "type": "string",
+      "description": "\ud559\ub144 (1~6: \ucd081~6, 7~9: \uc9111~3, 10~12: \uace01~3)"
     }
-  },
-  "required": [
-    "role"
-  ]
+  }
 }
