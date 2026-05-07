@@ -28,6 +28,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Plus, MoreVertical } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import AssignmentForm from '@/components/AssignmentForm';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { format } from 'date-fns';
@@ -35,6 +36,7 @@ import { format } from 'date-fns';
 export default function TeacherAssignments() {
   const { data, loading: teacherLoading } = useTeacher();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const my_classes = data?.my_classes || [];
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -214,7 +216,11 @@ export default function TeacherAssignments() {
               ?.student_count || 0;
 
             return (
-              <Card key={assignment.id} className="hover:shadow-md transition-shadow">
+              <Card
+                key={assignment.id}
+                className="hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => navigate(`/teacher/assignments/${assignment.id}`)}
+              >
                 <CardHeader className="flex flex-row items-start justify-between pb-3">
                   <div className="flex-1">
                     <CardTitle className="text-lg">{assignment.title}</CardTitle>
@@ -229,25 +235,25 @@ export default function TeacherAssignments() {
                       {assignment.status === 'active' ? '진행중' : '마감'}
                     </Badge>
                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
+                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                         <Button variant="ghost" size="icon">
                           <MoreVertical className="w-4 h-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
+                      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                         {assignment.status === 'active' && (
                           <DropdownMenuItem
-                            onClick={() => handleClose(assignment.id)}
+                            onClick={(e) => { e.stopPropagation(); handleClose(assignment.id); }}
                           >
                             마감
                           </DropdownMenuItem>
                         )}
-                        <DropdownMenuItem onClick={() => handleDuplicate(assignment)}>
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDuplicate(assignment); }}>
                           복사하여 새 숙제
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           className="text-destructive"
-                          onClick={() => setDeleteId(assignment.id)}
+                          onClick={(e) => { e.stopPropagation(); setDeleteId(assignment.id); }}
                         >
                           삭제
                         </DropdownMenuItem>

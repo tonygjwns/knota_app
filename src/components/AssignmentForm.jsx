@@ -32,11 +32,12 @@ import { Slider } from '@/components/ui/slider';
 import { Search, X, RotateCcw } from 'lucide-react';
 import { InlineLoader } from '@/components/LoadingOverlay';
 
-export default function AssignmentForm({ classId, onSave, onClose }) {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [deadline, setDeadline] = useState('');
-  const [selectedProblems, setSelectedProblems] = useState([]);
+export default function AssignmentForm({ classId, onSave, onClose, assignment }) {
+  const [title, setTitle] = useState(assignment?.title || '');
+  const [description, setDescription] = useState(assignment?.description || '');
+  const [deadline, setDeadline] = useState(assignment?.deadline || '');
+  const initialProblemIds = assignment ? JSON.parse(assignment.problem_ids || '[]') : [];
+  const [selectedProblems, setSelectedProblems] = useState(initialProblemIds);
   const [selectionTab, setSelectionTab] = useState('tool');
   const [saving, setSaving] = useState(false);
 
@@ -142,16 +143,18 @@ export default function AssignmentForm({ classId, onSave, onClose }) {
         ...(selectionTab === 'domain' && { domain: selectedDomain }),
       };
 
-      await onSave({
+      const data = {
         title: title.trim(),
         description: description.trim() || null,
         class_id: classId,
         created_by: user.id,
         problem_ids: JSON.stringify(selectedProblems),
         deadline: deadline || null,
-        status: 'active',
+        status: assignment?.status || 'active',
         selection_criteria: JSON.stringify(criteria),
-      });
+      };
+
+      await onSave(data);
       onClose();
     } finally {
       setSaving(false);
@@ -174,7 +177,7 @@ export default function AssignmentForm({ classId, onSave, onClose }) {
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>새 숙제 출제</DialogTitle>
+          <DialogTitle>{assignment ? '숙제 수정' : '새 숙제 출제'}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -479,7 +482,7 @@ export default function AssignmentForm({ classId, onSave, onClose }) {
             onClick={handleSave}
             disabled={!title.trim() || selectedProblems.length === 0 || saving}
           >
-            {saving ? '저장 중...' : '숙제 출제'}
+            {saving ? '저장 중...' : assignment ? '수정 완료' : '숙제 출제'}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -38,37 +38,51 @@ export default function StudentDetail({ mode = 'admin' }) {
           }
         }
 
-        // 학생 fetch (mode 별 분기)
-         let studentData;
-         if (mode === 'teacher') {
-           // 캐시된 my_students 에서 찾기 (User.filter 호출 안 함)
-           const myStudent = teacherData?.my_students?.find(s => s.id === userId);
-           if (!myStudent) {
-             toast.error('학생을 찾을 수 없어요');
-             navigate('/teacher');
-             return;
-           }
-           studentData = myStudent;
-         } else {
-           // admin mode 는 User entity 접근 가능
-           const users = await base44.entities.User.filter({ id: userId });
-           if (users.length === 0) throw new Error('학생을 찾을 수 없어요');
-           studentData = users[0];
-         }
-         setStudent(studentData);
+        // [Stage 1] 학생 fetch
+        try {
+          let studentData;
+          if (mode === 'teacher') {
+            const myStudent = teacherData?.my_students?.find(s => s.id === userId);
+            if (!myStudent) {
+              toast.error('학생을 찾을 수 없어요');
+              navigate('/teacher');
+              return;
+            }
+            studentData = myStudent;
+          } else {
+            const users = await base44.entities.User.filter({ id: userId });
+            if (users.length === 0) throw new Error('학생을 찾을 수 없어요');
+            studentData = users[0];
+          }
+          setStudent(studentData);
+        } catch (e) {
+          console.error('Stage 1 - Student fetch failed:', e);
+          throw new Error(`학생 정보 로드 실패: ${e.message}`);
+        }
 
-        // 시도 fetch
-        const attemptsData = await base44.entities.StudentAttempt.filter(
-          { student_id: userId },
-          '-submitted_at',
-          1000
-        );
-        setAttempts(attemptsData);
+        // [Stage 2] 시도 fetch
+        try {
+          const attemptsData = await base44.entities.StudentAttempt.filter(
+            { student_id: userId },
+            '-submitted_at',
+            1000
+          );
+          setAttempts(attemptsData);
+        } catch (e) {
+          console.error('Stage 2 - StudentAttempt fetch failed:', e);
+          throw new Error(`시도 정보 로드 실패: ${e.message}`);
+        }
 
-        // 도구 fetch
-        const toolsData = await base44.entities.MathTool.list();
-        setTools(toolsData);
+        // [Stage 3] 도구 fetch
+        try {
+          const toolsData = await base44.entities.MathTool.list();
+          setTools(toolsData);
+        } catch (e) {
+          console.error('Stage 3 - MathTool fetch failed:', e);
+          throw new Error(`도구 정보 로드 실패: ${e.message}`);
+        }
       } catch (e) {
+        console.error('StudentDetail load error:', e);
         setError(e.message || '데이터를 불러오지 못했어요');
       } finally {
         setLoading(false);

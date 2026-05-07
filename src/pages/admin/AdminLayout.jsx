@@ -4,6 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { Users, BookOpen, CheckSquare, BarChart2, Building, GraduationCap, UserCheck } from 'lucide-react';
 import { toast } from 'sonner';
+import UserMenuDropdown from '@/components/UserMenuDropdown';
 
 const ADMIN_NAV = [
   { path: '/admin', icon: BarChart2, label: '대시보드', exact: true },
@@ -32,13 +33,13 @@ export default function AdminLayout() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Admin top bar */}
-      <header className="bg-slate-900 text-white px-4 py-3 flex items-center gap-3">
-        <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center">
-          <span className="text-white text-xs font-bold">관</span>
-        </div>
-        <span className="font-bold flex-1">관리자 패널</span>
-        <span className="text-sm text-slate-300 truncate max-w-[160px]">{user.full_name || user.email}</span>
-      </header>
+       <header className="bg-slate-900 text-white px-4 py-3 flex items-center gap-3">
+         <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center">
+           <span className="text-white text-xs font-bold">관</span>
+         </div>
+         <span className="font-bold flex-1">관리자 패널</span>
+         <UserMenuDropdown />
+       </header>
 
       <div className="flex flex-1">
         {/* Sidebar */}
@@ -61,43 +62,26 @@ export default function AdminLayout() {
               );
             })}
           </nav>
-          {/* User info + logout */}
-          <div className="mt-auto pt-3 border-t border-slate-700 space-y-2">
-            <div className="px-3 py-2 bg-slate-700 rounded-lg">
-              <p className="text-sm font-medium truncate">{user.full_name || '(이름 없음)'}</p>
-              <p className="text-xs text-slate-400 truncate">{user.email}</p>
-              <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-purple-600 text-white">관리자</span>
-            </div>
-            <button
-              onClick={() => base44.auth.logout('/')}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/10 text-slate-300 text-sm transition-colors">
-              로그아웃
-            </button>
-          </div>
+
         </aside>
 
         {/* Mobile admin nav — split into 2 rows if too many items */}
         <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-slate-800 border-t border-slate-700">
           <div className="flex items-center justify-around px-1 py-1.5 flex-wrap">
             {ADMIN_NAV.map(item => {
-              const active = item.exact
-                ? location.pathname === item.path
-                : location.pathname.startsWith(item.path);
-              return (
-                <Link key={item.path} to={item.path}
-                      className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg text-xs min-w-[48px] ${
-                        active ? 'text-primary' : 'text-slate-400'
-                      }`}>
-                  <item.icon className="w-4 h-4" />
-                  <span className="text-[10px]">{item.label}</span>
-                </Link>
-              );
-            })}
-            <button onClick={() => base44.auth.logout('/')}
-              className="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg text-xs text-slate-400 min-w-[48px]">
-              <span className="w-4 h-4 flex items-center justify-center text-base leading-none">↩</span>
-              <span className="text-[10px]">로그아웃</span>
-            </button>
+                const active = item.exact
+                  ? location.pathname === item.path
+                  : location.pathname.startsWith(item.path);
+                return (
+                  <Link key={item.path} to={item.path}
+                        className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg text-xs min-w-[48px] ${
+                          active ? 'text-primary' : 'text-slate-400'
+                        }`}>
+                    <item.icon className="w-4 h-4" />
+                    <span className="text-[10px]">{item.label}</span>
+                  </Link>
+                );
+              })}
           </div>
         </div>
 
