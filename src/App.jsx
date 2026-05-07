@@ -30,6 +30,7 @@ import TeacherStudents from './pages/teacher/TeacherStudents';
 import TeacherClasses from './pages/teacher/TeacherClasses';
 import TeacherAssignments from './pages/teacher/TeacherAssignments';
 import AssignmentDetail from './pages/teacher/AssignmentDetail';
+import StudentAssignment from './pages/StudentAssignment';
 import Profile from './pages/Profile';
 import StudentDetail from './pages/shared/StudentDetail';
 import ProblemDetail from './pages/shared/ProblemDetail';
@@ -78,6 +79,7 @@ const AuthenticatedApp = () => {
       <Route path="/problem/:id" element={<ProblemSolve />} />
       <Route path="/result/:id" element={<ResultView />} />
       <Route path="/history" element={<History />} />
+      <Route path="/assignment/:assignmentId" element={<StudentAssignment />} />
       <Route path="/profile" element={<Profile />} />
 
       {/* Admin routes */}

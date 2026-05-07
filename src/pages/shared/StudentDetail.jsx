@@ -2,24 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { useTeacher } from '@/lib/TeacherContext';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, User, Zap, TrendingUp, Loader2 } from 'lucide-react';
+import { ArrowLeft, User } from 'lucide-react';
 import { toast } from 'sonner';
-import { aggregateToolMastery, topWeakTools, topStrongTools } from '@/lib/toolMastery';
 import MathRenderer from '@/components/MathRenderer';
 
-export default function StudentDetail({ mode = 'admin' }) {
+export default function StudentDetail() {
   const { userId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data: teacherData } = useTeacher();
 
   const [student, setStudent] = useState(null);
   const [attempts, setAttempts] = useState([]);
-  const [tools, setTools] = useState([]);
+  const [weakTools, setWeakTools] = useState([]);
+  const [strongTools, setStrongTools] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sortKey, setSortKey] = useState('submitted_at');
@@ -29,87 +27,30 @@ export default function StudentDetail({ mode = 'admin' }) {
   useEffect(() => {
     const load = async () => {
       try {
-        // 권한 체크 (teacher mode)
-        if (mode === 'teacher') {
-          if (!teacherData?.my_students?.some(s => s.id === userId)) {
-            toast.error('접근 권한이 없어요');
-            navigate('/teacher');
-            return;
-          }
+        const result = await base44.functions.invoke('studentDetailSummary', { userId });
+        if (result.error) {
+          toast.error(result.error);
+          navigate(-1);
+          return;
         }
-
-        // [Stage 1] 학생 fetch
-        try {
-          let studentData;
-          if (mode === 'teacher') {
-            const myStudent = teacherData?.my_students?.find(s => s.id === userId);
-            if (!myStudent) {
-              toast.error('학생을 찾을 수 없어요');
-              navigate('/teacher');
-              return;
-            }
-            studentData = myStudent;
-          } else {
-            const users = await base44.entities.User.filter({ id: userId });
-            if (users.length === 0) throw new Error('학생을 찾을 수 없어요');
-            studentData = users[0];
-          }
-          setStudent(studentData);
-        } catch (e) {
-          console.error('Stage 1 - Student fetch failed:', e);
-          throw new Error(`학생 정보 로드 실패: ${e.message}`);
-        }
-
-        // [Stage 2] 시도 fetch
-        try {
-          const attemptsData = await base44.entities.StudentAttempt.filter(
-            { student_id: userId },
-            '-submitted_at',
-            1000
-          );
-          setAttempts(attemptsData);
-        } catch (e) {
-          console.error('Stage 2 - StudentAttempt fetch failed:', e);
-          throw new Error(`시도 정보 로드 실패: ${e.message}`);
-        }
-
-        // [Stage 3] 도구 fetch
-        try {
-          const toolsData = await base44.entities.MathTool.list();
-          setTools(toolsData);
-        } catch (e) {
-          console.error('Stage 3 - MathTool fetch failed:', e);
-          throw new Error(`도구 정보 로드 실패: ${e.message}`);
-        }
+        setStudent(result.student);
+        setAttempts(result.attempts || []);
+        setWeakTools(result.weak_tools || []);
+        setStrongTools(result.strong_tools || []);
       } catch (e) {
         console.error('StudentDetail load error:', e);
-        setError(e.message || '데이터를 불러오지 못했어요');
+        toast.error(e.message || '데이터를 불러오지 못했어요');
+        navigate(-1);
       } finally {
         setLoading(false);
       }
     };
     load();
-  }, [userId, mode, teacherData, navigate]);
+  }, [userId, navigate]);
 
   if (loading) return <InlineLoader message="학생 정보 불러오는 중..." />;
   if (error) return <div className="text-center py-12 text-red-500">{error}</div>;
   if (!student) return null;
-
-  // 매듭 인사이트
-  const problemMap = new Map();
-  attempts.forEach(a => {
-    if (!problemMap.has(a.problem_id)) {
-      problemMap.set(a.problem_id, {
-        domain_id: a.problem_id,
-        domain_name: a.problem_domain,
-        tool_ids: []
-      });
-    }
-  });
-  const toolNameMap = new Map(tools.map(t => [t.tool_id, t]));
-  const masteryMap = aggregateToolMastery(attempts, problemMap);
-  const weakTools = topWeakTools(masteryMap, toolNameMap, 5, 3);
-  const strongTools = topStrongTools(masteryMap, toolNameMap, 5, 70, 3);
 
   // 정렬
   const sorted = [...attempts].sort((a, b) => {
@@ -168,7 +109,7 @@ export default function StudentDetail({ mode = 'admin' }) {
             약점 매듭 (평균 점수 낮은 순)
           </h2>
           <div className="space-y-2">
-            {weakTools.slice(0, 5).map(tool => (
+            {weakTools.map(tool => (
               <div key={tool.tool_id} className="bg-red-50 rounded-lg p-3 border border-red-100">
                 <div className="flex items-center justify-between mb-2">
                   <p className="font-medium text-sm">{tool.name}</p>
@@ -193,7 +134,7 @@ export default function StudentDetail({ mode = 'admin' }) {
             강점 매듭 (Top 5)
           </h2>
           <div className="space-y-2">
-            {strongTools.slice(0, 5).map(tool => (
+            {strongTools.map(tool => (
               <div key={tool.tool_id} className="bg-emerald-50 rounded-lg p-3 border border-emerald-100">
                 <div className="flex items-center justify-between mb-2">
                   <p className="font-medium text-sm">{tool.name}</p>

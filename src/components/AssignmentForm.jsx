@@ -26,9 +26,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Card, CardContent, CardDescription } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Slider } from '@/components/ui/slider';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Search, X, RotateCcw } from 'lucide-react';
 import { InlineLoader } from '@/components/LoadingOverlay';
 
@@ -45,6 +45,7 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment })
   const [selectedTool, setSelectedTool] = useState('');
   const [toolCount, setToolCount] = useState(10);
   const [toolPreview, setToolPreview] = useState([]);
+  const [selectedToolPreviewIds, setSelectedToolPreviewIds] = useState(new Set());
   const [tools, setTools] = useState([]);
   const [toolsLoading, setToolsLoading] = useState(true);
 
@@ -52,6 +53,7 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment })
   const [selectedDomain, setSelectedDomain] = useState('');
   const [domainCount, setDomainCount] = useState(10);
   const [domainPreview, setDomainPreview] = useState([]);
+  const [selectedDomainPreviewIds, setSelectedDomainPreviewIds] = useState(new Set());
   const [domains, setDomains] = useState([]);
   const [domainsLoading, setDomainsLoading] = useState(true);
 
@@ -87,6 +89,7 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment })
     });
     const shuffled = filtered.sort(() => Math.random() - 0.5).slice(0, toolCount);
     setToolPreview(shuffled);
+    setSelectedToolPreviewIds(new Set(shuffled.map(p => p.id)));
   }, [selectedTool, toolCount, allProblems]);
 
   React.useEffect(() => {
@@ -99,11 +102,36 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment })
     const filtered = allProblems.filter(p => p.domain_id === selectedDomain);
     const shuffled = filtered.sort(() => Math.random() - 0.5).slice(0, domainCount);
     setDomainPreview(shuffled);
+    setSelectedDomainPreviewIds(new Set(shuffled.map(p => p.id)));
   }, [selectedDomain, domainCount, allProblems]);
 
   React.useEffect(() => {
     regenerateDomainPreview();
   }, [selectedDomain, domainCount, regenerateDomainPreview]);
+
+  // 체크박스 토글
+  const toggleToolPreview = (problemId) => {
+    setSelectedToolPreviewIds(prev => {
+      const next = new Set(prev);
+      if (next.has(problemId)) next.delete(problemId);
+      else next.add(problemId);
+      return next;
+    });
+  };
+
+  const toggleDomainPreview = (problemId) => {
+    setSelectedDomainPreviewIds(prev => {
+      const next = new Set(prev);
+      if (next.has(problemId)) next.delete(problemId);
+      else next.add(problemId);
+      return next;
+    });
+  };
+
+  const selectAllToolPreview = () => setSelectedToolPreviewIds(new Set(toolPreview.map(p => p.id)));
+  const deselectAllToolPreview = () => setSelectedToolPreviewIds(new Set());
+  const selectAllDomainPreview = () => setSelectedDomainPreviewIds(new Set(domainPreview.map(p => p.id)));
+  const deselectAllDomainPreview = () => setSelectedDomainPreviewIds(new Set());
 
   // 검색 필터
   const searchResults = useMemo(() => {
@@ -126,8 +154,8 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment })
   };
 
   // 도구별/단원별 미리보기 추가
-  const addPreviewProblems = (problems) => {
-    const ids = problems.map(p => p.id).filter(id => !selectedProblems.includes(id));
+  const addSelectedPreviewProblems = (problems, selectedIds) => {
+    const ids = problems.filter(p => selectedIds.has(p.id)).map(p => p.id).filter(id => !selectedProblems.includes(id));
     setSelectedProblems(prev => [...prev, ...ids]);
   };
 
@@ -249,51 +277,73 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment })
                       <>
                         <div>
                           <div className="flex justify-between items-center mb-2">
-                            <label className="text-sm font-medium">문제 수: {toolCount}</label>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => regenerateToolPreview()}
-                              className="gap-1"
-                            >
-                              <RotateCcw className="w-4 h-4" />
-                              다시 뽑기
-                            </Button>
+                            <label className="text-sm font-medium">문제 수</label>
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="number"
+                                min={1}
+                                max={50}
+                                value={toolCount}
+                                onChange={(e) => setToolCount(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
+                                className="w-20 h-8"
+                              />
+                              <span className="text-sm text-muted-foreground">개</span>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => regenerateToolPreview()}
+                                className="gap-1"
+                              >
+                                <RotateCcw className="w-4 h-4" />
+                                다시 뽑기
+                              </Button>
+                            </div>
                           </div>
-                          <Slider
-                            value={[toolCount]}
-                            onValueChange={([v]) => setToolCount(v)}
-                            min={5}
-                            max={30}
-                            step={5}
-                            className="w-full"
-                          />
                         </div>
 
                         <div>
-                          <p className="text-xs text-muted-foreground mb-2">
-                            미리보기 ({toolPreview.length}개)
-                          </p>
+                          <div className="flex justify-between items-center mb-2">
+                            <p className="text-xs text-muted-foreground">미리보기 ({toolPreview.length}개)</p>
+                            <div className="flex gap-1">
+                              <Button variant="ghost" size="sm" onClick={selectAllToolPreview} className="h-6 text-xs">전체 선택</Button>
+                              <Button variant="ghost" size="sm" onClick={deselectAllToolPreview} className="h-6 text-xs">전체 해제</Button>
+                            </div>
+                          </div>
                           <div className="space-y-2 max-h-40 overflow-y-auto">
-                            {toolPreview.map(p => (
-                              <Card key={p.id} className="p-3">
-                                <p className="text-xs font-mono text-muted-foreground">
-                                  {p.id.slice(0, 8)}...
-                                </p>
-                                <p className="text-sm truncate">
-                                  {parseProblemText(p.content).substring(0, 50)}...
-                                </p>
-                              </Card>
-                            ))}
+                            {toolPreview.map(p => {
+                              const isSelected = selectedToolPreviewIds.has(p.id);
+                              return (
+                                <Card
+                                  key={p.id}
+                                  className={`p-3 cursor-pointer transition-all ${
+                                    isSelected ? 'border-primary bg-primary/5' : 'hover:bg-muted'
+                                  }`}
+                                  onClick={() => toggleToolPreview(p.id)}
+                                >
+                                  <div className="flex items-start gap-2">
+                                    <Checkbox checked={isSelected} onChange={() => toggleToolPreview(p.id)} />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-xs font-mono text-muted-foreground">
+                                        {p.id.slice(0, 8)}...
+                                      </p>
+                                      <p className="text-sm truncate">
+                                        {parseProblemText(p.content).substring(0, 50)}...
+                                      </p>
+                                    </div>
+                                  </div>
+                                </Card>
+                              );
+                            })}
                           </div>
                         </div>
 
                         {toolPreview.length > 0 && (
                           <Button
-                            onClick={() => addPreviewProblems(toolPreview)}
+                            onClick={() => addSelectedPreviewProblems(toolPreview, selectedToolPreviewIds)}
                             className="w-full"
+                            disabled={selectedToolPreviewIds.size === 0}
                           >
-                            이 문제들 추가 ({toolPreview.length})
+                            선택한 {selectedToolPreviewIds.size}개 문제 추가
                           </Button>
                         )}
                       </>
@@ -328,53 +378,73 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment })
                       <>
                         <div>
                           <div className="flex justify-between items-center mb-2">
-                            <label className="text-sm font-medium">
-                              문제 수: {domainCount}
-                            </label>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => regenerateDomainPreview()}
-                              className="gap-1"
-                            >
-                              <RotateCcw className="w-4 h-4" />
-                              다시 뽑기
-                            </Button>
+                            <label className="text-sm font-medium">문제 수</label>
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="number"
+                                min={1}
+                                max={50}
+                                value={domainCount}
+                                onChange={(e) => setDomainCount(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
+                                className="w-20 h-8"
+                              />
+                              <span className="text-sm text-muted-foreground">개</span>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => regenerateDomainPreview()}
+                                className="gap-1"
+                              >
+                                <RotateCcw className="w-4 h-4" />
+                                다시 뽑기
+                              </Button>
+                            </div>
                           </div>
-                          <Slider
-                            value={[domainCount]}
-                            onValueChange={([v]) => setDomainCount(v)}
-                            min={5}
-                            max={30}
-                            step={5}
-                            className="w-full"
-                          />
                         </div>
 
                         <div>
-                          <p className="text-xs text-muted-foreground mb-2">
-                            미리보기 ({domainPreview.length}개)
-                          </p>
+                          <div className="flex justify-between items-center mb-2">
+                            <p className="text-xs text-muted-foreground">미리보기 ({domainPreview.length}개)</p>
+                            <div className="flex gap-1">
+                              <Button variant="ghost" size="sm" onClick={selectAllDomainPreview} className="h-6 text-xs">전체 선택</Button>
+                              <Button variant="ghost" size="sm" onClick={deselectAllDomainPreview} className="h-6 text-xs">전체 해제</Button>
+                            </div>
+                          </div>
                           <div className="space-y-2 max-h-40 overflow-y-auto">
-                            {domainPreview.map(p => (
-                              <Card key={p.id} className="p-3">
-                                <p className="text-xs font-mono text-muted-foreground">
-                                  {p.id.slice(0, 8)}...
-                                </p>
-                                <p className="text-sm truncate">
-                                  {parseProblemText(p.content).substring(0, 50)}...
-                                </p>
-                              </Card>
-                            ))}
+                            {domainPreview.map(p => {
+                              const isSelected = selectedDomainPreviewIds.has(p.id);
+                              return (
+                                <Card
+                                  key={p.id}
+                                  className={`p-3 cursor-pointer transition-all ${
+                                    isSelected ? 'border-primary bg-primary/5' : 'hover:bg-muted'
+                                  }`}
+                                  onClick={() => toggleDomainPreview(p.id)}
+                                >
+                                  <div className="flex items-start gap-2">
+                                    <Checkbox checked={isSelected} onChange={() => toggleDomainPreview(p.id)} />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-xs font-mono text-muted-foreground">
+                                        {p.id.slice(0, 8)}...
+                                      </p>
+                                      <p className="text-sm truncate">
+                                        {parseProblemText(p.content).substring(0, 50)}...
+                                      </p>
+                                    </div>
+                                  </div>
+                                </Card>
+                              );
+                            })}
                           </div>
                         </div>
 
                         {domainPreview.length > 0 && (
                           <Button
-                            onClick={() => addPreviewProblems(domainPreview)}
+                            onClick={() => addSelectedPreviewProblems(domainPreview, selectedDomainPreviewIds)}
                             className="w-full"
+                            disabled={selectedDomainPreviewIds.size === 0}
                           >
-                            이 문제들 추가 ({domainPreview.length})
+                            선택한 {selectedDomainPreviewIds.size}개 문제 추가
                           </Button>
                         )}
                       </>

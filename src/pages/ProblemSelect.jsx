@@ -6,8 +6,9 @@ import AppLayout from '@/components/AppLayout';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import ScoreBadge from '@/components/ScoreBadge';
-import { Shuffle, BookOpen, Wrench, AlertCircle, ChevronRight, ArrowLeft, Clock } from 'lucide-react';
+import { Shuffle, BookOpen, Wrench, AlertCircle, ChevronRight, ArrowLeft, Clock, ClipboardList, CheckCircle } from 'lucide-react';
 
 // ──────────────────────────────────────────────
 // Hub placeholder card
@@ -32,9 +33,101 @@ function ComingSoonCard({ title, desc }) {
 }
 
 // ──────────────────────────────────────────────
+// Assignment card for student
+// ──────────────────────────────────────────────
+function AssignmentCard({ assignment, user }) {
+  const navigate = useNavigate();
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
+
+  useEffect(() => {
+    const loadProgress = async () => {
+      try {
+        const problemIds = JSON.parse(assignment.problem_ids || '[]');
+        const attempts = await base44.entities.StudentAttempt.filter(
+          { student_id: user.id, assignment_id: assignment.id },
+          '-submitted_at',
+          100
+        );
+        const uniqueDone = new Set(attempts.map(a => a.problem_id)).size;
+        setProgress({ done: uniqueDone, total: problemIds.length });
+      } catch (e) {
+        console.error('Failed to load progress:', e);
+      }
+    };
+    loadProgress();
+  }, [assignment, user.id]);
+
+  const deadline = assignment.deadline ? new Date(assignment.deadline) : null;
+  const now = new Date();
+  const isUrgent = deadline && deadline.getTime() - now.getTime() < 24 * 60 * 60 * 1000;
+  const daysLeft = deadline ? Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+
+  return (
+    <Card
+      className="p-4 card-hover cursor-pointer"
+      onClick={() => navigate(`/assignment/${assignment.id}`)}
+    >
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <p className="font-semibold text-foreground truncate">{assignment.title}</p>
+            {isUrgent && (
+              <Badge className="bg-red-500 text-white text-xs">마감 임박</Badge>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {deadline
+              ? `마감: ${deadline.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} (${daysLeft > 0 ? `D-${daysLeft}` : '오늘'})`
+              : '마감 없음'}
+          </p>
+        </div>
+        <ClipboardList className="w-5 h-5 text-primary flex-shrink-0" />
+      </div>
+
+      {/* Progress */}
+      <div className="space-y-1">
+        <div className="flex justify-between text-xs text-muted-foreground">
+          <span>진행률</span>
+          <span>{progress.done}/{progress.total} 문제</span>
+        </div>
+        <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+          <div
+            className="bg-primary h-full transition-all"
+            style={{ width: `${progress.total > 0 ? (progress.done / progress.total) * 100 : 0}%` }}
+          />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// ──────────────────────────────────────────────
 // Hub main (no mode param)
 // ──────────────────────────────────────────────
 function ProblemHub() {
+  const { user } = useAuth();
+  const [assignments, setAssignments] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadAssignments = async () => {
+      if (!user?.class_id) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const all = await base44.entities.Assignment.filter({ class_id: user.class_id }, '-created_date', 100);
+        const active = all.filter(a => a.status === 'active');
+        setAssignments(active);
+      } catch (e) {
+        console.error('Failed to load assignments:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadAssignments();
+  }, [user]);
+
   return (
     <AppLayout>
       <div className="space-y-7">
@@ -46,10 +139,17 @@ function ProblemHub() {
         {/* 받은 숙제 */}
         <section className="space-y-2">
           <h2 className="text-base font-semibold text-foreground">받은 숙제</h2>
-          <ComingSoonCard
-            title="숙제가 없어요"
-            desc="곧 강사 숙제 출제 기능이 추가돼요"
-          />
+          {loading ? (
+            <div className="text-center py-6"><InlineLoader message="숙제 불러오는 중..." /></div>
+          ) : assignments.length === 0 ? (
+            <ComingSoonCard title="받은 숙제가 없어요" desc="강사님이 숙제를 출제하면 여기에 표시돼요" />
+          ) : (
+            <div className="space-y-2">
+              {assignments.map(assignment => (
+                <AssignmentCard key={assignment.id} assignment={assignment} user={user} />
+              ))}
+            </div>
+          )}
         </section>
 
         {/* 오늘의 추천 */}

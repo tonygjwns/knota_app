@@ -59,6 +59,8 @@ export default function ProblemSolve() {
   const { id } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = new URLSearchParams(window.location.search);
+  const assignmentId = searchParams.get('assignment_id');
 
   const [problem, setProblem] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -327,6 +329,7 @@ ${ocrText}
         started_at: startedAt.current,
         submitted_at: submittedAt,
         duration_sec: durationSec,
+        assignment_id: assignmentId || null,
       });
 
       setStage(null);

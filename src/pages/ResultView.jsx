@@ -257,6 +257,25 @@ export default function ResultView() {
   };
 
   const handleNextProblem = async () => {
+    // 숙제 안에서는 다음 안 푼 문제로 이동
+    if (attempt.assignment_id) {
+      const assignment = await base44.entities.Assignment.filter({ id: attempt.assignment_id }).then(r => r[0]);
+      if (assignment) {
+        const problemIds = JSON.parse(assignment.problem_ids || '[]');
+        const myAttempts = await base44.entities.StudentAttempt.filter(
+          { student_id: user.id, assignment_id: attempt.assignment_id },
+          '-submitted_at',
+          100
+        );
+        const doneIds = new Set(myAttempts.map(a => a.problem_id));
+        const nextId = problemIds.find(id => !doneIds.has(id));
+        if (nextId) {
+          navigate(`/problem/${nextId}?assignment_id=${attempt.assignment_id}`);
+          return;
+        }
+      }
+    }
+    // 일반 자유 풀이
     const problems = await base44.entities.Problem.list('-created_date', 1000);
     if (problems.length > 0) {
       const idx = Math.floor(Math.random() * problems.length);
@@ -518,18 +537,24 @@ export default function ResultView() {
         )}
 
         {/* Action buttons */}
-        <div className="grid grid-cols-3 gap-2 pt-2">
+        <div className="grid grid-cols-2 gap-2 pt-2">
           <Button variant="outline" size="sm" className="btn-touch" onClick={() => navigate('/home')}>
             메인으로
           </Button>
-          <Button variant="outline" size="sm" className="btn-touch"
-                  onClick={() => navigate(`/problem/${attempt.problem_id}`)}>
-            <RotateCcw className="w-4 h-4 mr-1" /> 다시 풀기
-          </Button>
-          <Button size="sm" className="btn-touch" onClick={handleNextProblem}>
-            다음 문제 <ChevronRight className="w-4 h-4 ml-1" />
-          </Button>
+          {attempt.assignment_id ? (
+            <Button size="sm" className="btn-touch" onClick={() => navigate(`/assignment/${attempt.assignment_id}`)}>
+              <ArrowLeft className="w-4 h-4 mr-1" /> 숙제로 돌아가기
+            </Button>
+          ) : (
+            <Button variant="outline" size="sm" className="btn-touch"
+                    onClick={() => navigate(`/problem/${attempt.problem_id}`)}>
+              <RotateCcw className="w-4 h-4 mr-1" /> 다시 풀기
+            </Button>
+          )}
         </div>
+        <Button size="sm" className="btn-touch w-full mt-2" onClick={handleNextProblem}>
+          {attempt.assignment_id ? '다음 문제 (숙제)' : '다음 문제'} <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
       </div>
     </AppLayout>
   );
