@@ -33,6 +33,64 @@ function ComingSoonCard({ title, desc }) {
 }
 
 // ──────────────────────────────────────────────
+// Closed assignment card (gray, expired)
+// ──────────────────────────────────────────────
+function ClosedAssignmentCard({ assignment, user }) {
+  const navigate = useNavigate();
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
+
+  useEffect(() => {
+    const loadProgress = async () => {
+      try {
+        const problemIds = JSON.parse(assignment.problem_ids || '[]');
+        const attempts = await base44.entities.StudentAttempt.filter(
+          { student_id: user.id, assignment_id: assignment.id },
+          '-submitted_at',
+          100
+        );
+        const uniqueDone = new Set(attempts.map(a => a.problem_id)).size;
+        setProgress({ done: uniqueDone, total: problemIds.length });
+      } catch (e) {
+        console.error('Failed to load progress:', e);
+      }
+    };
+    loadProgress();
+  }, [assignment, user.id]);
+
+  return (
+    <Card
+      className="p-4 cursor-pointer border-2 border-gray-200 bg-gray-50/50"
+      onClick={() => navigate(`/assignment/${assignment.id}`)}
+    >
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <p className="font-semibold text-foreground truncate text-gray-500">{assignment.title}</p>
+            <Badge className="bg-gray-400 text-white text-xs">마감됨</Badge>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            마감: {new Date(assignment.deadline || assignment.created_date).toLocaleDateString('ko-KR')}
+          </p>
+        </div>
+        <ClipboardList className="w-5 h-5 text-gray-400 flex-shrink-0" />
+      </div>
+      <div className="space-y-1">
+        <div className="flex justify-between text-xs text-muted-foreground">
+          <span>진행률</span>
+          <span>{progress.done}/{progress.total} 문제</span>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+          <div
+            className="bg-gray-400 h-full transition-all"
+            style={{ width: `${progress.total > 0 ? (progress.done / progress.total) * 100 : 0}%` }}
+          />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// ──────────────────────────────────────────────
 // Assignment card for student
 // ──────────────────────────────────────────────
 function AssignmentCard({ assignment, user }) {
@@ -108,6 +166,7 @@ function ProblemHub() {
   const { user } = useAuth();
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showClosed, setShowClosed] = useState(false);
 
   useEffect(() => {
     const loadAssignments = async () => {
@@ -117,8 +176,10 @@ function ProblemHub() {
       }
       try {
         const all = await base44.entities.Assignment.filter({ class_id: user.class_id }, '-created_date', 100);
-        const active = all.filter(a => a.status === 'active');
-        setAssignments(active);
+        const now = new Date();
+        const active = all.filter(a => a.status === 'active' || (a.deadline && new Date(a.deadline) > now));
+        const closed = all.filter(a => a.status === 'closed' || (a.deadline && new Date(a.deadline) <= now));
+        setAssignments({ active, closed });
       } catch (e) {
         console.error('Failed to load assignments:', e);
       } finally {
@@ -141,13 +202,38 @@ function ProblemHub() {
           <h2 className="text-base font-semibold text-foreground">받은 숙제</h2>
           {loading ? (
             <div className="text-center py-6"><InlineLoader message="숙제 불러오는 중..." /></div>
-          ) : assignments.length === 0 ? (
+          ) : !assignments.active || assignments.active.length === 0 ? (
             <ComingSoonCard title="받은 숙제가 없어요" desc="강사님이 숙제를 출제하면 여기에 표시돼요" />
           ) : (
-            <div className="space-y-2">
-              {assignments.map(assignment => (
-                <AssignmentCard key={assignment.id} assignment={assignment} user={user} />
-              ))}
+            <div className="space-y-3">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+                  📋 진행 중 ({assignments.active.length})
+                </h3>
+                <div className="space-y-2">
+                  {assignments.active.map(assignment => (
+                    <AssignmentCard key={assignment.id} assignment={assignment} user={user} />
+                  ))}
+                </div>
+              </div>
+              {assignments.closed && assignments.closed.length > 0 && (
+                <div>
+                  <button
+                    onClick={() => setShowClosed(!showClosed)}
+                    className="text-sm font-semibold text-muted-foreground hover:text-foreground flex items-center gap-2 mb-2"
+                  >
+                    📁 마감된 숙제 ({assignments.closed.length})
+                    <ChevronRight className={`w-4 h-4 transition-transform ${showClosed ? 'rotate-90' : ''}`} />
+                  </button>
+                  {showClosed && (
+                    <div className="space-y-2">
+                      {assignments.closed.map(assignment => (
+                        <ClosedAssignmentCard key={assignment.id} assignment={assignment} user={user} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </section>

@@ -514,26 +514,42 @@ export default function ResultView() {
           )}
         </div>
 
-        {/* 이 매듭 더 연습하기 — Coming Soon */}
-        {weakToolNames.length > 0 && (
-          <div className="rounded-xl border border-border bg-muted/40 p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Clock className="w-4 h-4 text-muted-foreground" />
-              <p className="text-sm font-semibold text-foreground">이 매듭 더 연습하기</p>
-              <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full border border-border">
-                곧 추가될 기능
-              </span>
+        {/* 매듭 보강 권유 카드 */}
+        {(attempt.correctness === 'partial' || attempt.correctness === 'wrong') && weakToolIds.length > 0 && (
+          <Card className="p-4 border-primary/30 bg-primary/5">
+            <div className="flex items-start gap-3 mb-3">
+              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                <Wrench className="w-4 h-4 text-primary" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-foreground mb-1">🎯 매듭 보강하기</h3>
+                <p className="text-xs text-muted-foreground">
+                  {weakToolNames.length > 0
+                    ? `[${weakToolNames.join(', ')}] 부분이 어려웠어요`
+                    : '일부 매듭이 부족했어요'}
+                </p>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {weakToolNames.map((name, i) => (
-                <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">
-                  <Wrench className="w-3 h-3" />
-                  {name}
-                </span>
-              ))}
+            <p className="text-xs text-muted-foreground mb-3">
+              매듭 학습 + 유사 문제 3 개로 보강해 봐요
+            </p>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                className="flex-1"
+                onClick={() => navigate(`/remediation/${attempt.id}/retry`)}
+              >
+                보강 시작하기
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {}}
+              >
+                그냥 넘어가기
+              </Button>
             </div>
-            <p className="text-xs text-muted-foreground">곧 이 도구 연습 문제 추천이 추가돼요</p>
-          </div>
+          </Card>
         )}
 
         {/* Action buttons */}

@@ -88,6 +88,7 @@ export default function StudentAssignment() {
   const now = new Date();
   const isUrgent = deadline && deadline.getTime() - now.getTime() < 24 * 60 * 60 * 1000;
   const daysLeft = deadline ? Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+  const isClosed = assignment.status === 'closed' || (deadline && deadline <= now);
 
   return (
     <AppLayout>
@@ -137,23 +138,32 @@ export default function StudentAssignment() {
           )}
         </Card>
 
-        {/* Continue button */}
-        {assignment.status === 'active' && (
-          <Button
-            size="lg"
-            className="w-full"
-            onClick={() => {
-              if (nextUnfinishedProblem) {
-                navigate(`/problem/${nextUnfinishedProblem.id}?assignment_id=${assignment.id}`);
-              } else if (problems.length > 0) {
-                navigate(`/problem/${problems[0].id}?assignment_id=${assignment.id}`);
-              }
-            }}
-            disabled={assignment.status !== 'active'}
-          >
-            {allDone ? '다시 풀기' : nextUnfinishedProblem ? '이어 풀기' : '문제 풀기'}
-          </Button>
+        {/* Closed notice */}
+        {isClosed && (
+          <Card className="p-4 bg-gray-50 border-gray-200">
+            <p className="text-sm text-muted-foreground flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              이 숙제는 마감됐어요
+            </p>
+          </Card>
         )}
+
+        {/* Continue / View Results button */}
+        <Button
+          size="lg"
+          className="w-full"
+          variant={isClosed ? 'outline' : 'default'}
+          onClick={() => {
+            if (nextUnfinishedProblem && !isClosed) {
+              navigate(`/problem/${nextUnfinishedProblem.id}?assignment_id=${assignment.id}`);
+            } else if (problems.length > 0) {
+              navigate(`/problem/${problems[0].id}?assignment_id=${assignment.id}`);
+            }
+          }}
+          disabled={isClosed && !allDone}
+        >
+          {isClosed ? '결과 보기' : allDone ? '다시 풀기' : nextUnfinishedProblem ? '이어 풀기' : '문제 풀기'}
+        </Button>
 
         {/* Problem list */}
         <div>
@@ -162,15 +172,20 @@ export default function StudentAssignment() {
             {problems.map(p => {
               const attempt = attemptMap.get(p.id);
               const isDone = !!attempt;
+              const isDisabled = isClosed && !isDone;
               return (
                 <Card
                   key={p.id}
-                  className={`p-4 cursor-pointer transition-all ${
-                    isDone
-                      ? 'border-emerald-200 bg-emerald-50/30 hover:bg-emerald-50'
-                      : 'border-border hover:bg-muted'
+                  className={`p-4 transition-all ${
+                    isDisabled
+                      ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
+                      : isDone
+                        ? 'border-emerald-200 bg-emerald-50/30 hover:bg-emerald-50 cursor-pointer'
+                        : 'border-border hover:bg-muted cursor-pointer'
                   }`}
-                  onClick={() => navigate(`/problem/${p.id}?assignment_id=${assignment.id}`)}
+                  onClick={() => {
+                    if (!isDisabled) navigate(`/problem/${p.id}?assignment_id=${assignment.id}`);
+                  }}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
@@ -185,6 +200,11 @@ export default function StudentAssignment() {
                         <div className="flex items-center gap-1 text-emerald-600">
                           <CheckCircle className="w-5 h-5" />
                           <span className="text-xs font-bold">{attempt.score}점</span>
+                        </div>
+                      ) : isDisabled ? (
+                        <div className="flex items-center gap-1 text-gray-400">
+                          <Clock className="w-5 h-5" />
+                          <span className="text-xs">마감됨</span>
                         </div>
                       ) : (
                         <Circle className="w-5 h-5 text-muted-foreground" />

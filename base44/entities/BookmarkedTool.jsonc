@@ -1,0 +1,26 @@
+{
+  "name": "BookmarkedTool",
+  "type": "object",
+  "properties": {
+    "student_id": {
+      "type": "string",
+      "description": "User ID of the student"
+    },
+    "tool_id": {
+      "type": "string",
+      "description": "MathTool.tool_id"
+    },
+    "context_attempt_id": {
+      "type": "string",
+      "description": "\ubcf4\uac15 \uc911\uc774\ub358 attempt id"
+    },
+    "note": {
+      "type": "string",
+      "description": "\ud559\uc0dd \uba54\ubaa8 (\uc120\ud0dd)"
+    }
+  },
+  "required": [
+    "student_id",
+    "tool_id"
+  ]
+}
