@@ -213,6 +213,7 @@ ${OCR_SYSTEM_PROMPT}`;
 5. 할루시 방지 — 학생이 쓰지 않은 내용 추측 금지. 확신 없으면 confidence ↓
 6. OCR 검증 — OCR 결과가 의심스러우면 ocr_quality_concern에 구체적 우려 텍스트 명시
 7. Actionable feedback — "다시 살펴봐요" 같은 모호한 말 금지. 어느 자리/왜를 step_feedback, gap_locations, error_locations에 명시
+8. 매듭(도구) 매핑 — error_locations 와 gap_locations 의 각 항목에서 오류/공백이 correct_solution_path 의 어느 도구에 해당하는지 식별 가능하면 tool_id 필드에 그 도구 ID를 적어주세요. correct_solution_path의 'Step N: 도구 = "X"' 양식을 참고하세요. 식별 불가시 null.
 
 ## 점수 기준
 - 100 = 정답 + 풀이 완전 + 표기 정합
@@ -280,7 +281,8 @@ ${ocrText}
                 type: 'object',
                 properties: {
                   description: { type: 'string' },
-                  expected_step: { type: 'string' }
+                  expected_step: { type: 'string' },
+                  tool_id: { type: 'string', description: 'correct_solution_path 에서 매핑된 도구 ID. 불명확하면 null.' }
                 },
                 required: ['description', 'expected_step']
               }
@@ -293,7 +295,8 @@ ${ocrText}
                   description: { type: 'string' },
                   student_wrote: { type: 'string' },
                   correct_form: { type: 'string' },
-                  error_type: { type: 'string', enum: ['calculation', 'conceptual', 'notation'] }
+                  error_type: { type: 'string', enum: ['calculation', 'conceptual', 'notation'] },
+                  tool_id: { type: 'string', description: 'correct_solution_path 에서 매핑된 도구 ID. 불명확하면 null.' }
                 },
                 required: ['description', 'student_wrote', 'correct_form', 'error_type']
               }

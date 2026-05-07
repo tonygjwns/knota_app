@@ -10,7 +10,7 @@ import ScoreBadge, { ScoreSummaryText, StepStatusBadge } from '@/components/Scor
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { ChevronDown, ChevronUp, AlertTriangle, ArrowLeft, RotateCcw, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle, ArrowLeft, RotateCcw, ChevronRight, Clock, Wrench } from 'lucide-react';
 import { toast } from 'sonner';
 
 const REGRADE_PROMPT_TEMPLATE = (problemContent, correctedText) => `당신은 한국 K-12 수학 풀이 채점 전문가입니다.
@@ -24,6 +24,7 @@ const REGRADE_PROMPT_TEMPLATE = (problemContent, correctedText) => `당신은 �
 4. 오류 분류: calculation / conceptual / notation
 5. 할루시 방지 — 학생이 쓰지 않은 내용 추측 금지
 6. Actionable feedback — 어느 자리/왜를 명시
+7. 매듭(도구) 매핑 — error_locations 와 gap_locations 항목에서 correct_solution_path 의 어느 도구에 해당하는지 식별 가능하면 tool_id 에 도구 ID를 적어주세요. 식별 불가시 null.
 
 ## 점수 기준
 - 100 = 정답 + 풀이 완전 + 표기 정합
@@ -43,6 +44,60 @@ ${correctedText}
 </student_ocr_solution>
 
 위 학생 풀이를 GradingOutput JSON 스키마 양식으로 채점해 주세요.`;
+
+const REGRADE_SCHEMA = {
+  type: 'object',
+  properties: {
+    schema_version: { type: 'string', enum: ['v1'] },
+    score: { type: 'integer', minimum: 0, maximum: 100 },
+    correctness: { type: 'string', enum: ['correct', 'partial', 'wrong'] },
+    summary: { type: 'string' },
+    step_feedback: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          step_number: { type: 'integer', minimum: 1 },
+          student_step: { type: 'string' },
+          status: { type: 'string', enum: ['correct', 'partial', 'missing', 'wrong'] },
+          comment: { type: 'string' },
+          correction: { type: 'string' }
+        },
+        required: ['step_number', 'student_step', 'status', 'comment']
+      }
+    },
+    gap_locations: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          description: { type: 'string' },
+          expected_step: { type: 'string' },
+          tool_id: { type: 'string' }
+        },
+        required: ['description', 'expected_step']
+      }
+    },
+    error_locations: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          description: { type: 'string' },
+          student_wrote: { type: 'string' },
+          correct_form: { type: 'string' },
+          error_type: { type: 'string', enum: ['calculation', 'conceptual', 'notation'] },
+          tool_id: { type: 'string' }
+        },
+        required: ['description', 'student_wrote', 'correct_form', 'error_type']
+      }
+    },
+    alternative_solution: { type: 'string' },
+    confidence: { type: 'integer', minimum: 0, maximum: 100 },
+    ocr_quality_concern: { type: 'string' }
+  },
+  required: ['schema_version', 'score', 'correctness', 'summary', 'step_feedback', 'gap_locations', 'error_locations', 'confidence']
+};
 
 function StepCard({ step }) {
   const [open, setOpen] = useState(step.status !== 'correct');
@@ -103,6 +158,8 @@ export default function ResultView() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [attempt, setAttempt] = useState(null);
+  const [problem, setProblem] = useState(null);
+  const [tools, setTools] = useState([]); // MathTool[]
   const [loading, setLoading] = useState(true);
   const [grading, setGrading] = useState(null);
   const [showOCR, setShowOCR] = useState(false);
@@ -110,6 +167,7 @@ export default function ResultView() {
   const [correctedText, setCorrectedText] = useState('');
   const [regrading, setRegrading] = useState(false);
   const [showAlt, setShowAlt] = useState(false);
+  const [tooltipTool, setTooltipTool] = useState(null); // tool entity for tooltip modal
 
   useEffect(() => {
     loadAttempt();
@@ -121,7 +179,6 @@ export default function ResultView() {
       const attempts = await base44.entities.StudentAttempt.filter({ id }, '-created_date', 1);
       if (attempts.length > 0) {
         const a = attempts[0];
-        // 보안: 본인 또는 admin만 접근 가능
         if (user && a.student_id !== user.id && user.role !== 'admin') {
           toast.error('이 결과를 볼 권한이 없어요');
           navigate('/home');
@@ -135,10 +192,37 @@ export default function ResultView() {
           } catch {}
         }
         setCorrectedText(a.ocr_corrected_text || a.ocr_text || '');
+
+        // Fetch problem + tools
+        if (a.problem_id) {
+          const problems = await base44.entities.Problem.filter({ id: a.problem_id }, '-created_date', 1);
+          if (problems.length > 0) {
+            const prob = problems[0];
+            setProblem(prob);
+            // Parse tool_ids and fetch MathTools
+            let toolIds = [];
+            try {
+              const parsed = JSON.parse(prob.tool_ids || '[]');
+              if (Array.isArray(parsed)) toolIds = parsed.filter(Boolean);
+            } catch {}
+            if (toolIds.length > 0) {
+              const allTools = await base44.entities.MathTool.list('name', 100);
+              setTools(allTools.filter(t => toolIds.includes(t.tool_id)));
+            }
+          }
+        }
       }
     } finally {
       setLoading(false);
     }
+  };
+
+  // Build toolId → name map for error/gap display
+  const toolNameMap = new Map(tools.map(t => [t.tool_id, t.name]));
+
+  const getToolName = (toolId) => {
+    if (!toolId) return null;
+    return toolNameMap.get(toolId) || '도구 미식별';
   };
 
   const handleRegrade = async () => {
@@ -148,62 +232,11 @@ export default function ResultView() {
       const resultRaw = await base44.integrations.Core.InvokeLLM({
         prompt: REGRADE_PROMPT_TEMPLATE(attempt.problem_content, correctedText),
         model: 'claude_sonnet_4_6',
-        response_json_schema: {
-          type: 'object',
-          properties: {
-            schema_version: { type: 'string', enum: ['v1'] },
-            score: { type: 'integer', minimum: 0, maximum: 100 },
-            correctness: { type: 'string', enum: ['correct', 'partial', 'wrong'] },
-            summary: { type: 'string' },
-            step_feedback: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  step_number: { type: 'integer', minimum: 1 },
-                  student_step: { type: 'string' },
-                  status: { type: 'string', enum: ['correct', 'partial', 'missing', 'wrong'] },
-                  comment: { type: 'string' },
-                  correction: { type: 'string' }
-                },
-                required: ['step_number', 'student_step', 'status', 'comment']
-              }
-            },
-            gap_locations: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  description: { type: 'string' },
-                  expected_step: { type: 'string' }
-                },
-                required: ['description', 'expected_step']
-              }
-            },
-            error_locations: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  description: { type: 'string' },
-                  student_wrote: { type: 'string' },
-                  correct_form: { type: 'string' },
-                  error_type: { type: 'string', enum: ['calculation', 'conceptual', 'notation'] }
-                },
-                required: ['description', 'student_wrote', 'correct_form', 'error_type']
-              }
-            },
-            alternative_solution: { type: 'string' },
-            confidence: { type: 'integer', minimum: 0, maximum: 100 },
-            ocr_quality_concern: { type: 'string' }
-          },
-          required: ['schema_version', 'score', 'correctness', 'summary', 'step_feedback', 'gap_locations', 'error_locations', 'confidence']
-        }
+        response_json_schema: REGRADE_SCHEMA
       });
 
       const result = resultRaw?.response ?? resultRaw;
 
-      // Update attempt
       await base44.entities.StudentAttempt.update(attempt.id, {
         ocr_corrected_text: correctedText,
         claude_grade_json: JSON.stringify(result),
@@ -243,9 +276,33 @@ export default function ResultView() {
   const gaps = grading?.gap_locations || [];
   const errors = grading?.error_locations || [];
 
+  // Unique tool_ids from errors/gaps for "이 매듭 더 연습하기"
+  const weakToolIds = [...new Set([
+    ...errors.map(e => e.tool_id).filter(Boolean),
+    ...gaps.map(g => g.tool_id).filter(Boolean),
+  ])];
+  const weakToolNames = weakToolIds.map(id => getToolName(id)).filter(Boolean);
+
   return (
     <AppLayout>
       {regrading && <LoadingOverlay stage="grading" />}
+
+      {/* Tool tooltip modal */}
+      {tooltipTool && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setTooltipTool(null)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <Card className="relative z-10 p-5 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-2 mb-3">
+              <Wrench className="w-4 h-4 text-primary" />
+              <p className="font-semibold text-foreground">{tooltipTool.name}</p>
+            </div>
+            {tooltipTool.goal && <p className="text-sm text-muted-foreground mb-2">{tooltipTool.goal}</p>}
+            {tooltipTool.description && <p className="text-sm text-foreground">{tooltipTool.description}</p>}
+            <Button size="sm" variant="outline" className="mt-4 w-full" onClick={() => setTooltipTool(null)}>닫기</Button>
+          </Card>
+        </div>
+      )}
+
       <div className="space-y-5 pb-8">
         {/* Back */}
         <Button variant="ghost" size="sm" onClick={() => navigate('/home')} className="gap-2">
@@ -266,6 +323,24 @@ export default function ResultView() {
             <p className="text-muted-foreground text-sm mt-3 leading-relaxed">{grading.summary}</p>
           )}
         </Card>
+
+        {/* Tools used chips */}
+        {tools.length > 0 && (
+          <div>
+            <p className="text-xs text-muted-foreground mb-2 font-medium">이 문제에 사용된 도구</p>
+            <div className="flex flex-wrap gap-2">
+              {tools.map(tool => (
+                <button
+                  key={tool.tool_id}
+                  onClick={() => setTooltipTool(tool)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-full text-xs font-medium hover:bg-primary/20 transition-colors">
+                  <Wrench className="w-3 h-3" />
+                  {tool.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* OCR quality warning */}
         {grading?.ocr_quality_concern && (
@@ -301,17 +376,22 @@ export default function ResultView() {
           <div>
             <h2 className="text-base font-semibold mb-2 text-amber-700">빠진 단계</h2>
             <div className="space-y-2">
-              {gaps.map((gap, i) => (
-                <div key={i} className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                  <p className="text-xs text-amber-600 font-medium mb-1">여기에 단계가 빠졌어요</p>
-                  <p className="text-sm text-amber-800">{gap.description}</p>
-                  {gap.expected_step && (
-                    <div className="mt-2 bg-white/60 rounded-lg p-2">
-                      <MathRenderer content={gap.expected_step} className="text-sm" />
-                    </div>
-                  )}
-                </div>
-              ))}
+              {gaps.map((gap, i) => {
+                const toolName = getToolName(gap.tool_id);
+                return (
+                  <div key={i} className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                    <p className="text-xs text-amber-600 font-medium mb-1">
+                      {toolName ? `[${toolName}] — 여기에 단계가 빠졌어요` : '여기에 단계가 빠졌어요'}
+                    </p>
+                    <p className="text-sm text-amber-800">{gap.description}</p>
+                    {gap.expected_step && (
+                      <div className="mt-2 bg-white/60 rounded-lg p-2">
+                        <MathRenderer content={gap.expected_step} className="text-sm" />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -321,25 +401,29 @@ export default function ResultView() {
           <div>
             <h2 className="text-base font-semibold mb-2 text-red-700">오류 위치</h2>
             <div className="space-y-2">
-              {errors.map((err, i) => (
-                <div key={i} className="bg-red-50 border border-red-200 rounded-xl p-4">
-                  <p className="text-xs text-red-600 font-medium mb-1">
-                    {err.error_type === 'calculation' ? '계산 오류' :
-                     err.error_type === 'conceptual' ? '개념 오류' : '표기 오류'}
-                  </p>
-                  <p className="text-sm text-red-800 mb-2">{err.description}</p>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="bg-red-100 rounded p-2">
-                      <p className="text-red-500 mb-1">학생 풀이</p>
-                      <MathRenderer content={err.student_wrote} />
-                    </div>
-                    <div className="bg-emerald-100 rounded p-2">
-                      <p className="text-emerald-600 mb-1">올바른 풀이</p>
-                      <MathRenderer content={err.correct_form} />
+              {errors.map((err, i) => {
+                const toolName = getToolName(err.tool_id);
+                const errTypeLabel = err.error_type === 'calculation' ? '계산 오류' :
+                                     err.error_type === 'conceptual' ? '개념 오류' : '표기 오류';
+                return (
+                  <div key={i} className="bg-red-50 border border-red-200 rounded-xl p-4">
+                    <p className="text-xs text-red-600 font-medium mb-1">
+                      {toolName ? `[${toolName}] — ${errTypeLabel}` : errTypeLabel}
+                    </p>
+                    <p className="text-sm text-red-800 mb-2">{err.description}</p>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="bg-red-100 rounded p-2">
+                        <p className="text-red-500 mb-1">학생 풀이</p>
+                        <MathRenderer content={err.student_wrote} />
+                      </div>
+                      <div className="bg-emerald-100 rounded p-2">
+                        <p className="text-emerald-600 mb-1">올바른 풀이</p>
+                        <MathRenderer content={err.correct_form} />
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -410,6 +494,28 @@ export default function ResultView() {
             </Card>
           )}
         </div>
+
+        {/* 이 매듭 더 연습하기 — Coming Soon */}
+        {weakToolNames.length > 0 && (
+          <div className="rounded-xl border border-border bg-muted/40 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Clock className="w-4 h-4 text-muted-foreground" />
+              <p className="text-sm font-semibold text-foreground">이 매듭 더 연습하기</p>
+              <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full border border-border">
+                곧 추가될 기능
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {weakToolNames.map((name, i) => (
+                <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">
+                  <Wrench className="w-3 h-3" />
+                  {name}
+                </span>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">곧 이 도구 연습 문제 추천이 추가돼요</p>
+          </div>
+        )}
 
         {/* Action buttons */}
         <div className="grid grid-cols-3 gap-2 pt-2">

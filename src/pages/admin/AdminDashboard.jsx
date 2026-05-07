@@ -2,14 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import { Users, BookOpen, TrendingUp, CheckCircle } from 'lucide-react';
 import DataImportPanel from '@/components/admin/DataImportPanel';
+import { aggregateToolMastery, topWeakTools } from '@/lib/toolMastery';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [domainData, setDomainData] = useState([]);
   const [hardestProblems, setHardestProblems] = useState([]);
+  const [weakToolChart, setWeakToolChart] = useState([]); // Top 10 weak tools
+  const [toolUsageChart, setToolUsageChart] = useState([]); // Top 10 by usage
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -19,10 +22,11 @@ export default function AdminDashboard() {
   const loadDashboard = async () => {
     setLoading(true);
     try {
-      const [attempts, users, problems] = await Promise.all([
+      const [attempts, users, problems, allTools] = await Promise.all([
         base44.entities.StudentAttempt.list('-submitted_at', 200),
         base44.entities.User.list('-created_date', 100),
-        base44.entities.Problem.list('-created_date', 50),
+        base44.entities.Problem.list('-created_date', 1000, 0),
+        base44.entities.MathTool.list('name', 100),
       ]);
 
       // Overall stats
@@ -53,12 +57,12 @@ export default function AdminDashboard() {
       setDomainData(dData);
 
       // Hardest problems
-      const problemMap = {};
+      const problemAttemptMap = {};
       attempts.forEach(a => {
-        if (!problemMap[a.problem_id]) problemMap[a.problem_id] = { scores: [], content: a.problem_content };
-        problemMap[a.problem_id].scores.push(a.score || 0);
+        if (!problemAttemptMap[a.problem_id]) problemAttemptMap[a.problem_id] = { scores: [], content: a.problem_content };
+        problemAttemptMap[a.problem_id].scores.push(a.score || 0);
       });
-      const hardest = Object.entries(problemMap)
+      const hardest = Object.entries(problemAttemptMap)
         .map(([pid, v]) => ({
           problem_id: pid,
           content: v.content,
@@ -69,6 +73,23 @@ export default function AdminDashboard() {
         .sort((a, b) => a.avg - b.avg)
         .slice(0, 5);
       setHardestProblems(hardest);
+
+      // Tool mastery charts
+      const problemMap = new Map(problems.map(p => [p.id, p]));
+      const toolNameMap = new Map(allTools.map(t => [t.tool_id, t]));
+      const masteryMap = aggregateToolMastery(attempts, problemMap);
+
+      // Weak tools Top 10 (min 5 attempts)
+      const weak = topWeakTools(masteryMap, toolNameMap, 10, 5);
+      setWeakToolChart(weak.map(t => ({ name: t.name, avg: t.avg_score, count: t.attempts })));
+
+      // Tool usage Top 10
+      const usageArr = [];
+      masteryMap.forEach((entry, toolId) => {
+        const tool = toolNameMap.get(toolId);
+        usageArr.push({ name: tool?.name || toolId, count: entry.attempts, avg: entry.avg_score });
+      });
+      setToolUsageChart(usageArr.sort((a, b) => b.count - a.count).slice(0, 10));
     } finally {
       setLoading(false);
     }
@@ -115,6 +136,55 @@ export default function AdminDashboard() {
                 contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }}
               />
               <Bar dataKey="avg" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+      )}
+
+      {/* Weak tool chart */}
+      {weakToolChart.length > 0 ? (
+        <Card className="p-5">
+          <h2 className="text-lg font-semibold mb-1">전체 학생이 자주 막히는 매듭 Top {weakToolChart.length}</h2>
+          <p className="text-xs text-muted-foreground mb-4">5회 이상 시도 · 평균 점수 낮은 순</p>
+          <ResponsiveContainer width="100%" height={Math.max(200, weakToolChart.length * 36)}>
+            <BarChart data={weakToolChart} layout="vertical" margin={{ top: 5, right: 50, bottom: 5, left: 10 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+              <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11 }} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={120} />
+              <Tooltip
+                formatter={(v, name) => [`${v}점`, '평균 점수']}
+                contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }}
+              />
+              <Bar dataKey="avg" radius={[0, 4, 4, 0]}>
+                {weakToolChart.map((entry, i) => (
+                  <Cell key={i} fill={entry.avg < 40 ? '#ef4444' : entry.avg < 60 ? '#f97316' : '#eab308'} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+      ) : (
+        <Card className="p-5">
+          <h2 className="text-lg font-semibold mb-1">전체 학생이 자주 막히는 매듭</h2>
+          <p className="text-sm text-muted-foreground mt-2">충분한 시도 데이터가 쌓이면 표시돼요 (도구당 5회 이상 시도 필요)</p>
+        </Card>
+      )}
+
+      {/* Tool usage chart */}
+      {toolUsageChart.length > 0 && (
+        <Card className="p-5">
+          <h2 className="text-lg font-semibold mb-1">매듭별 시도 분포 Top {toolUsageChart.length}</h2>
+          <p className="text-xs text-muted-foreground mb-4">가장 많이 등장한 도구</p>
+          <ResponsiveContainer width="100%" height={Math.max(200, toolUsageChart.length * 36)}>
+            <BarChart data={toolUsageChart} layout="vertical" margin={{ top: 5, right: 50, bottom: 5, left: 10 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+              <XAxis type="number" tick={{ fontSize: 11 }} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={120} />
+              <Tooltip
+                formatter={(v) => [`${v}회`, '시도 수']}
+                contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }}
+              />
+              <Bar dataKey="count" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Card>
