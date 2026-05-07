@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTeacher } from '@/lib/TeacherContext';
+import { useAuth } from '@/lib/AuthContext';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,7 +33,9 @@ import { InlineLoader } from '@/components/LoadingOverlay';
 import { format } from 'date-fns';
 
 export default function TeacherAssignments() {
-  const { my_classes, user } = useTeacher();
+  const { data, loading: teacherLoading } = useTeacher();
+  const { user } = useAuth();
+  const my_classes = data?.my_classes || [];
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -135,6 +138,10 @@ export default function TeacherAssignments() {
     setShowForm(true);
     // 복사된 데이터는 폼에서 설정 (현재는 빈 폼)
   };
+
+  if (teacherLoading || !data) {
+    return <InlineLoader message="학급 정보 불러오는 중..." />;
+  }
 
   if (!my_classes || my_classes.length === 0) {
     return (

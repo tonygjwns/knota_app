@@ -38,11 +38,24 @@ export default function StudentDetail({ mode = 'admin' }) {
           }
         }
 
-        // 학생 fetch
-        const users = await base44.entities.User.filter({ id: userId });
-        if (users.length === 0) throw new Error('학생을 찾을 수 없어요');
-        const studentData = users[0];
-        setStudent(studentData);
+        // 학생 fetch (mode 별 분기)
+         let studentData;
+         if (mode === 'teacher') {
+           // 캐시된 my_students 에서 찾기 (User.filter 호출 안 함)
+           const myStudent = teacherData?.my_students?.find(s => s.id === userId);
+           if (!myStudent) {
+             toast.error('학생을 찾을 수 없어요');
+             navigate('/teacher');
+             return;
+           }
+           studentData = myStudent;
+         } else {
+           // admin mode 는 User entity 접근 가능
+           const users = await base44.entities.User.filter({ id: userId });
+           if (users.length === 0) throw new Error('학생을 찾을 수 없어요');
+           studentData = users[0];
+         }
+         setStudent(studentData);
 
         // 시도 fetch
         const attemptsData = await base44.entities.StudentAttempt.filter(

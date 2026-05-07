@@ -1,5 +1,13 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
+
+const parseProblemText = (content) => {
+  try {
+    const arr = typeof content === 'string' ? JSON.parse(content) : content;
+    if (Array.isArray(arr)) return arr.map(b => b.text).join(' ');
+    return String(content);
+  } catch { return String(content || ''); }
+};
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -270,7 +278,7 @@ export default function AssignmentForm({ classId, onSave, onClose }) {
                                   {p.id.slice(0, 8)}...
                                 </p>
                                 <p className="text-sm truncate">
-                                  {(p.content || '').substring(0, 50)}...
+                                  {parseProblemText(p.content).substring(0, 50)}...
                                 </p>
                               </Card>
                             ))}
@@ -351,7 +359,7 @@ export default function AssignmentForm({ classId, onSave, onClose }) {
                                   {p.id.slice(0, 8)}...
                                 </p>
                                 <p className="text-sm truncate">
-                                  {(p.content || '').substring(0, 50)}...
+                                  {parseProblemText(p.content).substring(0, 50)}...
                                 </p>
                               </Card>
                             ))}
@@ -389,28 +397,28 @@ export default function AssignmentForm({ classId, onSave, onClose }) {
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto">
-                      {searchResults.map(p => (
-                        <Card
-                          key={p.id}
-                          className={`p-2 cursor-pointer transition-all ${
-                            selectedProblems.includes(p.id)
-                              ? 'bg-primary/10 border-primary'
-                              : 'hover:bg-muted'
-                          }`}
-                          onClick={() => toggleProblem(p.id)}
-                        >
-                          <p className="text-xs font-mono text-muted-foreground">
-                            {p.id.slice(0, 8)}
-                          </p>
-                          <p className="text-xs line-clamp-2">
-                            {(p.content || '').substring(0, 40)}...
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {p.domain_name}
-                          </p>
-                        </Card>
-                      ))}
-                    </div>
+                       {searchResults.map(p => (
+                         <Card
+                           key={p.id}
+                           className={`p-2 cursor-pointer transition-all ${
+                             selectedProblems.includes(p.id)
+                               ? 'bg-primary/10 border-primary'
+                               : 'hover:bg-muted'
+                           }`}
+                           onClick={() => toggleProblem(p.id)}
+                         >
+                           <p className="text-xs font-mono text-muted-foreground">
+                             {p.id.slice(0, 8)}
+                           </p>
+                           <p className="text-xs line-clamp-2">
+                             {parseProblemText(p.content).substring(0, 40)}...
+                           </p>
+                           <p className="text-xs text-muted-foreground mt-1">
+                             {p.domain_name}
+                           </p>
+                         </Card>
+                       ))}
+                     </div>
 
                     {searchQuery && searchResults.length === 0 && (
                       <p className="text-sm text-muted-foreground text-center py-4">
@@ -430,26 +438,26 @@ export default function AssignmentForm({ classId, onSave, onClose }) {
                 선택된 문제 ({selectedProblems.length}개)
               </label>
               <div className="space-y-2 max-h-48 overflow-y-auto">
-                {selectedProblemObjects.map(p => (
-                  <div
-                    key={p.id}
-                    className="flex items-start justify-between gap-2 p-2 bg-secondary rounded-lg"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-mono text-muted-foreground">
-                        {p.id.slice(0, 8)}
-                      </p>
-                      <p className="text-sm truncate">
-                        {(p.content || '').substring(0, 50)}...
-                      </p>
-                      <div className="flex gap-1 mt-1 flex-wrap">
-                        {p.domain_name && (
-                          <Badge variant="outline" className="text-xs">
-                            {p.domain_name}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
+              {selectedProblemObjects.map(p => (
+              <div
+               key={p.id}
+               className="flex items-start justify-between gap-2 p-2 bg-secondary rounded-lg"
+              >
+               <div className="flex-1 min-w-0">
+                 <p className="text-xs font-mono text-muted-foreground">
+                   {p.id.slice(0, 8)}
+                 </p>
+                 <p className="text-sm truncate">
+                   {parseProblemText(p.content).substring(0, 50)}...
+                 </p>
+                 <div className="flex gap-1 mt-1 flex-wrap">
+                   {p.domain_name && (
+                     <Badge variant="outline" className="text-xs">
+                       {p.domain_name}
+                     </Badge>
+                   )}
+                 </div>
+               </div>
                     <button
                       onClick={() => toggleProblem(p.id)}
                       className="text-destructive hover:bg-destructive/10 p-1 rounded"

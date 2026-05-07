@@ -65,13 +65,19 @@ export default function ProblemDetail({ mode = 'admin' }) {
         const toolsData = await base44.entities.MathTool.list();
         setTools(toolsData);
 
-        // 학생 정보 fetch (시도된 unique student_id 만)
+        // 학생 정보 fetch (mode 별 분기)
         if (filteredAttempts.length > 0) {
-          const studentIds = [...new Set(filteredAttempts.map(a => a.student_id))];
-          const usersData = await Promise.all(
-            studentIds.map(id => base44.entities.User.filter({ id }))
-          );
-          setUsers(usersData.flat());
+          if (mode === 'teacher') {
+            // 캐시된 my_students 사용 (User.filter 호출 안 함)
+            setUsers(teacherData?.my_students || []);
+          } else {
+            // admin mode 는 User entity 접근 가능
+            const studentIds = [...new Set(filteredAttempts.map(a => a.student_id))];
+            const usersData = await Promise.all(
+              studentIds.map(id => base44.entities.User.filter({ id }))
+            );
+            setUsers(usersData.flat());
+          }
         }
       } catch (e) {
         setError(e.message || '데이터를 불러오지 못했어요');
