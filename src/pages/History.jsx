@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
@@ -9,7 +9,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Filter, Search, ChevronRight, BookOpen } from 'lucide-react';
+import { Search, ChevronRight, BookOpen } from 'lucide-react';
 
 const PAGE_SIZE = 20;
 
@@ -21,6 +21,21 @@ export default function History() {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [filters, setFilters] = useState({ sort: 'recent', correctness: 'all', search: '' });
+  const [stats, setStats] = useState(null); // null = not yet loaded
+
+  // Load overall stats once on mount
+  useEffect(() => {
+    if (!user) return;
+    base44.entities.StudentAttempt.filter({ student_id: user.id }, '-submitted_at', 1000, 0)
+      .then(all => {
+        if (all.length === 0) { setStats({ total: 0, correct: 0, avg: 0 }); return; }
+        const total = all.length;
+        const correct = all.filter(a => a.correctness === 'correct').length;
+        const avg = Math.round(all.reduce((s, a) => s + (a.score || 0), 0) / total);
+        setStats({ total, correct, avg, capped: total >= 1000 });
+      })
+      .catch(() => setStats({ total: 0, correct: 0, avg: 0 }));
+  }, [user?.id]);
 
   useEffect(() => {
     loadAttempts(0, true);
@@ -72,6 +87,8 @@ export default function History() {
     }
   };
 
+  const fmt = (n, capped) => capped && n >= 1000 ? '1000+' : String(n);
+
   return (
     <AppLayout>
       <div className="space-y-5">
@@ -79,6 +96,22 @@ export default function History() {
           <h1 className="text-2xl font-bold">내 풀이 기록</h1>
           <p className="text-muted-foreground text-sm mt-1">지금까지 푼 문제들을 볼 수 있어요</p>
         </div>
+
+        {/* Stats cards */}
+        {stats && stats.total > 0 && (
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: '총 풀이', value: fmt(stats.total, stats.capped) + '개' },
+              { label: '정답', value: fmt(stats.correct, stats.capped) + '개' },
+              { label: '평균 점수', value: stats.avg + '점' },
+            ].map(s => (
+              <Card key={s.label} className="p-3 text-center">
+                <p className="text-xl font-bold text-primary">{s.value}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
+              </Card>
+            ))}
+          </div>
+        )}
 
         {/* Filters */}
         <div className="space-y-3">

@@ -10,17 +10,11 @@ const NAV_ITEMS = [
   { path: '/history', icon: History, label: '내 기록' },
 ];
 
-const ADMIN_ITEMS = [
-  { path: '/admin', icon: Settings, label: '관리자' },
-];
-
 export default function AppLayout({ children }) {
   const location = useLocation();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const [menuOpen, setMenuOpen] = useState(false);
-
-  const allItems = isAdmin ? [...NAV_ITEMS, ...ADMIN_ITEMS] : NAV_ITEMS;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -62,7 +56,7 @@ export default function AppLayout({ children }) {
                 <p className="text-xs text-muted-foreground mt-0.5">{user.email}</p>
               </div>
             )}
-            {allItems.map(item => {
+            {NAV_ITEMS.map(item => {
               const active = location.pathname === item.path;
               return (
                 <Link key={item.path} to={item.path}
@@ -75,7 +69,16 @@ export default function AppLayout({ children }) {
                 </Link>
               );
             })}
-            <div className="mt-auto">
+            <div className="mt-auto flex flex-col gap-1">
+              {isAdmin && (
+                <Link
+                  to="/admin"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-3 px-3 py-3 rounded-xl transition-colors btn-touch hover:bg-muted text-muted-foreground border border-border">
+                  <Settings className="w-5 h-5" />
+                  <span className="font-medium text-sm">관리자 패널</span>
+                </Link>
+              )}
               <button onClick={() => base44.auth.logout('/')}
                       className="w-full px-3 py-3 rounded-xl text-left text-muted-foreground hover:bg-muted transition-colors text-sm btn-touch">
                 로그아웃
@@ -106,8 +109,8 @@ export default function AppLayout({ children }) {
           )}
 
           <nav className="flex flex-col gap-1 flex-1">
-            {allItems.map(item => {
-              const active = location.pathname === item.path || 
+            {NAV_ITEMS.map(item => {
+              const active = location.pathname === item.path ||
                 (item.path !== '/home' && location.pathname.startsWith(item.path));
               return (
                 <Link key={item.path} to={item.path}
@@ -121,10 +124,20 @@ export default function AppLayout({ children }) {
             })}
           </nav>
 
-          <button onClick={() => base44.auth.logout('/')}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted text-muted-foreground transition-colors text-sm">
-            로그아웃
-          </button>
+          <div className="flex flex-col gap-1">
+            {isAdmin && (
+              <Link
+                to="/admin"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors hover:bg-muted text-muted-foreground border border-border">
+                <Settings className="w-5 h-5 flex-shrink-0" />
+                <span className="font-medium text-sm">관리자 패널</span>
+              </Link>
+            )}
+            <button onClick={() => base44.auth.logout('/')}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted text-muted-foreground transition-colors text-sm">
+              로그아웃
+            </button>
+          </div>
         </aside>
 
         {/* Main content */}
@@ -135,10 +148,10 @@ export default function AppLayout({ children }) {
         </main>
       </div>
 
-      {/* Bottom nav (mobile) */}
+      {/* Bottom nav (mobile) — NAV_ITEMS only */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-card/95 backdrop-blur-sm border-t border-border safe-bottom">
         <div className="flex items-center justify-around px-2 py-2">
-          {allItems.map(item => {
+          {NAV_ITEMS.map(item => {
             const active = location.pathname === item.path ||
               (item.path !== '/home' && location.pathname.startsWith(item.path));
             return (
