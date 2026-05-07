@@ -27,19 +27,20 @@ export default function StudentDetail() {
   useEffect(() => {
     const load = async () => {
       try {
-        const result = await base44.functions.invoke('studentDetailSummary', { userId });
-        if (result.error) {
-          toast.error(result.error);
+        const res = await base44.functions.invoke('studentDetailSummary', { userId });
+        const data = res.data;
+        if (!data || data.error) {
+          toast.error(data?.error || '데이터를 불러오지 못해요');
           navigate(-1);
           return;
         }
-        setStudent(result.student);
-        setAttempts(result.attempts || []);
-        setWeakTools(result.weak_tools || []);
-        setStrongTools(result.strong_tools || []);
+        setStudent(data.student);
+        setAttempts(data.attempts || []);
+        setWeakTools(data.weak_tools || []);
+        setStrongTools(data.strong_tools || []);
       } catch (e) {
         console.error('StudentDetail load error:', e);
-        toast.error(e.message || '데이터를 불러오지 못했어요');
+        toast.error(e.message || '데이터를 불러오지 못해요');
         navigate(-1);
       } finally {
         setLoading(false);

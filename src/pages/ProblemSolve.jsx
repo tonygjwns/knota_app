@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import AppLayout from '@/components/AppLayout';
@@ -59,7 +59,7 @@ export default function ProblemSolve() {
   const { id } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [searchParams] = new URLSearchParams(window.location.search);
+  const [searchParams] = useSearchParams();
   const assignmentId = searchParams.get('assignment_id');
 
   const [problem, setProblem] = useState(null);
