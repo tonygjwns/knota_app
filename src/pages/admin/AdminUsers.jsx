@@ -210,6 +210,11 @@ export default function AdminUsers() {
                       <span className={`text-xs px-2 py-0.5 rounded-full border ${cfg.color}`}>
                         {cfg.label}
                       </span>
+                      {u.email?.endsWith('@knota.test') && (
+                        <span className="text-xs px-2 py-0.5 rounded-full border bg-slate-100 text-slate-500 border-slate-300 font-mono">
+                          DUMMY
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-muted-foreground truncate">{u.email}</p>
                     {u.approval_status === 'rejected' && u.rejected_reason && (
