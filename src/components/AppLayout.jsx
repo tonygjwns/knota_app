@@ -121,9 +121,7 @@ export default function AppLayout({ children }) {
             </div>
             <div>
               <p className="font-bold text-foreground">
-                {isAdmin ? '관리자' : isTeacher
-                  ? (orgLabel ? `${orgLabel.split(' · ')[0]}` : '수학 학습')
-                  : '수학 학습'}
+                {isAdmin ? '관리자' : (user?.full_name || '수학 학습')}
               </p>
               <p className="text-xs text-muted-foreground">
                 {isAdmin ? '관리자 패널' : isTeacher ? '강사' : (orgLabel || 'K-12 수학')}
