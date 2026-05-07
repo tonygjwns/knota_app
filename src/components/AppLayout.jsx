@@ -128,7 +128,6 @@ export default function AppLayout({ children }) {
                 </p>
               </div>
             </Link>
-            <UserMenuDropdown orgLabel={orgLabel} />
           </div>
 
           <nav className="flex flex-col gap-1 flex-1">
@@ -171,6 +170,10 @@ export default function AppLayout({ children }) {
 
         {/* Main content */}
         <main className="flex-1 overflow-auto pb-20 md:pb-0">
+          {/* 데스크탑 상단 바: 우측에 유저 메뉴 */}
+          <div className="hidden md:flex items-center justify-end px-6 py-3 border-b border-border bg-card/50">
+            <UserMenuDropdown orgLabel={orgLabel} />
+          </div>
           <div className="max-w-2xl mx-auto px-4 py-6 animate-fade-in">
             {children}
           </div>
