@@ -24,10 +24,10 @@ export default function AdminDashboard() {
   const loadDashboard = async () => {
     setLoading(true);
     try {
-      const [attempts, users, problems, allTools] = await Promise.all([
+      const [attempts, users, allProblems, allTools] = await Promise.all([
         base44.entities.StudentAttempt.list('-submitted_at', 200),
         base44.entities.User.list('-created_date', 100),
-        base44.entities.Problem.list('-created_date', 1000, 0),
+        base44.entities.Problem.list('-created_date', 1000),
         base44.entities.MathTool.list('name', 100),
       ]);
 
@@ -60,6 +60,7 @@ export default function AdminDashboard() {
 
       // Hardest problems
       const problemAttemptMap = {};
+      const problemEntityMap = new Map(allProblems.map(p => [p.problem_id, p.id]));
       attempts.forEach(a => {
         if (!problemAttemptMap[a.problem_id]) problemAttemptMap[a.problem_id] = { scores: [], content: a.problem_content };
         problemAttemptMap[a.problem_id].scores.push(a.score || 0);
@@ -67,6 +68,7 @@ export default function AdminDashboard() {
       const hardest = Object.entries(problemAttemptMap)
         .map(([pid, v]) => ({
           problem_id: pid,
+          entity_id: problemEntityMap.get(pid) || pid,
           content: v.content,
           avg: Math.round(v.scores.reduce((s, x) => s + x, 0) / v.scores.length),
           count: v.scores.length,
@@ -77,7 +79,7 @@ export default function AdminDashboard() {
       setHardestProblems(hardest);
 
       // Tool mastery charts
-      const problemMap = new Map(problems.map(p => [p.id, p]));
+      const problemMap = new Map(allProblems.map(p => [p.id, p]));
       const toolNameMap = new Map(allTools.map(t => [t.tool_id, t]));
       const masteryMap = aggregateToolMastery(attempts, problemMap);
 
@@ -200,7 +202,7 @@ export default function AdminDashboard() {
             {hardestProblems.map((p, i) => (
               <div key={p.problem_id}
                 className="flex items-center justify-between gap-3 cursor-pointer hover:bg-muted/50 rounded-xl p-2 -mx-2 transition-colors"
-                onClick={() => navigate(`/admin/problems/${p.problem_id}`)}>
+                onClick={() => navigate(`/admin/problems/${p.entity_id}`)}>
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <span className="text-lg font-bold text-muted-foreground w-6">{i + 1}</span>
                   <div className="flex-1 min-w-0">

@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, User, Zap, TrendingUp, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { aggregateToolMastery } from '@/lib/toolMastery';
+import { aggregateToolMastery, topWeakTools, topStrongTools } from '@/lib/toolMastery';
 import MathRenderer from '@/components/MathRenderer';
 
 export default function StudentDetail({ mode = 'admin' }) {
@@ -69,17 +69,20 @@ export default function StudentDetail({ mode = 'admin' }) {
   if (!student) return null;
 
   // 매듭 인사이트
-  const problemMap = {};
+  const problemMap = new Map();
   attempts.forEach(a => {
-    if (a.problem_domain) {
-      problemMap[a.problem_id] = {
+    if (!problemMap.has(a.problem_id)) {
+      problemMap.set(a.problem_id, {
         domain_id: a.problem_id,
         domain_name: a.problem_domain,
         tool_ids: []
-      };
+      });
     }
   });
-  const mastery = aggregateToolMastery(attempts, problemMap, tools);
+  const toolNameMap = new Map(tools.map(t => [t.tool_id, t]));
+  const masteryMap = aggregateToolMastery(attempts, problemMap);
+  const weakTools = topWeakTools(masteryMap, toolNameMap, 5, 3);
+  const strongTools = topStrongTools(masteryMap, toolNameMap, 5, 70, 3);
 
   // 정렬
   const sorted = [...attempts].sort((a, b) => {
@@ -131,21 +134,21 @@ export default function StudentDetail({ mode = 'admin' }) {
       </div>
 
       {/* 약점 매듭 */}
-      {mastery.weak_tools.length > 0 && (
+      {weakTools.length > 0 && (
         <Card className="p-4 border-red-200">
           <h2 className="font-semibold text-sm mb-3 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-red-500" />
             약점 매듭 (평균 점수 낮은 순)
           </h2>
           <div className="space-y-2">
-            {mastery.weak_tools.slice(0, 5).map(tool => (
-              <div key={tool.id} className="bg-red-50 rounded-lg p-3 border border-red-100">
+            {weakTools.slice(0, 5).map(tool => (
+              <div key={tool.tool_id} className="bg-red-50 rounded-lg p-3 border border-red-100">
                 <div className="flex items-center justify-between mb-2">
                   <p className="font-medium text-sm">{tool.name}</p>
                   <span className="text-sm font-bold text-red-600">{tool.avg_score}점</span>
                 </div>
                 <div className="flex gap-1 text-xs text-muted-foreground">
-                  <span>시도 {tool.attempt_count}회</span>
+                  <span>시도 {tool.attempts}회</span>
                   <span>•</span>
                   <span>정답 {tool.correct_count}회</span>
                 </div>
@@ -156,21 +159,21 @@ export default function StudentDetail({ mode = 'admin' }) {
       )}
 
       {/* 강점 매듭 */}
-      {mastery.strong_tools.length > 0 && (
+      {strongTools.length > 0 && (
         <Card className="p-4 border-emerald-200">
           <h2 className="font-semibold text-sm mb-3 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
             강점 매듭 (Top 5)
           </h2>
           <div className="space-y-2">
-            {mastery.strong_tools.slice(0, 5).map(tool => (
-              <div key={tool.id} className="bg-emerald-50 rounded-lg p-3 border border-emerald-100">
+            {strongTools.slice(0, 5).map(tool => (
+              <div key={tool.tool_id} className="bg-emerald-50 rounded-lg p-3 border border-emerald-100">
                 <div className="flex items-center justify-between mb-2">
                   <p className="font-medium text-sm">{tool.name}</p>
                   <span className="text-sm font-bold text-emerald-600">{tool.avg_score}점</span>
                 </div>
                 <div className="flex gap-1 text-xs text-muted-foreground">
-                  <span>시도 {tool.attempt_count}회</span>
+                  <span>시도 {tool.attempts}회</span>
                   <span>•</span>
                   <span>정답 {tool.correct_count}회</span>
                 </div>

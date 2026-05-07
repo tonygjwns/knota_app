@@ -8,6 +8,16 @@ import { ArrowLeft, ChevronDown, User } from 'lucide-react';
 import { toast } from 'sonner';
 import MathRenderer from '@/components/MathRenderer';
 
+const parseProblemText = (content) => {
+  try {
+    const arr = typeof content === 'string' ? JSON.parse(content) : content;
+    if (Array.isArray(arr)) return arr.map(b => b.text).join('\n');
+    return String(content);
+  } catch {
+    return String(content || '');
+  }
+};
+
 export default function ProblemDetail({ mode = 'admin' }) {
   const { problemId } = useParams();
   const navigate = useNavigate();
@@ -27,8 +37,12 @@ export default function ProblemDetail({ mode = 'admin' }) {
   useEffect(() => {
     const load = async () => {
       try {
-        // 문제 fetch
-        const problemsData = await base44.entities.Problem.filter({ id: problemId });
+        // 문제 fetch (entity id 또는 snapshot UUID 모두 지원)
+        let problemsData = await base44.entities.Problem.filter({ id: problemId });
+        if (problemsData.length === 0) {
+          // Fallback: snapshot UUID 양식 시도
+          problemsData = await base44.entities.Problem.filter({ problem_id: problemId });
+        }
         if (problemsData.length === 0) throw new Error('문제를 찾을 수 없어요');
         setProblems(problemsData[0]);
 
@@ -93,7 +107,7 @@ export default function ProblemDetail({ mode = 'admin' }) {
   // 도구 매핑
   const toolIds = problem.tool_ids ? JSON.parse(problem.tool_ids) : [];
   const toolNames = toolIds
-    .map(id => tools.find(t => t.tool_id === id)?.name_en || id)
+    .map(id => tools.find(t => t.tool_id === id)?.name || id)
     .filter(Boolean);
 
   return (
@@ -122,7 +136,7 @@ export default function ProblemDetail({ mode = 'admin' }) {
       <Card className="p-4">
         <div className="prose prose-sm max-w-none">
           {problem.content ? (
-            <MathRenderer text={problem.content} />
+            <MathRenderer content={parseProblemText(problem.content)} />
           ) : (
             <p className="text-muted-foreground">(문제 내용 없음)</p>
           )}
@@ -141,7 +155,7 @@ export default function ProblemDetail({ mode = 'admin' }) {
           </button>
           {showAnswer && (
             <div className="mt-3 pt-3 border-t prose prose-sm max-w-none">
-              <MathRenderer text={problem.verified_answer} />
+              <MathRenderer content={parseProblemText(problem.verified_answer)} />
             </div>
           )}
         </Card>
