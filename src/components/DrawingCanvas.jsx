@@ -2,11 +2,11 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Undo2, Trash2, Pencil, Eraser, Plus } from 'lucide-react';
 
-const PAGE_HEIGHT = 400; // px per page
+const PAGE_HEIGHT = 400;
 
 export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penSize = 3 }) {
   const canvasRef = useRef(null);
-  const containerRef = useRef(null);
+  const wrapperRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [history, setHistory] = useState([]);
   const [tool, setTool] = useState('pen');
@@ -14,16 +14,56 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
   const [canvasHeight, setCanvasHeight] = useState(PAGE_HEIGHT);
   const lastPos = useRef(null);
 
-  const getPos = (e, canvas) => {
+  // Get position relative to CANVAS logical coordinates (accounts for DPR scaling)
+  const getPos = (e) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
+    // canvas.width/height are physical pixels; rect.width/height are CSS pixels
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
-    if (e.touches) {
+    if (e.touches && e.touches.length > 0) {
       const t = e.touches[0];
       return { x: (t.clientX - rect.left) * scaleX, y: (t.clientY - rect.top) * scaleY };
     }
     return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
   };
+
+  // Initialize canvas size based on wrapper width
+  const initCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    const wrapper = wrapperRef.current;
+    if (!canvas || !wrapper) return;
+    const dpr = window.devicePixelRatio || 1;
+    const cssWidth = wrapper.clientWidth;
+    const cssHeight = canvasHeight;
+    // Only resize if actually changed to avoid clearing unnecessarily
+    if (canvas.width === Math.round(cssWidth * dpr) && canvas.height === Math.round(cssHeight * dpr)) return;
+    const ctx = canvas.getContext('2d');
+    const data = canvas.toDataURL();
+    canvas.width = Math.round(cssWidth * dpr);
+    canvas.height = Math.round(cssHeight * dpr);
+    ctx.scale(dpr, dpr);
+    if (data !== 'data:,') {
+      const img = new Image();
+      img.onload = () => ctx.drawImage(img, 0, 0, cssWidth, cssHeight);
+      img.src = data;
+    }
+  }, [canvasHeight]);
+
+  // Run initCanvas whenever height changes
+  useEffect(() => {
+    initCanvas();
+  }, [initCanvas]);
+
+  // ResizeObserver for width changes
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+    const ro = new ResizeObserver(() => { initCanvas(); });
+    ro.observe(wrapper);
+    return () => ro.disconnect();
+  }, [initCanvas]);
 
   const saveState = useCallback(() => {
     const canvas = canvasRef.current;
@@ -34,27 +74,33 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
   const expandCanvas = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const data = canvas.toDataURL();
-    const newHeight = canvasHeight + PAGE_HEIGHT;
-    setCanvasHeight(newHeight);
-    // After state update, restore drawing on next render via effect
-    const img = new Image();
-    img.onload = () => {
-      // canvas dimensions are set by the effect below, so wait a tick
-      requestAnimationFrame(() => {
-        ctx.drawImage(img, 0, 0);
+    const wrapper = wrapperRef.current;
+    const dpr = window.devicePixelRatio || 1;
+    const cssWidth = wrapper.clientWidth;
+    const oldData = canvas.toDataURL();
+    const newCssHeight = canvasHeight + PAGE_HEIGHT;
+
+    setCanvasHeight(newCssHeight);
+
+    requestAnimationFrame(() => {
+      const ctx = canvas.getContext('2d');
+      canvas.width = Math.round(cssWidth * dpr);
+      canvas.height = Math.round(newCssHeight * dpr);
+      ctx.scale(dpr, dpr);
+      const img = new Image();
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0, cssWidth, newCssHeight);
         if (onImageReady) canvas.toBlob(b => b && onImageReady(b), 'image/jpeg', 0.7);
-      });
-    };
-    img.src = data;
+      };
+      img.src = oldData;
+    });
   };
 
   const startDraw = useCallback((e) => {
     e.preventDefault();
     const canvas = canvasRef.current;
     saveState();
-    const pos = getPos(e, canvas);
+    const pos = getPos(e);
     lastPos.current = pos;
     setIsDrawing(true);
     const ctx = canvas.getContext('2d');
@@ -71,7 +117,7 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
     e.preventDefault();
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    const pos = getPos(e, canvas);
+    const pos = getPos(e);
     ctx.beginPath();
     ctx.moveTo(lastPos.current.x, lastPos.current.y);
     ctx.lineTo(pos.x, pos.y);
@@ -109,7 +155,7 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
     const img = new Image();
     img.onload = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0);
+      ctx.drawImage(img, 0, 0, canvas.width / (window.devicePixelRatio || 1), canvas.height / (window.devicePixelRatio || 1));
       if (onImageReady) canvas.toBlob(b => b && onImageReady(b), 'image/jpeg', 0.7);
     };
     img.src = prev;
@@ -123,43 +169,11 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
     if (onImageReady) onImageReady(null);
   };
 
-  // Resize canvas resolution when height changes
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const data = canvas.toDataURL();
-    canvas.width = canvas.offsetWidth * window.devicePixelRatio;
-    canvas.height = canvasHeight * window.devicePixelRatio;
-    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-    const img = new Image();
-    img.onload = () => ctx.drawImage(img, 0, 0);
-    img.src = data;
-  }, [canvasHeight]);
-
-  // Handle container width changes
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const ro = new ResizeObserver(() => {
-      const ctx = canvas.getContext('2d');
-      const data = canvas.toDataURL();
-      canvas.width = canvas.offsetWidth * window.devicePixelRatio;
-      canvas.height = canvasHeight * window.devicePixelRatio;
-      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-      const img = new Image();
-      img.onload = () => ctx.drawImage(img, 0, 0);
-      img.src = data;
-    });
-    ro.observe(canvas.parentElement);
-    return () => ro.disconnect();
-  }, [canvasHeight]);
-
   const isEmpty = history.length === 0;
   const cursorClass = tool === 'eraser' ? 'cursor-cell' : 'drawing-canvas';
 
   return (
-    <div className="flex flex-col gap-3" ref={containerRef}>
-      {/* Tool toggle */}
+    <div className="flex flex-col gap-3">
       <div className="flex gap-2">
         <Button type="button" variant={tool === 'pen' ? 'default' : 'outline'} size="sm"
           onClick={() => setTool('pen')} className="flex-1 btn-touch">
@@ -171,7 +185,8 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
         </Button>
       </div>
 
-      <div className="relative bg-white border-2 border-dashed border-border rounded-xl overflow-hidden"
+      <div ref={wrapperRef}
+           className="relative bg-white border-2 border-dashed border-border rounded-xl overflow-hidden"
            style={{ height: canvasHeight }}>
         {isEmpty && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground pointer-events-none select-none">
@@ -181,8 +196,8 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
         )}
         <canvas
           ref={canvasRef}
-          className={`${cursorClass} w-full`}
-          style={{ height: canvasHeight, display: 'block' }}
+          className={cursorClass}
+          style={{ width: '100%', height: canvasHeight, display: 'block' }}
           onMouseDown={startDraw}
           onMouseMove={draw}
           onMouseUp={stopDraw}

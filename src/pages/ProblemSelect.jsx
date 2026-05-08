@@ -483,11 +483,30 @@ function ProblemModeView({ mode, user, navigate }) {
     setLoading(true);
     try {
       if (mode === 'domain') {
-        const d = await base44.entities.Domain.list('name', 50);
-        setDomains(d);
+        const [d, allP] = await Promise.all([
+          base44.entities.Domain.list('name', 50),
+          base44.entities.Problem.list('domain_id', 5000),
+        ]);
+        // Count problems per domain dynamically
+        const countMap = {};
+        allP.forEach(p => {
+          if (p.domain_id) countMap[p.domain_id] = (countMap[p.domain_id] || 0) + 1;
+        });
+        setDomains(d.map(dom => ({ ...dom, problem_count: countMap[dom.domain_id] || 0 })));
       } else if (mode === 'tool') {
-        const t = await base44.entities.MathTool.list('name', 50);
-        setTools(t);
+        const [t, allP] = await Promise.all([
+          base44.entities.MathTool.list('name', 50),
+          base44.entities.Problem.list('tool_ids', 5000),
+        ]);
+        // Count problems per tool dynamically
+        const toolCountMap = {};
+        allP.forEach(p => {
+          try {
+            const ids = JSON.parse(p.tool_ids || '[]');
+            ids.forEach(tid => { toolCountMap[tid] = (toolCountMap[tid] || 0) + 1; });
+          } catch {}
+        });
+        setTools(t.map(tool => ({ ...tool, problem_count: toolCountMap[tool.tool_id] || 0 })));
       } else if (mode === 'wrong') {
         if (user) {
           const attempts = await base44.entities.StudentAttempt.filter(

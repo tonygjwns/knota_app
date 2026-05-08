@@ -3,17 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { Users, BookOpen, TrendingUp, CheckCircle } from 'lucide-react';
 import DataImportPanel from '@/components/admin/DataImportPanel';
-import { aggregateToolMastery, topWeakTools } from '@/lib/toolMastery';
+import { aggregateToolMastery } from '@/lib/toolMastery';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [domainData, setDomainData] = useState([]);
   const [hardestProblems, setHardestProblems] = useState([]);
-  const [weakToolChart, setWeakToolChart] = useState([]); // Top 10 weak tools
   const [toolUsageChart, setToolUsageChart] = useState([]); // Top 10 by usage
   const [loading, setLoading] = useState(true);
 
@@ -83,10 +82,6 @@ export default function AdminDashboard() {
       const toolNameMap = new Map(allTools.map(t => [t.tool_id, t]));
       const masteryMap = aggregateToolMastery(attempts, problemMap);
 
-      // Weak tools Top 10 (min 5 attempts)
-      const weak = topWeakTools(masteryMap, toolNameMap, 10, 5);
-      setWeakToolChart(weak.map(t => ({ name: t.name, avg: t.avg_score, count: t.attempts })));
-
       // Tool usage Top 10
       const usageArr = [];
       masteryMap.forEach((entry, toolId) => {
@@ -142,35 +137,6 @@ export default function AdminDashboard() {
               <Bar dataKey="avg" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        </Card>
-      )}
-
-      {/* Weak tool chart */}
-      {weakToolChart.length > 0 ? (
-        <Card className="p-5">
-          <h2 className="text-lg font-semibold mb-1">전체 학생이 자주 막히는 매듭 Top {weakToolChart.length}</h2>
-          <p className="text-xs text-muted-foreground mb-4">5회 이상 시도 · 평균 점수 낮은 순</p>
-          <ResponsiveContainer width="100%" height={Math.max(200, weakToolChart.length * 36)}>
-            <BarChart data={weakToolChart} layout="vertical" margin={{ top: 5, right: 50, bottom: 5, left: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-              <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={120} />
-              <Tooltip
-                formatter={(v, name) => [`${v}점`, '평균 점수']}
-                contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }}
-              />
-              <Bar dataKey="avg" radius={[0, 4, 4, 0]}>
-                {weakToolChart.map((entry, i) => (
-                  <Cell key={i} fill={entry.avg < 40 ? '#ef4444' : entry.avg < 60 ? '#f97316' : '#eab308'} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-      ) : (
-        <Card className="p-5">
-          <h2 className="text-lg font-semibold mb-1">전체 학생이 자주 막히는 매듭</h2>
-          <p className="text-sm text-muted-foreground mt-2">충분한 시도 데이터가 쌓이면 표시돼요 (도구당 5회 이상 시도 필요)</p>
         </Card>
       )}
 
