@@ -12,7 +12,7 @@ const NAV_ITEMS = [
   { path: '/bookmarks', icon: Star, label: '즐겨찾기' },
 ];
 
-export default function AppLayout({ children, fullWidth = false }) {
+export default function AppLayout({ children }) {
   const location = useLocation();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
@@ -168,7 +168,7 @@ export default function AppLayout({ children, fullWidth = false }) {
           <div className="hidden md:flex items-center justify-end px-6 py-3 border-b border-border bg-card/50">
             <UserMenuDropdown orgLabel={orgLabel} />
           </div>
-          <div className={fullWidth ? 'animate-fade-in' : 'max-w-2xl mx-auto px-4 py-6 animate-fade-in'}>
+          <div className="px-6 py-6 animate-fade-in">
             {children}
           </div>
         </main>
