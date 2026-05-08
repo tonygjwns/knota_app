@@ -201,6 +201,23 @@ ${OCR_SYSTEM_PROMPT}`;
       setStage('grading');
       const problemText = parseProblemText(problem.content);
 
+      // Fetch relevant tools for this problem and build tools block
+      const toolIds = (() => { try { return JSON.parse(problem.tool_ids || '[]'); } catch { return []; } })();
+      let toolsBlock = '(이 문제에 매핑된 도구 없음)';
+      if (toolIds.length > 0) {
+        const allTools = await base44.entities.MathTool.list('name', 100);
+        const relevantTools = allTools.filter(t => toolIds.includes(t.tool_id));
+        if (relevantTools.length > 0) {
+          toolsBlock = relevantTools.map(t =>
+            `- tool_id: "${t.tool_id}"\n  name: "${t.name}"\n  goal: "${t.goal || ''}"`
+          ).join('\n');
+        }
+        // Store for sanitization after grading
+        window.__relevantToolIds = new Set(relevantTools.map(t => t.tool_id));
+      } else {
+        window.__relevantToolIds = new Set();
+      }
+
       const gradingPrompt = `당신은 한국 K-12 수학 풀이 채점 전문가입니다.
 
 학생의 손글씨 풀이(OCR 추출 결과)를 받아, problem + verified_answer + agent_solution + 정답 풀이 path와 비교해 채점합니다. 출력은 GradingOutput 스키마 JSON.
@@ -216,7 +233,7 @@ ${OCR_SYSTEM_PROMPT}`;
 5. 할루시 방지 — 학생이 쓰지 않은 내용 추측 금지. 확신 없으면 confidence ↓
 6. OCR 검증 — OCR 결과가 의심스러우면 ocr_quality_concern에 구체적 우려 텍스트 명시
 7. Actionable feedback — "다시 살펴봐요" 같은 모호한 말 금지. 어느 자리/왜를 step_feedback, gap_locations, error_locations에 명시
-8. 매듭(도구) 매핑 — error_locations 와 gap_locations 의 각 항목에서 오류/공백이 correct_solution_path 의 어느 도구에 해당하는지 식별 가능하면 tool_id 필드에 그 도구 ID를 적어주세요. correct_solution_path의 'Step N: 도구 = "X"' 양식을 참고하세요. 식별 불가시 null.
+8. 매듭 매핑 (엄격) — error_locations 와 gap_locations 의 각 항목에서 tool_id 를 채울 때, 반드시 <available_tools> 안에 있는 tool_id 중 하나만 사용하세요. 그 어느 것도 학생의 오류/공백과 맞지 않으면 null 을 쓰세요. 절대로 새 ID 를 만들거나 한국어 이름, 영문 이름, 자유 문자열을 넣지 마세요. <available_tools> 가 비어있으면 tool_id 는 모두 null.
 
 ## 점수 기준
 - 100 = 정답 + 풀이 완전 + 표기 정합
@@ -246,6 +263,10 @@ ${problem.agent_solution || '(agent 풀이 없음)'}
 <correct_solution_path>
 ${formatSolutionPath(problem.solution_path)}
 </correct_solution_path>
+
+<available_tools>
+${toolsBlock}
+</available_tools>
 
 <student_ocr_solution>
 ${ocrText}
@@ -313,6 +334,15 @@ ${ocrText}
       });
 
       const gradeResult = gradeRaw?.response ?? gradeRaw;
+
+      // Sanitize tool_ids against registry (defense-in-depth)
+      const validIds = window.__relevantToolIds || new Set();
+      const sanitize = (arr) => (arr || []).map(item => ({
+        ...item,
+        tool_id: validIds.has(item.tool_id) ? item.tool_id : null
+      }));
+      gradeResult.error_locations = sanitize(gradeResult.error_locations);
+      gradeResult.gap_locations = sanitize(gradeResult.gap_locations);
 
       // Save attempt — ocr_corrected_text는 학생이 직접 수정할 때만 저장 (기본 흐름은 null)
       const attempt = await base44.entities.StudentAttempt.create({

@@ -177,8 +177,8 @@ export default function AdminDashboard() {
       {/* Tool usage chart */}
       {toolUsageChart.length > 0 && (
         <Card className="p-5">
-          <h2 className="text-lg font-semibold mb-1">매듭별 시도 분포 Top {toolUsageChart.length}</h2>
-          <p className="text-xs text-muted-foreground mb-4">가장 많이 등장한 도구</p>
+          <h2 className="text-lg font-semibold mb-1">전체 학생이 자주 푼 매듭 Top {toolUsageChart.length}</h2>
+          <p className="text-xs text-muted-foreground mb-4">도구 활동량 — 전체 풀이에서 가장 많이 등장한 도구</p>
           <ResponsiveContainer width="100%" height={Math.max(200, toolUsageChart.length * 36)}>
             <BarChart data={toolUsageChart} layout="vertical" margin={{ top: 5, right: 50, bottom: 5, left: 10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />

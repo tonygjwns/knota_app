@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, BookOpen, History, Settings, Menu, X, GraduationCap } from 'lucide-react';
+import { Home, BookOpen, History, Settings, Menu, X, GraduationCap, Star } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import UserMenuDropdown from '@/components/UserMenuDropdown';
@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { path: '/home', icon: Home, label: '홈' },
   { path: '/problems', icon: BookOpen, label: '문제' },
   { path: '/history', icon: History, label: '내 기록' },
+  { path: '/bookmarks', icon: Star, label: '즐겨찾기' },
 ];
 
 export default function AppLayout({ children }) {

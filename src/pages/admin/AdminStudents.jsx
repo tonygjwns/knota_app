@@ -17,6 +17,9 @@ const STATUS_CONFIG = {
   rejected: { label: '거절됨',   color: 'bg-red-100 text-red-700 border-red-200' },
 };
 
+const STATUS_FILTERS = ['전체', '승인 대기', '승인됨', '거절됨'];
+const FILTER_STATUS = { '승인 대기': 'pending', '승인됨': 'approved', '거절됨': 'rejected' };
+
 function StudentManageModal({ target, allAcademies, allClasses, onSave, onClose }) {
   const [role, setRole] = useState(target.role || 'student');
   const [academyId, setAcademyId] = useState(target.academy_id || '');
@@ -86,6 +89,7 @@ export default function AdminStudents() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('전체');
   const [page, setPage] = useState(0);
   const [manageTarget, setManageTarget] = useState(null);
   const [pendingCount, setPendingCount] = useState(0);
@@ -139,6 +143,11 @@ export default function AdminStudents() {
   const filtered = students
     .filter(u => classFilter === 'all' || u.class_id === classFilter)
     .filter(u => {
+      const statusKey = FILTER_STATUS[statusFilter];
+      if (statusKey && (u.approval_status || 'pending') !== statusKey) return false;
+      return true;
+    })
+    .filter(u => {
       if (!search) return true;
       const q = search.toLowerCase();
       return (u.full_name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q);
@@ -161,6 +170,18 @@ export default function AdminStudents() {
           <p className="text-sm font-medium text-amber-700">승인 대기 중 <span className="font-bold">{pendingCount}명</span> — 검토가 필요해요</p>
         </div>
       )}
+
+      {/* Approval status filter */}
+      <div className="flex gap-2 flex-wrap">
+        {STATUS_FILTERS.map(f => (
+          <button key={f} onClick={() => { setStatusFilter(f); setPage(0); }}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              statusFilter === f ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            }`}>
+            {f}
+          </button>
+        ))}
+      </div>
 
       {/* Class filter */}
       <div className="flex gap-2 flex-wrap">

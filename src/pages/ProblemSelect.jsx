@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import ScoreBadge from '@/components/ScoreBadge';
-import { Shuffle, BookOpen, Wrench, AlertCircle, ChevronRight, ArrowLeft, Clock, ClipboardList, CheckCircle } from 'lucide-react';
+import { Shuffle, BookOpen, Wrench, AlertCircle, ChevronRight, ArrowLeft, Clock, ClipboardList, CheckCircle, Star } from 'lucide-react';
 
 // ──────────────────────────────────────────────
 // Hub placeholder card
@@ -169,6 +169,7 @@ function ProblemHub() {
   const [showClosed, setShowClosed] = useState(false);
   const [recommendedProblems, setRecommendedProblems] = useState([]);
   const [recsLoading, setRecsLoading] = useState(true);
+  const [bookmarkCount, setBookmarkCount] = useState(0);
 
   useEffect(() => {
     const loadAssignments = async () => {
@@ -179,8 +180,9 @@ function ProblemHub() {
       try {
         const all = await base44.entities.Assignment.filter({ class_id: user.class_id }, '-created_date', 100);
         const now = new Date();
-        const active = all.filter(a => a.status === 'active' || (a.deadline && new Date(a.deadline) > now));
-        const closed = all.filter(a => a.status === 'closed' || (a.deadline && new Date(a.deadline) <= now));
+        const isClosed = (a) => a.status === 'closed' || (a.deadline && new Date(a.deadline) <= now);
+        const closed = all.filter(isClosed);
+        const active = all.filter(a => !isClosed(a));
         setAssignments({ active, closed });
       } catch (e) {
         console.error('Failed to load assignments:', e);
@@ -200,7 +202,7 @@ function ProblemHub() {
       }
       try {
         const [bookmarks, allAttempts, allProblems, allTools] = await Promise.all([
-          base44.entities.BookmarkedTool.filter({ student_id: user.id }),
+          base44.entities.BookmarkedTool.filter({ student_id: user.id }, '-created_date', 100),
           base44.entities.StudentAttempt.filter({ student_id: user.id }, '-submitted_at', 500),
           base44.entities.Problem.list('-created_date', 1000, 0),
           base44.entities.MathTool.list('name', 100),
@@ -273,6 +275,7 @@ function ProblemHub() {
         // Fallback: random problems if no recommendations
         const finalRecs = recProblems.length > 0 ? recProblems : allProblems.slice(0, 5);
         setRecommendedProblems(finalRecs);
+        setBookmarkCount(bookmarks.length);
       } catch (e) {
         console.error('Failed to load recommendations:', e);
       } finally {
@@ -330,6 +333,27 @@ function ProblemHub() {
             </div>
           )}
         </section>
+
+        {/* 즐겨찾기 매듭 */}
+        {bookmarkCount > 0 && (
+          <section className="space-y-2">
+            <h2 className="text-base font-semibold text-foreground">내 즐겨찾기 매듭</h2>
+            <Link to="/bookmarks">
+              <Card className="p-4 card-hover cursor-pointer">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-amber-500 bg-amber-50">
+                    <Star className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm text-foreground">내 즐겨찾기 매듭 ({bookmarkCount})</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">나중에 다시 공부하려고 표시한 매듭들</p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                </div>
+              </Card>
+            </Link>
+          </section>
+        )}
 
         {/* 오늘의 추천 */}
         <section className="space-y-2">

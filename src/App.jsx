@@ -38,6 +38,7 @@ import RemediationRetry from './pages/remediation/RemediationRetry';
 import RemediationLesson from './pages/remediation/RemediationLesson';
 import RemediationPractice from './pages/remediation/RemediationPractice';
 import RemediationComplete from './pages/remediation/RemediationComplete';
+import Bookmarks from './pages/Bookmarks';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user } = useAuth();
@@ -89,6 +90,7 @@ const AuthenticatedApp = () => {
       <Route path="/remediation/:attemptId/lesson" element={<RemediationLesson />} />
       <Route path="/remediation/:attemptId/practice/:practiceIdx" element={<RemediationPractice />} />
       <Route path="/remediation/:attemptId/complete" element={<RemediationComplete />} />
+      <Route path="/bookmarks" element={<Bookmarks />} />
 
       {/* Admin routes */}
       <Route path="/admin" element={<AdminLayout />}>

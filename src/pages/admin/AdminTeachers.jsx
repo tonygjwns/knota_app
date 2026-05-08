@@ -63,12 +63,16 @@ const STATUS_CONFIG = {
   rejected: { label: '거절됨',   color: 'bg-red-100 text-red-700 border-red-200' },
 };
 
+const FILTERS = ['전체', '승인 대기', '승인됨', '거절됨'];
+const FILTER_STATUS = { '승인 대기': 'pending', '승인됨': 'approved', '거절됨': 'rejected' };
+
 export default function AdminTeachers() {
   const [teachers, setTeachers] = useState([]);
   const [classes, setClasses] = useState([]);
   const [academies, setAcademies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('전체');
   const [page, setPage] = useState(0);
   const [manageTarget, setManageTarget] = useState(null);
   const [pendingCount, setPendingCount] = useState(0);
@@ -113,6 +117,8 @@ export default function AdminTeachers() {
   };
 
   const filtered = teachers.filter(u => {
+    const statusKey = FILTER_STATUS[filter];
+    if (statusKey && (u.approval_status || 'pending') !== statusKey) return false;
     if (!search) return true;
     const q = search.toLowerCase();
     return (u.full_name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q);
@@ -135,6 +141,17 @@ export default function AdminTeachers() {
           <p className="text-sm font-medium text-amber-700">승인 대기 중 <span className="font-bold">{pendingCount}명</span> — 검토가 필요해요</p>
         </div>
       )}
+
+      <div className="flex gap-2 flex-wrap">
+        {FILTERS.map(f => (
+          <button key={f} onClick={() => { setFilter(f); setPage(0); }}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              filter === f ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            }`}>
+            {f}
+          </button>
+        ))}
+      </div>
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />

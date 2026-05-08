@@ -3,15 +3,17 @@ import { useTeacher } from '@/lib/TeacherContext';
 import { base44 } from '@/api/base44Client';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { Users, BookOpen, Target, TrendingUp, Plus } from 'lucide-react';
+import { Users, BookOpen, Target, TrendingUp } from 'lucide-react';
 import AssignmentForm from '@/components/AssignmentForm';
+import ClassSelectDialog from '@/components/ClassSelectDialog';
+import { toast } from 'sonner';
 
 export default function TeacherDashboard() {
   const { data, loading, error } = useTeacher();
-  const [selectedToolForAssignment, setSelectedToolForAssignment] = useState(null);
-  const [showAssignmentForm, setShowAssignmentForm] = useState(false);
+  const [pendingTool, setPendingTool] = useState(null);
+  const [selectedClass, setSelectedClass] = useState(null);
+  const [showForm, setShowForm] = useState(false);
 
   if (loading) return <InlineLoader message="대시보드 불러오는 중..." />;
 
@@ -69,7 +71,8 @@ export default function TeacherDashboard() {
 
       {weak_tools.length > 0 && (
         <Card className="p-4">
-          <h2 className="font-semibold text-sm mb-4">매듭별 약점 (평균 점수 낮은 순)</h2>
+          <h2 className="font-semibold text-sm mb-1">학급 학생들이 자주 막히는 매듭</h2>
+          <p className="text-xs text-muted-foreground mb-4">평균 점수 낮은 순</p>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={weak_tools} layout="vertical" margin={{ left: 8, right: 24 }}>
               <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11 }} />
@@ -77,10 +80,13 @@ export default function TeacherDashboard() {
               <Tooltip formatter={(v) => [`${v}점`, '평균 점수']} />
               <Bar dataKey="avg_score" radius={[0, 4, 4, 0]} onClick={(data) => {
                 const tool = weak_tools.find(t => t.name === data.name);
-                if (tool) {
-                  setSelectedToolForAssignment(tool.tool_id);
-                  setShowAssignmentForm(true);
+                if (!tool) return;
+                setPendingTool(tool.tool_id);
+                if (my_classes.length === 1) {
+                  setSelectedClass(my_classes[0].id);
+                  setShowForm(true);
                 }
+                // else: ClassSelectDialog opens via conditional render
               }} style={{ cursor: 'pointer' }}>
                 {weak_tools.map((entry, i) => (
                   <Cell key={i} fill={entry.avg_score < 50 ? '#ef4444' : entry.avg_score < 70 ? '#f59e0b' : '#10b981'} />
@@ -94,7 +100,8 @@ export default function TeacherDashboard() {
 
       {tool_distribution.length > 0 && (
         <Card className="p-4">
-          <h2 className="font-semibold text-sm mb-4">매듭별 시도 분포 (Top 10)</h2>
+          <h2 className="font-semibold text-sm mb-1">학급에서 자주 풀이된 매듭 Top 10</h2>
+          <p className="text-xs text-muted-foreground mb-4">도구 활동량 — 어느 도구가 수업에 자주 등장했는지</p>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={tool_distribution} layout="vertical" margin={{ left: 8, right: 24 }}>
               <XAxis type="number" tick={{ fontSize: 11 }} />
@@ -110,20 +117,32 @@ export default function TeacherDashboard() {
         <Card className="p-8 text-center text-muted-foreground text-sm">학생들의 제출 데이터가 없어요</Card>
       )}
 
-      {/* Assignment Form Modal */}
-      {showAssignmentForm && (
+      {/* Class select dialog (when teacher has multiple classes) */}
+      {pendingTool && !selectedClass && my_classes.length > 1 && (
+        <ClassSelectDialog
+          classes={my_classes}
+          onSelect={(cid) => { setSelectedClass(cid); setShowForm(true); }}
+          onClose={() => { setPendingTool(null); }}
+        />
+      )}
+
+      {/* Assignment form */}
+      {showForm && selectedClass && (
         <AssignmentForm
-          classId={my_classes[0]?.id}
+          classId={selectedClass}
+          preselectedToolId={pendingTool}
           onSave={async (data) => {
             await base44.entities.Assignment.create(data);
-            setShowAssignmentForm(false);
-            setSelectedToolForAssignment(null);
+            setShowForm(false);
+            setSelectedClass(null);
+            setPendingTool(null);
+            toast.success('숙제가 출제됐어요');
           }}
           onClose={() => {
-            setShowAssignmentForm(false);
-            setSelectedToolForAssignment(null);
+            setShowForm(false);
+            setSelectedClass(null);
+            setPendingTool(null);
           }}
-          preselectedToolId={selectedToolForAssignment}
         />
       )}
     </div>
