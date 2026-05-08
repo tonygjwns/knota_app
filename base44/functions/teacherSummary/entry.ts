@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    if (user.role !== 'teacher' && user.role !== 'admin') {
+    if (user.role !== 'teacher') {
       return Response.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -77,6 +77,7 @@ Deno.serve(async (req) => {
         attempts_summary: { total: 0, avg_score: 0, correct_rate: 0 },
         weak_tools: [],
         tool_distribution: [],
+        domain_summary: [],
         timing: { classes_ms, students_ms: 0, attempts_ms: 0, mastery_ms: 0, total_ms: Date.now() - t0 },
       });
     }
@@ -109,6 +110,7 @@ Deno.serve(async (req) => {
         attempts_summary: { total: 0, avg_score: 0, correct_rate: 0 },
         weak_tools: [],
         tool_distribution: [],
+        domain_summary: [],
         timing: { classes_ms, students_ms, attempts_ms: 0, mastery_ms: 0, total_ms: Date.now() - t0 },
       });
     }
@@ -227,6 +229,21 @@ Deno.serve(async (req) => {
       grade_range: c.grade_range || '',
     }));
 
+    // domain_summary: 단원별 평균 점수
+    const domainMap = new Map();
+    for (const a of allAttempts) {
+      const d = a.problem_domain || '미분류';
+      if (!domainMap.has(d)) domainMap.set(d, { sum: 0, count: 0 });
+      const entry = domainMap.get(d);
+      entry.sum += a.score || 0;
+      entry.count += 1;
+    }
+    const domain_summary = [];
+    domainMap.forEach((entry, name) => {
+      domain_summary.push({ name, avg: Math.round(entry.sum / entry.count), count: entry.count });
+    });
+    domain_summary.sort((a, b) => b.count - a.count);
+
     // attempts_summary
     const total = allAttempts.length;
     const avg_score = total > 0
@@ -247,6 +264,7 @@ Deno.serve(async (req) => {
       attempts_summary: { total, avg_score, correct_rate },
       weak_tools: top_weak,
       tool_distribution: top_dist,
+      domain_summary,
       timing: { classes_ms, students_ms, attempts_ms, mastery_ms, total_ms },
     });
 

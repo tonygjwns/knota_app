@@ -9,9 +9,9 @@ import UserMenuDropdown from '@/components/UserMenuDropdown';
 const ADMIN_NAV = [
   { path: '/admin', icon: BarChart2, label: '대시보드', exact: true },
   { path: '/admin/academies', icon: Building, label: '학원/학급' },
-  { path: '/admin/teachers', icon: GraduationCap, label: '강사 목록' },
-  { path: '/admin/students', icon: Users, label: '학생 목록' },
-  { path: '/admin/problems', icon: BookOpen, label: '문제 목록' },
+  { path: '/admin/teachers', icon: GraduationCap, label: '강사' },
+  { path: '/admin/students', icon: Users, label: '학생' },
+  { path: '/admin/problems', icon: BookOpen, label: '문제' },
   { path: '/admin/review', icon: CheckSquare, label: '채점 검토' },
 ];
 
