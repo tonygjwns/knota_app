@@ -233,7 +233,7 @@ ${OCR_SYSTEM_PROMPT}`;
 5. 할루시 방지 — 학생이 쓰지 않은 내용 추측 금지. 확신 없으면 confidence ↓
 6. OCR 검증 — OCR 결과가 의심스러우면 ocr_quality_concern에 구체적 우려 텍스트 명시
 7. Actionable feedback — "다시 살펴봐요" 같은 모호한 말 금지. 어느 자리/왜를 step_feedback, gap_locations, error_locations에 명시
-8. 매듭 매핑 (엄격) — error_locations 와 gap_locations 의 각 항목에서 tool_id 를 채울 때, 반드시 <available_tools> 안에 있는 tool_id 중 하나만 사용하세요. 그 어느 것도 학생의 오류/공백과 맞지 않으면 null 을 쓰세요. 절대로 새 ID 를 만들거나 한국어 이름, 영문 이름, 자유 문자열을 넣지 마세요. <available_tools> 가 비어있으면 tool_id 는 모두 null.
+8. 매듭 매핑 (엄격) — step_feedback, error_locations, gap_locations 의 각 항목에서 tool_id 를 채울 때, 반드시 <available_tools> 안에 있는 tool_id 중 하나만 사용하세요. 학생이 그 step 에서 어느 도구를 사용했는지 (또는 사용했어야 하는지) 가 분명하지 않으면 null. 절대로 새 ID 를 만들거나 자유 문자열 금지. <available_tools> 가 비어있으면 모두 null.
 
 ## 점수 기준
 - 100 = 정답 + 풀이 완전 + 표기 정합
@@ -268,6 +268,8 @@ ${formatSolutionPath(problem.solution_path)}
 ${toolsBlock}
 </available_tools>
 
+학생 풀이의 각 step 이 어떤 도구를 사용했는지 식별해 step_feedback[].tool_id 에 적어주세요 (correct / partial / missing / wrong 모두 적용). correct_solution_path 의 Step N: 도구 = "X" 와 매칭하면 됩니다.
+
 <student_ocr_solution>
 ${ocrText}
 </student_ocr_solution>
@@ -294,7 +296,8 @@ ${ocrText}
                   student_step: { type: 'string' },
                   status: { type: 'string', enum: ['correct', 'partial', 'missing', 'wrong'] },
                   comment: { type: 'string' },
-                  correction: { type: 'string' }
+                  correction: { type: 'string' },
+                  tool_id: { type: 'string', description: 'available_tools 안의 ID 또는 null. 자유 문자열 금지.' }
                 },
                 required: ['step_number', 'student_step', 'status', 'comment']
               }
@@ -341,6 +344,7 @@ ${ocrText}
         ...item,
         tool_id: validIds.has(item.tool_id) ? item.tool_id : null
       }));
+      gradeResult.step_feedback = sanitize(gradeResult.step_feedback);
       gradeResult.error_locations = sanitize(gradeResult.error_locations);
       gradeResult.gap_locations = sanitize(gradeResult.gap_locations);
 

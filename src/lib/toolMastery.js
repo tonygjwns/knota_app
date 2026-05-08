@@ -18,6 +18,9 @@ export function aggregateToolMastery(attempts, problemMap) {
     let toolIds = [];
 
     // 1순위: claude_grade_json 의 error_locations[].tool_id
+    // TODO: Future enhancement — also aggregate step_feedback[].tool_id as a positive signal.
+    //       correct/partial steps with a tool_id should boost that tool's mastery score,
+    //       reducing false negatives in weak-tool detection. Currently only error_locations contributes.
     if (attempt.claude_grade_json) {
       try {
         const grading = JSON.parse(attempt.claude_grade_json);

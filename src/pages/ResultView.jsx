@@ -10,7 +10,7 @@ import ScoreBadge, { ScoreSummaryText, StepStatusBadge } from '@/components/Scor
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { ChevronDown, ChevronUp, AlertTriangle, ArrowLeft, RotateCcw, ChevronRight, Clock, Wrench } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle, ArrowLeft, RotateCcw, ChevronRight, Clock, Wrench, Star } from 'lucide-react';
 import { toast } from 'sonner';
 
 const REGRADE_PROMPT_TEMPLATE = (problemContent, correctedText, toolsBlock = '') => `당신은 한국 K-12 수학 풀이 채점 전문가입니다.
@@ -24,7 +24,7 @@ const REGRADE_PROMPT_TEMPLATE = (problemContent, correctedText, toolsBlock = '')
 4. 오류 분류: calculation / conceptual / notation
 5. 할루시 방지 — 학생이 쓰지 않은 내용 추측 금지
 6. Actionable feedback — 어느 자리/왜를 명시
-7. 매듭 매핑 (엄격) — error_locations 와 gap_locations 의 각 항목에서 tool_id 를 채울 때, 반드시 <available_tools> 안에 있는 tool_id 중 하나만 사용하세요. 그 어느 것도 학생의 오류/공백과 맞지 않으면 null 을 쓰세요. 절대로 새 ID 를 만들거나 한국어 이름, 영문 이름, 자유 문자열을 넣지 마세요. <available_tools> 가 비어있으면 tool_id 는 모두 null.
+7. 매듭 매핑 (엄격) — step_feedback, error_locations, gap_locations 의 각 항목에서 tool_id 를 채울 때, 반드시 <available_tools> 안에 있는 tool_id 중 하나만 사용하세요. 학생이 그 step 에서 어느 도구를 사용했는지 (또는 사용했어야 하는지) 가 분명하지 않으면 null. 절대로 새 ID 를 만들거나 자유 문자열 금지. <available_tools> 가 비어있으면 모두 null.
 
 ## 점수 기준
 - 100 = 정답 + 풀이 완전 + 표기 정합
@@ -38,6 +38,12 @@ const REGRADE_PROMPT_TEMPLATE = (problemContent, correctedText, toolsBlock = '')
 <problem>
 ${problemContent || ''}
 </problem>
+
+<available_tools>
+${toolsBlock || '(도구 정보 없음)'}
+</available_tools>
+
+학생 풀이의 각 step 이 어떤 도구를 사용했는지 식별해 step_feedback[].tool_id 에 적어주세요. <available_tools> 안의 ID 만 사용하고, 불명확하면 null.
 
 <student_ocr_solution>
 ${correctedText}
@@ -61,7 +67,8 @@ const REGRADE_SCHEMA = {
           student_step: { type: 'string' },
           status: { type: 'string', enum: ['correct', 'partial', 'missing', 'wrong'] },
           comment: { type: 'string' },
-          correction: { type: 'string' }
+          correction: { type: 'string' },
+          tool_id: { type: 'string', description: 'available_tools 안의 ID 또는 null. 자유 문자열 금지.' }
         },
         required: ['step_number', 'student_step', 'status', 'comment']
       }
@@ -99,8 +106,10 @@ const REGRADE_SCHEMA = {
   required: ['schema_version', 'score', 'correctness', 'summary', 'step_feedback', 'gap_locations', 'error_locations', 'confidence']
 };
 
-function StepCard({ step }) {
+function StepCard({ step, getToolName, onToolClick }) {
   const [open, setOpen] = useState(step.status !== 'correct');
+  const toolName = getToolName ? getToolName(step.tool_id) : null;
+
   return (
     <div className={`rounded-xl border overflow-hidden transition-all ${
       step.status === 'correct' ? 'border-emerald-200 bg-emerald-50/30' :
@@ -115,10 +124,22 @@ function StepCard({ step }) {
           <span className="text-xs font-mono text-muted-foreground flex-shrink-0">
             {step.step_number}단계
           </span>
-          <StepStatusBadge status={step.status} />
-          {step.student_step && (
-            <span className="text-sm text-foreground truncate">{step.student_step.slice(0, 50)}</span>
+          {toolName ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); onToolClick && onToolClick(step.tool_id); }}
+              className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full inline-flex items-center gap-1 flex-shrink-0 hover:bg-primary/20 transition-colors"
+            >
+              <Wrench className="w-3 h-3" />
+              {toolName}
+            </button>
+          ) : (
+            step.student_step && (
+              <span className="text-sm text-foreground truncate">
+                {step.student_step.slice(0, 50)}
+              </span>
+            )
           )}
+          <StepStatusBadge status={step.status} />
         </div>
         {open ? <ChevronUp className="w-4 h-4 flex-shrink-0 text-muted-foreground" /> :
                 <ChevronDown className="w-4 h-4 flex-shrink-0 text-muted-foreground" />}
@@ -169,6 +190,8 @@ export default function ResultView() {
   const [showAlt, setShowAlt] = useState(false);
   const [tooltipTool, setTooltipTool] = useState(null); // tool entity for tooltip modal
   const [dismissedRemediation, setDismissedRemediation] = useState(false);
+  const [bookmarkedToolIds, setBookmarkedToolIds] = useState(new Set());
+  const [bookmarkIdMap, setBookmarkIdMap] = useState(new Map());
 
   useEffect(() => {
     loadAttempt();
@@ -209,6 +232,14 @@ export default function ResultView() {
             if (toolIds.length > 0) {
               const allTools = await base44.entities.MathTool.list('name', 100);
               setTools(allTools.filter(t => toolIds.includes(t.tool_id)));
+              // Fetch bookmarks for this student
+              if (user) {
+                const myBookmarks = await base44.entities.BookmarkedTool.filter({ student_id: user.id });
+                const bookmarkedSet = new Set(myBookmarks.filter(b => toolIds.includes(b.tool_id)).map(b => b.tool_id));
+                const idMap = new Map(myBookmarks.map(b => [b.tool_id, b.id]));
+                setBookmarkedToolIds(bookmarkedSet);
+                setBookmarkIdMap(idMap);
+              }
             }
           }
         }
@@ -218,12 +249,41 @@ export default function ResultView() {
     }
   };
 
-  // Build toolId → name map for error/gap display
+  // Build toolId → name/entity map
   const toolNameMap = new Map(tools.map(t => [t.tool_id, t.name]));
+  const toolEntityMap = new Map(tools.map(t => [t.tool_id, t]));
 
   const getToolName = (toolId) => {
     if (!toolId) return null;
-    return toolNameMap.get(toolId) || '도구 미식별';
+    return toolNameMap.get(toolId) || null;
+  };
+
+  const getToolEntity = (toolId) => toolEntityMap.get(toolId) || null;
+
+  const toggleBookmark = async (tool) => {
+    if (!user || !attempt) return;
+    const isBookmarked = bookmarkedToolIds.has(tool.tool_id);
+    if (isBookmarked) {
+      const id = bookmarkIdMap.get(tool.tool_id);
+      if (!id) return;
+      await base44.entities.BookmarkedTool.delete(id);
+      setBookmarkedToolIds(prev => { const next = new Set(prev); next.delete(tool.tool_id); return next; });
+      toast.success('즐겨찾기 해제했어요');
+    } else {
+      const created = await base44.entities.BookmarkedTool.create({
+        student_id: user.id,
+        tool_id: tool.tool_id,
+        context_attempt_id: attempt.id,
+      });
+      setBookmarkedToolIds(prev => new Set([...prev, tool.tool_id]));
+      setBookmarkIdMap(prev => new Map(prev).set(tool.tool_id, created.id));
+      toast.success('즐겨찾기에 추가했어요');
+    }
+  };
+
+  const handleToolChipClick = (toolId) => {
+    const entity = getToolEntity(toolId);
+    if (entity) setTooltipTool(entity);
   };
 
   const handleRegrade = async () => {
@@ -249,6 +309,7 @@ export default function ResultView() {
         ...item,
         tool_id: validIds.has(item.tool_id) ? item.tool_id : null
       }));
+      result.step_feedback = sanitize(result.step_feedback);
       result.error_locations = sanitize(result.error_locations);
       result.gap_locations = sanitize(result.gap_locations);
 
@@ -332,7 +393,15 @@ export default function ResultView() {
             </div>
             {tooltipTool.goal && <p className="text-sm text-muted-foreground mb-2">{tooltipTool.goal}</p>}
             {tooltipTool.description && <p className="text-sm text-foreground">{tooltipTool.description}</p>}
-            <Button size="sm" variant="outline" className="mt-4 w-full" onClick={() => setTooltipTool(null)}>닫기</Button>
+            <div className="flex gap-2 mt-4">
+              {user && (
+                <Button size="sm" variant="outline" className="flex-1" onClick={() => toggleBookmark(tooltipTool)}>
+                  <Star className={`w-3 h-3 mr-1 ${bookmarkedToolIds.has(tooltipTool.tool_id) ? 'fill-amber-500 text-amber-500' : ''}`} />
+                  {bookmarkedToolIds.has(tooltipTool.tool_id) ? '즐겨찾기 해제' : '즐겨찾기에 추가'}
+                </Button>
+              )}
+              <Button size="sm" onClick={() => setTooltipTool(null)}>닫기</Button>
+            </div>
           </Card>
         </div>
       )}
@@ -364,13 +433,24 @@ export default function ResultView() {
             <p className="text-xs text-muted-foreground mb-2 font-medium">이 문제에 사용된 도구</p>
             <div className="flex flex-wrap gap-2">
               {tools.map(tool => (
-                <button
-                  key={tool.tool_id}
-                  onClick={() => setTooltipTool(tool)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-full text-xs font-medium hover:bg-primary/20 transition-colors">
-                  <Wrench className="w-3 h-3" />
-                  {tool.name}
-                </button>
+                <div key={tool.tool_id} className="inline-flex items-center gap-0 bg-primary/10 text-primary rounded-full text-xs font-medium">
+                  <button
+                    onClick={() => setTooltipTool(tool)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 hover:bg-primary/20 rounded-l-full transition-colors"
+                  >
+                    <Wrench className="w-3 h-3" />
+                    {tool.name}
+                  </button>
+                  {user && (
+                    <button
+                      onClick={() => toggleBookmark(tool)}
+                      className="px-2 py-1.5 hover:bg-primary/20 rounded-r-full transition-colors"
+                      aria-label={bookmarkedToolIds.has(tool.tool_id) ? '즐겨찾기 해제' : '즐겨찾기에 추가'}
+                    >
+                      <Star className={`w-3 h-3 ${bookmarkedToolIds.has(tool.tool_id) ? 'fill-amber-500 text-amber-500' : ''}`} />
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           </div>
@@ -400,7 +480,7 @@ export default function ResultView() {
           <div>
             <h2 className="text-lg font-semibold mb-3">단계별 피드백</h2>
             <div className="space-y-2">
-              {steps.map((step, i) => <StepCard key={i} step={step} />)}
+              {steps.map((step, i) => <StepCard key={i} step={step} getToolName={getToolName} onToolClick={handleToolChipClick} />)}
             </div>
           </div>
         )}
@@ -412,11 +492,23 @@ export default function ResultView() {
             <div className="space-y-2">
               {gaps.map((gap, i) => {
                 const toolName = getToolName(gap.tool_id);
+                const toolEntity = getToolEntity(gap.tool_id);
                 return (
                   <div key={i} className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                    <p className="text-xs text-amber-600 font-medium mb-1">
-                      {toolName ? `[${toolName}] — 여기에 단계가 빠졌어요` : '여기에 단계가 빠졌어요'}
-                    </p>
+                    <div className="flex items-center gap-2 mb-1">
+                      {toolName && toolEntity ? (
+                        <button
+                          onClick={() => setTooltipTool(toolEntity)}
+                          className="text-xs bg-amber-200/60 text-amber-800 px-2 py-0.5 rounded-full inline-flex items-center gap-1 hover:bg-amber-200 transition-colors"
+                        >
+                          <Wrench className="w-3 h-3" />
+                          {toolName}
+                        </button>
+                      ) : null}
+                      <p className="text-xs text-amber-600 font-medium">
+                        {toolName ? '— 여기에 단계가 빠졌어요' : '여기에 단계가 빠졌어요'}
+                      </p>
+                    </div>
                     <p className="text-sm text-amber-800">{gap.description}</p>
                     {gap.expected_step && (
                       <div className="mt-2 bg-white/60 rounded-lg p-2">
@@ -437,13 +529,23 @@ export default function ResultView() {
             <div className="space-y-2">
               {errors.map((err, i) => {
                 const toolName = getToolName(err.tool_id);
+                const toolEntity = getToolEntity(err.tool_id);
                 const errTypeLabel = err.error_type === 'calculation' ? '계산 오류' :
                                      err.error_type === 'conceptual' ? '개념 오류' : '표기 오류';
                 return (
                   <div key={i} className="bg-red-50 border border-red-200 rounded-xl p-4">
-                    <p className="text-xs text-red-600 font-medium mb-1">
-                      {toolName ? `[${toolName}] — ${errTypeLabel}` : errTypeLabel}
-                    </p>
+                    <div className="flex items-center gap-2 mb-1">
+                      {toolName && toolEntity ? (
+                        <button
+                          onClick={() => setTooltipTool(toolEntity)}
+                          className="text-xs bg-red-200/60 text-red-800 px-2 py-0.5 rounded-full inline-flex items-center gap-1 hover:bg-red-200 transition-colors"
+                        >
+                          <Wrench className="w-3 h-3" />
+                          {toolName}
+                        </button>
+                      ) : null}
+                      <p className="text-xs text-red-600 font-medium">{toolName ? `— ${errTypeLabel}` : errTypeLabel}</p>
+                    </div>
                     <p className="text-sm text-red-800 mb-2">{err.description}</p>
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div className="bg-red-100 rounded p-2">
