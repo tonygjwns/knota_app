@@ -9,9 +9,8 @@ import LoadingOverlay, { InlineLoader } from '@/components/LoadingOverlay';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
-import { ArrowLeft, Upload, Image, Send, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Upload, Image, Send, AlertCircle, Star } from 'lucide-react';
 import { toast } from 'sonner';
-
 const OCR_SYSTEM_PROMPT = `당신은 한국 K-12 수학 손글씨 풀이 OCR 전문가입니다.
 
 학생의 손글씨 수학 풀이 이미지를 받아, 구조화된 markdown + LaTeX 양식으로 추출합니다.
@@ -71,6 +70,8 @@ export default function ProblemSolve() {
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const [activeTab, setActiveTab] = useState('canvas');
+  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [bookmarkId, setBookmarkId] = useState(null);
   const startedAt = useRef(new Date().toISOString());
   const fileInputRef = useRef(null);
 
@@ -85,6 +86,14 @@ export default function ProblemSolve() {
       const p = await base44.entities.Problem.filter({ id }, '-created_date', 1);
       if (p.length > 0) {
         setProblem(p[0]);
+        // Check bookmark status
+        if (user) {
+          const existing = await base44.entities.BookmarkedProblem.filter({ student_id: user.id, problem_id: p[0].id }, '-created_date', 1);
+          if (existing.length > 0) {
+            setIsBookmarked(true);
+            setBookmarkId(existing[0].id);
+          }
+        }
       } else {
         setError('문제를 찾을 수 없어요.');
       }
@@ -92,6 +101,27 @@ export default function ProblemSolve() {
       setError('문제를 불러오지 못했어요.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const toggleBookmark = async () => {
+    if (!user || !problem) return;
+    if (isBookmarked) {
+      await base44.entities.BookmarkedProblem.delete(bookmarkId);
+      setIsBookmarked(false);
+      setBookmarkId(null);
+      toast.success('즐겨찾기에서 제거했어요');
+    } else {
+      const problemText = parseProblemText(problem.content);
+      const created = await base44.entities.BookmarkedProblem.create({
+        student_id: user.id,
+        problem_id: problem.id,
+        problem_content_preview: problemText.slice(0, 100),
+        problem_domain: problem.domain_name || '',
+      });
+      setIsBookmarked(true);
+      setBookmarkId(created.id);
+      toast.success('즐겨찾기에 추가했어요');
     }
   };
 
@@ -381,65 +411,99 @@ ${ocrText}
   const problemText = problem ? parseProblemText(problem.content) : '';
 
   return (
-    <AppLayout>
+    <AppLayout fullWidth>
       {stage && <LoadingOverlay stage={stage} />}
 
-      <div className="space-y-5">
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="btn-touch">
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div>
-            {problem?.domain_name && (
-              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                {problem.domain_name}
-              </span>
+      {/* 가로 레이아웃: 좌 = 문제, 우 = 풀이 */}
+      <div className="flex flex-col lg:flex-row lg:gap-0 h-full min-h-screen">
+
+        {/* ── 좌측: 문제 영역 ── */}
+        <div className="lg:w-2/5 lg:border-r border-border flex flex-col">
+          {/* Header */}
+          <div className="flex items-center gap-2 p-4 border-b border-border">
+            <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="btn-touch">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div className="flex-1 min-w-0">
+              {problem?.domain_name && (
+                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                  {problem.domain_name}
+                </span>
+              )}
+              <h1 className="text-base font-bold mt-0.5">문제</h1>
+            </div>
+            {user && problem && (
+              <button
+                onClick={toggleBookmark}
+                className="p-2 rounded-full hover:bg-muted transition-colors"
+                aria-label="즐겨찾기"
+              >
+                <Star className={`w-5 h-5 ${isBookmarked ? 'fill-amber-500 text-amber-500' : 'text-muted-foreground'}`} />
+              </button>
             )}
-            <h1 className="text-lg font-bold mt-1">문제</h1>
           </div>
-        </div>
 
-        {/* Problem text */}
-        {problem && (
-          <Card className="p-5 bg-blue-50/50 border-blue-100">
-            <MathRenderer content={problemText} className="text-base" />
-          </Card>
-        )}
+          {/* Problem text — 스크롤 가능 */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {problem && (
+              <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-5">
+                <MathRenderer content={problemText} className="text-base" />
+              </div>
+            )}
+          </div>
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex gap-3">
-            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-red-800 font-medium">{error}</p>
-              <Button variant="link" className="text-red-600 p-0 h-auto mt-1" onClick={handleSubmit}>
-                다시 시도
+          {/* Submit — 좌측 하단 고정 */}
+          <div className="p-4 border-t border-border">
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex gap-2 mb-3">
+                <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-red-800 text-sm font-medium">{error}</p>
+                  <Button variant="link" className="text-red-600 p-0 h-auto text-xs mt-0.5" onClick={handleSubmit}>
+                    다시 시도
+                  </Button>
+                </div>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1 btn-touch" onClick={() => navigate('/home')}>
+                메인으로
+              </Button>
+              <Button className="flex-[2] btn-touch" size="lg" onClick={handleSubmit}>
+                <Send className="w-4 h-4 mr-2" />
+                제출
               </Button>
             </div>
           </div>
-        )}
+        </div>
 
-        {/* Input area */}
-        <div>
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid grid-cols-2 w-full">
-              <TabsTrigger value="canvas">✍️ 필기로 풀기</TabsTrigger>
-              <TabsTrigger value="photo">📷 사진으로 올리기</TabsTrigger>
-            </TabsList>
-            <TabsContent value="canvas" className="mt-4">
-              <DrawingCanvas onImageReady={setCanvasBlob} />
-            </TabsContent>
-            <TabsContent value="photo" className="mt-4">
+        {/* ── 우측: 풀이 작성 영역 ── */}
+        <div className="lg:flex-1 flex flex-col">
+          <div className="p-4 border-b border-border">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="grid grid-cols-2 w-full">
+                <TabsTrigger value="canvas">✍️ 필기로 풀기</TabsTrigger>
+                <TabsTrigger value="photo">📷 사진으로 올리기</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+
+          {/* 풀이 영역 — 스크롤 가능 */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {activeTab === 'canvas' && (
+              <DrawingCanvas onImageReady={setCanvasBlob} height={600} />
+            )}
+            {activeTab === 'photo' && (
               <div className="space-y-3">
                 <div
-                  className="border-2 border-dashed border-border rounded-xl p-8 flex flex-col items-center gap-3 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors"
+                  className="border-2 border-dashed border-border rounded-xl p-10 flex flex-col items-center gap-3 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors"
                   onClick={() => fileInputRef.current?.click()}>
                   {photoPreview ? (
-                    <img src={photoPreview} alt="미리보기" className="max-h-64 rounded-lg object-contain" />
+                    <img src={photoPreview} alt="미리보기" className="max-h-96 rounded-lg object-contain" />
                   ) : (
                     <>
-                      <div className="w-14 h-14 bg-muted rounded-full flex items-center justify-center">
-                        <Image className="w-7 h-7 text-muted-foreground" />
+                      <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center">
+                        <Image className="w-8 h-8 text-muted-foreground" />
                       </div>
                       <p className="text-muted-foreground text-sm text-center">
                         사진을 탭해서 업로드하세요<br />
@@ -461,19 +525,8 @@ ${ocrText}
                   onChange={handlePhotoSelect}
                 />
               </div>
-            </TabsContent>
-          </Tabs>
-        </div>
-
-        {/* Submit */}
-        <div className="flex gap-3 pt-2">
-          <Button variant="outline" className="flex-1 btn-touch" onClick={() => navigate('/home')}>
-            메인으로
-          </Button>
-          <Button className="flex-2 btn-touch flex-[2]" size="lg" onClick={handleSubmit}>
-            <Send className="w-4 h-4 mr-2" />
-            제출
-          </Button>
+            )}
+          </div>
         </div>
       </div>
     </AppLayout>

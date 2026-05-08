@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Undo2, Trash2, Pencil, Eraser } from 'lucide-react';
 
-export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penSize = 3 }) {
+export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penSize = 3, height = 400 }) {
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [history, setHistory] = useState([]);
@@ -146,7 +146,7 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
       </div>
 
       <div className="relative bg-white border-2 border-dashed border-border rounded-xl overflow-hidden"
-           style={{ minHeight: 280 }}>
+           style={{ minHeight: height }}>
         {isEmpty && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground pointer-events-none select-none">
             <Pencil className="w-8 h-8 mb-2 opacity-30" />
@@ -156,7 +156,7 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
         <canvas
           ref={canvasRef}
           className={`${cursorClass} w-full`}
-          style={{ height: 280, display: 'block' }}
+          style={{ height, display: 'block' }}
           onMouseDown={startDraw}
           onMouseMove={draw}
           onMouseUp={stopDraw}

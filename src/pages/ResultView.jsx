@@ -10,7 +10,7 @@ import ScoreBadge, { ScoreSummaryText, StepStatusBadge } from '@/components/Scor
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { ChevronDown, ChevronUp, AlertTriangle, ArrowLeft, RotateCcw, ChevronRight, Clock, Wrench, Star } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle, ArrowLeft, RotateCcw, ChevronRight, Clock, Wrench, Star, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 
 const REGRADE_PROMPT_TEMPLATE = (problemContent, correctedText, toolsBlock = '') => `당신은 한국 K-12 수학 풀이 채점 전문가입니다.
@@ -192,6 +192,8 @@ export default function ResultView() {
   const [dismissedRemediation, setDismissedRemediation] = useState(false);
   const [bookmarkedToolIds, setBookmarkedToolIds] = useState(new Set());
   const [bookmarkIdMap, setBookmarkIdMap] = useState(new Map());
+  const [problemBookmarked, setProblemBookmarked] = useState(false);
+  const [problemBookmarkId, setProblemBookmarkId] = useState(null);
 
   useEffect(() => {
     loadAttempt();
@@ -234,11 +236,18 @@ export default function ResultView() {
               setTools(allTools.filter(t => toolIds.includes(t.tool_id)));
               // Fetch bookmarks for this student
               if (user) {
-                const myBookmarks = await base44.entities.BookmarkedTool.filter({ student_id: user.id });
-                const bookmarkedSet = new Set(myBookmarks.filter(b => toolIds.includes(b.tool_id)).map(b => b.tool_id));
-                const idMap = new Map(myBookmarks.map(b => [b.tool_id, b.id]));
+                const [myToolBookmarks, myProblemBookmarks] = await Promise.all([
+                  base44.entities.BookmarkedTool.filter({ student_id: user.id }),
+                  base44.entities.BookmarkedProblem.filter({ student_id: user.id, problem_id: a.problem_id }, '-created_date', 1),
+                ]);
+                const bookmarkedSet = new Set(myToolBookmarks.filter(b => toolIds.includes(b.tool_id)).map(b => b.tool_id));
+                const idMap = new Map(myToolBookmarks.map(b => [b.tool_id, b.id]));
                 setBookmarkedToolIds(bookmarkedSet);
                 setBookmarkIdMap(idMap);
+                if (myProblemBookmarks.length > 0) {
+                  setProblemBookmarked(true);
+                  setProblemBookmarkId(myProblemBookmarks[0].id);
+                }
               }
             }
           }
@@ -278,6 +287,26 @@ export default function ResultView() {
       setBookmarkedToolIds(prev => new Set([...prev, tool.tool_id]));
       setBookmarkIdMap(prev => new Map(prev).set(tool.tool_id, created.id));
       toast.success('즐겨찾기에 추가했어요');
+    }
+  };
+
+  const toggleProblemBookmark = async () => {
+    if (!user || !attempt) return;
+    if (problemBookmarked) {
+      await base44.entities.BookmarkedProblem.delete(problemBookmarkId);
+      setProblemBookmarked(false);
+      setProblemBookmarkId(null);
+      toast.success('문제 즐겨찾기를 해제했어요');
+    } else {
+      const created = await base44.entities.BookmarkedProblem.create({
+        student_id: user.id,
+        problem_id: attempt.problem_id,
+        problem_content_preview: (attempt.problem_content || '').slice(0, 100),
+        problem_domain: attempt.problem_domain || '',
+      });
+      setProblemBookmarked(true);
+      setProblemBookmarkId(created.id);
+      toast.success('문제를 즐겨찾기에 추가했어요');
     }
   };
 
@@ -407,10 +436,21 @@ export default function ResultView() {
       )}
 
       <div className="space-y-5 pb-8">
-        {/* Back */}
-        <Button variant="ghost" size="sm" onClick={() => navigate('/home')} className="gap-2">
-          <ArrowLeft className="w-4 h-4" /> 홈으로
-        </Button>
+        {/* Back + Problem bookmark */}
+        <div className="flex items-center justify-between">
+          <Button variant="ghost" size="sm" onClick={() => navigate('/home')} className="gap-2">
+            <ArrowLeft className="w-4 h-4" /> 홈으로
+          </Button>
+          {user && attempt && (
+            <button
+              onClick={toggleProblemBookmark}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border hover:bg-muted transition-colors text-sm"
+            >
+              <Star className={`w-4 h-4 ${problemBookmarked ? 'fill-amber-500 text-amber-500' : 'text-muted-foreground'}`} />
+              <span className="text-muted-foreground text-xs">{problemBookmarked ? '문제 저장됨' : '문제 저장'}</span>
+            </button>
+          )}
+        </div>
 
         {/* Score card */}
         <Card className={`p-6 bg-gradient-to-br ${scoreColor} border text-center`}>

@@ -1,0 +1,30 @@
+{
+  "name": "BookmarkedProblem",
+  "type": "object",
+  "properties": {
+    "student_id": {
+      "type": "string",
+      "description": "User ID of the student"
+    },
+    "problem_id": {
+      "type": "string",
+      "description": "Problem entity ID"
+    },
+    "problem_content_preview": {
+      "type": "string",
+      "description": "Short preview of the problem text (cached)"
+    },
+    "problem_domain": {
+      "type": "string",
+      "description": "Domain name (cached)"
+    },
+    "note": {
+      "type": "string",
+      "description": "\ud559\uc0dd \uba54\ubaa8 (\uc120\ud0dd)"
+    }
+  },
+  "required": [
+    "student_id",
+    "problem_id"
+  ]
+}
