@@ -106,7 +106,7 @@ const REGRADE_SCHEMA = {
   required: ['schema_version', 'score', 'correctness', 'summary', 'step_feedback', 'gap_locations', 'error_locations', 'confidence']
 };
 
-function StepCard({ step, getToolName, onToolClick }) {
+function StepCard({ step, getToolName, onToolClick, onBookmarkTool, bookmarkedToolIds }) {
   const [open, setOpen] = useState(step.status !== 'correct');
   const toolName = getToolName ? getToolName(step.tool_id) : null;
 
@@ -125,13 +125,21 @@ function StepCard({ step, getToolName, onToolClick }) {
             {step.step_number}단계
           </span>
           {toolName ? (
-            <button
-              onClick={(e) => { e.stopPropagation(); onToolClick && onToolClick(step.tool_id); }}
-              className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full inline-flex items-center gap-1 flex-shrink-0 hover:bg-primary/20 transition-colors"
-            >
-              <Wrench className="w-3 h-3" />
-              {toolName}
-            </button>
+            <div className="inline-flex items-center gap-0 flex-shrink-0">
+              <button
+                onClick={(e) => { e.stopPropagation(); onToolClick && onToolClick(step.tool_id); }}
+                className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-l-full inline-flex items-center gap-1 hover:bg-primary/20 transition-colors"
+              >
+                <Wrench className="w-3 h-3" />
+                {toolName}
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); onBookmarkTool && onBookmarkTool(step.tool_id); }}
+                className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-r-full hover:bg-primary/20 transition-colors"
+              >
+                <Star className={`w-3 h-3 ${bookmarkedToolIds?.has(step.tool_id) ? 'fill-amber-500 text-amber-500' : ''}`} />
+              </button>
+            </div>
           ) : (
             step.student_step && (
               <span className="text-sm text-foreground truncate">
@@ -520,7 +528,7 @@ export default function ResultView() {
           <div>
             <h2 className="text-lg font-semibold mb-3">단계별 피드백</h2>
             <div className="space-y-2">
-              {steps.map((step, i) => <StepCard key={i} step={step} getToolName={getToolName} onToolClick={handleToolChipClick} />)}
+              {steps.map((step, i) => <StepCard key={i} step={step} getToolName={getToolName} onToolClick={handleToolChipClick} onBookmarkTool={(toolId) => { const t = tools.find(t => t.tool_id === toolId); if (t) toggleBookmark(t); }} bookmarkedToolIds={bookmarkedToolIds} />)}
             </div>
           </div>
         )}
@@ -537,13 +545,23 @@ export default function ResultView() {
                   <div key={i} className="bg-amber-50 border border-amber-200 rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-1">
                       {toolName && toolEntity ? (
-                        <button
-                          onClick={() => setTooltipTool(toolEntity)}
-                          className="text-xs bg-amber-200/60 text-amber-800 px-2 py-0.5 rounded-full inline-flex items-center gap-1 hover:bg-amber-200 transition-colors"
-                        >
-                          <Wrench className="w-3 h-3" />
-                          {toolName}
-                        </button>
+                        <div className="inline-flex items-center gap-0">
+                          <button
+                            onClick={() => setTooltipTool(toolEntity)}
+                            className="text-xs bg-amber-200/60 text-amber-800 px-2 py-0.5 rounded-l-full inline-flex items-center gap-1 hover:bg-amber-200 transition-colors"
+                          >
+                            <Wrench className="w-3 h-3" />
+                            {toolName}
+                          </button>
+                          {user && (
+                            <button
+                              onClick={() => toggleBookmark(toolEntity)}
+                              className="text-xs bg-amber-200/60 text-amber-800 px-1.5 py-0.5 rounded-r-full hover:bg-amber-200 transition-colors"
+                            >
+                              <Star className={`w-3 h-3 ${bookmarkedToolIds.has(gap.tool_id) ? 'fill-amber-500 text-amber-500' : ''}`} />
+                            </button>
+                          )}
+                        </div>
                       ) : null}
                       <p className="text-xs text-amber-600 font-medium">
                         {toolName ? '— 여기에 단계가 빠졌어요' : '여기에 단계가 빠졌어요'}
@@ -576,13 +594,23 @@ export default function ResultView() {
                   <div key={i} className="bg-red-50 border border-red-200 rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-1">
                       {toolName && toolEntity ? (
-                        <button
-                          onClick={() => setTooltipTool(toolEntity)}
-                          className="text-xs bg-red-200/60 text-red-800 px-2 py-0.5 rounded-full inline-flex items-center gap-1 hover:bg-red-200 transition-colors"
-                        >
-                          <Wrench className="w-3 h-3" />
-                          {toolName}
-                        </button>
+                        <div className="inline-flex items-center gap-0">
+                          <button
+                            onClick={() => setTooltipTool(toolEntity)}
+                            className="text-xs bg-red-200/60 text-red-800 px-2 py-0.5 rounded-l-full inline-flex items-center gap-1 hover:bg-red-200 transition-colors"
+                          >
+                            <Wrench className="w-3 h-3" />
+                            {toolName}
+                          </button>
+                          {user && (
+                            <button
+                              onClick={() => toggleBookmark(toolEntity)}
+                              className="text-xs bg-red-200/60 text-red-800 px-1.5 py-0.5 rounded-r-full hover:bg-red-200 transition-colors"
+                            >
+                              <Star className={`w-3 h-3 ${bookmarkedToolIds.has(err.tool_id) ? 'fill-amber-500 text-amber-500' : ''}`} />
+                            </button>
+                          )}
+                        </div>
                       ) : null}
                       <p className="text-xs text-red-600 font-medium">{toolName ? `— ${errTypeLabel}` : errTypeLabel}</p>
                     </div>

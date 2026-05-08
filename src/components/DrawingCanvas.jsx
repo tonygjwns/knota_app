@@ -1,13 +1,17 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Undo2, Trash2, Pencil, Eraser } from 'lucide-react';
+import { Undo2, Trash2, Pencil, Eraser, Plus } from 'lucide-react';
 
-export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penSize = 3, height = 400 }) {
+const PAGE_HEIGHT = 400; // px per page
+
+export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penSize = 3 }) {
   const canvasRef = useRef(null);
+  const containerRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [history, setHistory] = useState([]);
-  const [tool, setTool] = useState('pen'); // 'pen' | 'eraser'
+  const [tool, setTool] = useState('pen');
   const [eraserSize] = useState(20);
+  const [canvasHeight, setCanvasHeight] = useState(PAGE_HEIGHT);
   const lastPos = useRef(null);
 
   const getPos = (e, canvas) => {
@@ -26,6 +30,25 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
     if (!canvas) return;
     setHistory(h => [...h.slice(-19), canvas.toDataURL()]);
   }, []);
+
+  const expandCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const data = canvas.toDataURL();
+    const newHeight = canvasHeight + PAGE_HEIGHT;
+    setCanvasHeight(newHeight);
+    // After state update, restore drawing on next render via effect
+    const img = new Image();
+    img.onload = () => {
+      // canvas dimensions are set by the effect below, so wait a tick
+      requestAnimationFrame(() => {
+        ctx.drawImage(img, 0, 0);
+        if (onImageReady) canvas.toBlob(b => b && onImageReady(b), 'image/jpeg', 0.7);
+      });
+    };
+    img.src = data;
+  };
 
   const startDraw = useCallback((e) => {
     e.preventDefault();
@@ -64,9 +87,7 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
       ctx.lineWidth = penSize;
     }
     ctx.stroke();
-    if (tool === 'eraser') {
-      ctx.globalCompositeOperation = 'source-over';
-    }
+    if (tool === 'eraser') ctx.globalCompositeOperation = 'source-over';
     lastPos.current = pos;
   }, [isDrawing, penColor, penSize, tool, eraserSize]);
 
@@ -102,51 +123,56 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
     if (onImageReady) onImageReady(null);
   };
 
-  // Resize canvas to fill container
+  // Resize canvas resolution when height changes
   useEffect(() => {
     const canvas = canvasRef.current;
-    const resize = () => {
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const data = canvas.toDataURL();
+    canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+    canvas.height = canvasHeight * window.devicePixelRatio;
+    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    const img = new Image();
+    img.onload = () => ctx.drawImage(img, 0, 0);
+    img.src = data;
+  }, [canvasHeight]);
+
+  // Handle container width changes
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ro = new ResizeObserver(() => {
       const ctx = canvas.getContext('2d');
       const data = canvas.toDataURL();
       canvas.width = canvas.offsetWidth * window.devicePixelRatio;
-      canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+      canvas.height = canvasHeight * window.devicePixelRatio;
       ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
       const img = new Image();
       img.onload = () => ctx.drawImage(img, 0, 0);
       img.src = data;
-    };
-    const ro = new ResizeObserver(resize);
+    });
     ro.observe(canvas.parentElement);
     return () => ro.disconnect();
-  }, []);
+  }, [canvasHeight]);
 
   const isEmpty = history.length === 0;
   const cursorClass = tool === 'eraser' ? 'cursor-cell' : 'drawing-canvas';
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3" ref={containerRef}>
       {/* Tool toggle */}
       <div className="flex gap-2">
-        <Button
-          type="button"
-          variant={tool === 'pen' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setTool('pen')}
-          className="flex-1 btn-touch">
+        <Button type="button" variant={tool === 'pen' ? 'default' : 'outline'} size="sm"
+          onClick={() => setTool('pen')} className="flex-1 btn-touch">
           <Pencil className="w-4 h-4 mr-1" /> 펜
         </Button>
-        <Button
-          type="button"
-          variant={tool === 'eraser' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setTool('eraser')}
-          className="flex-1 btn-touch">
+        <Button type="button" variant={tool === 'eraser' ? 'default' : 'outline'} size="sm"
+          onClick={() => setTool('eraser')} className="flex-1 btn-touch">
           <Eraser className="w-4 h-4 mr-1" /> 지우개
         </Button>
       </div>
 
       <div className="relative bg-white border-2 border-dashed border-border rounded-xl overflow-hidden"
-           style={{ minHeight: height }}>
+           style={{ height: canvasHeight }}>
         {isEmpty && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground pointer-events-none select-none">
             <Pencil className="w-8 h-8 mb-2 opacity-30" />
@@ -156,7 +182,7 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
         <canvas
           ref={canvasRef}
           className={`${cursorClass} w-full`}
-          style={{ height, display: 'block' }}
+          style={{ height: canvasHeight, display: 'block' }}
           onMouseDown={startDraw}
           onMouseMove={draw}
           onMouseUp={stopDraw}
@@ -175,6 +201,10 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
         <Button type="button" variant="outline" size="sm" onClick={clear}
                 className="btn-touch flex-1 text-destructive hover:text-destructive">
           <Trash2 className="w-4 h-4 mr-1" /> 초기화
+        </Button>
+        <Button type="button" variant="outline" size="sm" onClick={expandCanvas}
+                className="btn-touch flex-1">
+          <Plus className="w-4 h-4 mr-1" /> 칸 늘리기
         </Button>
       </div>
     </div>
