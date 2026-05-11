@@ -36,7 +36,8 @@ export default function RemediationPractice() {
         setAttempt(a);
 
         // Extract target tool
-        const grading = a.claude_grade_json ? JSON.parse(a.claude_grade_json) : null;
+        const rawGrading = a.claude_grade_json ? JSON.parse(a.claude_grade_json) : null;
+        const grading = rawGrading?.response ?? rawGrading;
         const errorToolIds = grading?.error_locations?.map(e => e.tool_id).filter(Boolean) || [];
         const gapToolIds = grading?.gap_locations?.map(g => g.tool_id).filter(Boolean) || [];
         const targetToolId = errorToolIds[0] || gapToolIds[0];

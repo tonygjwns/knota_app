@@ -42,15 +42,26 @@ export default function RemediationLesson() {
           if (t) setTool(t);
         }
 
-        // Extract step from problem solution_path
+        // Extract step from SolutionStep (new curation model)
         if (targetToolId && a.problem_id) {
-          const problem = problems.find(p => p.id === a.problem_id);
-          if (problem?.solution_path) {
-            try {
-              const path = JSON.parse(problem.solution_path);
-              const toolStep = path.find(s => s.tool_id === targetToolId);
+          const problemRow = problems.find(p => p.id === a.problem_id);
+          if (problemRow) {
+            // 1) matched_solution_id from grading, else fallback to priority=1
+            let solutionId = grading?.matched_solution_id || null;
+            if (!solutionId) {
+              const sols = await base44.entities.Solution.filter(
+                { problem_id: problemRow.problem_id }, 'priority', 5
+              );
+              if (sols.length > 0) solutionId = sols[0].solution_id;
+            }
+            // 2) find step for targetToolId in that solution
+            if (solutionId) {
+              const steps = await base44.entities.SolutionStep.filter(
+                { solution_id: solutionId }, 'sequence_order', 50
+              );
+              const toolStep = steps.find(s => s.tool_id === targetToolId);
               if (toolStep) setStep(toolStep);
-            } catch {}
+            }
           }
         }
       } catch (e) {
@@ -77,7 +88,7 @@ export default function RemediationLesson() {
     if (!tool || !user) return;
     try {
       await base44.entities.BookmarkedTool.create({
-        student_id: user.id,
+        user_id: user.id,
         tool_id: tool.tool_id,
         context_attempt_id: attemptId
       });
@@ -155,7 +166,10 @@ export default function RemediationLesson() {
               <div>
                 <p className="text-sm font-semibold mb-2">이 문제에 적용한다면</p>
                 <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
-                  <MathRenderer content={step.description || step.operation} />
+                  {step.application && <MathRenderer content={step.application} />}
+                  {step.appended_info && (
+                    <p className="text-xs text-muted-foreground mt-2 italic">→ {step.appended_info}</p>
+                  )}
                 </div>
               </div>
             )}
