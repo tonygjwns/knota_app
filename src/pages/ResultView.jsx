@@ -510,8 +510,8 @@ export default function ResultView() {
   if (loading) return <AppLayout><InlineLoader message="결과 불러오는 중..." /></AppLayout>;
   if (!attempt) return <AppLayout><div className="text-center py-12 text-muted-foreground">결과를 찾을 수 없어요.</div></AppLayout>;
 
-  // Only the student who submitted can perform write actions
-  const viewerIsOwner = attempt.student_id === user?.id;
+  // Only the student who submitted can perform write actions (not teachers viewing student work)
+  const viewerIsOwner = attempt?.student_id === user?.id;
 
   const score = attempt.score || 0;
   const scoreColor = score >= 80 ? 'from-emerald-50 to-emerald-100/50 border-emerald-200' :

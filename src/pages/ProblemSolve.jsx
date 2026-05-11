@@ -579,11 +579,16 @@ ${ocrText}
                 </div>
               </div>
             )}
+            {user?.role !== 'student' && user?.role !== 'admin' && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-3">
+                <p className="text-blue-800 text-xs">강사/관리자는 풀이를 제출할 수 없어요. 학생 계정으로 제출하세요.</p>
+              </div>
+            )}
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1 btn-touch" onClick={() => navigate('/home')}>
-                메인으로
+              <Button variant="outline" className="flex-1 btn-touch" onClick={() => navigate(-1)}>
+                뒤로
               </Button>
-              <Button className="flex-[2] btn-touch" size="lg" onClick={handleSubmit}>
+              <Button className="flex-[2] btn-touch" size="lg" onClick={handleSubmit} disabled={user?.role === 'teacher'}>
                 <Send className="w-4 h-4 mr-2" />
                 제출
               </Button>
