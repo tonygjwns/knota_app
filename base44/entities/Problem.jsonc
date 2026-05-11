@@ -34,14 +34,6 @@
       "type": "string",
       "description": "Tool IDs used (JSON array)"
     },
-    "agent_solution": {
-      "type": "string",
-      "description": "Agent solution text"
-    },
-    "solution_path": {
-      "type": "string",
-      "description": "Usage records solution path (JSON)"
-    },
     "difficulty": {
       "type": "number",
       "description": "Difficulty 1-5"

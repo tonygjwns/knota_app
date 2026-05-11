@@ -303,8 +303,6 @@ Deno.serve(async (req) => {
           domain_name: domainName,
           achvmt_std_codes: JSON.stringify([...achvmtSet]),
           tool_ids: JSON.stringify(toolIdsOrdered),
-          agent_solution: null,
-          solution_path: null,
           difficulty,
         };
       });
@@ -448,8 +446,6 @@ Deno.serve(async (req) => {
           domain_name: domainId ? (DOMAIN_MAP[domainId]?.name || null) : null,
           achvmt_std_codes: JSON.stringify([...achvmtSet]),
           tool_ids: JSON.stringify(toolIdsOrdered),
-          agent_solution: null,
-          solution_path: null,
           difficulty,
         };
       });

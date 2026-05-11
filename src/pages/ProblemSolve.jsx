@@ -367,7 +367,7 @@ ${ocrText}
                 properties: {
                   description: { type: 'string' },
                   expected_step: { type: 'string' },
-                  tool_id: { type: 'string', description: 'correct_solution_path 에서 매핑된 도구 ID. 불명확하면 null.' }
+                  tool_id: { type: 'string', description: '매칭된 별해의 path에서 매핑된 도구 ID. 불명확하면 null.' }
                 },
                 required: ['description', 'expected_step']
               }
@@ -381,7 +381,7 @@ ${ocrText}
                   student_wrote: { type: 'string' },
                   correct_form: { type: 'string' },
                   error_type: { type: 'string', enum: ['calculation', 'conceptual', 'notation'] },
-                  tool_id: { type: 'string', description: 'correct_solution_path 에서 매핑된 도구 ID. 불명확하면 null.' }
+                  tool_id: { type: 'string', description: '매칭된 별해의 path에서 매핑된 도구 ID. 불명확하면 null.' }
                 },
                 required: ['description', 'student_wrote', 'correct_form', 'error_type']
               }

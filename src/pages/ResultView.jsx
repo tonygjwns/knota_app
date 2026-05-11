@@ -14,18 +14,22 @@ import { ChevronDown, ChevronUp, AlertTriangle, ArrowLeft, RotateCcw, ChevronRig
 import SolutionCard from '@/components/SolutionCard';
 import { toast } from 'sonner';
 
-const REGRADE_PROMPT_TEMPLATE = (problemContent, correctedText, toolsBlock = '') => `당신은 한국 K-12 수학 풀이 채점 전문가입니다.
+const REGRADE_PROMPT_TEMPLATE = (problemContent, correctedText, toolsBlock = '', solutionsBlock = '(별해 데이터 없음)', verifiedAnswer = '(검증된 정답 없음)') => `당신은 한국 K-12 수학 풀이 채점 전문가입니다.
 
 학생이 OCR 결과를 직접 수정한 버전으로 재채점합니다.
 
 ## 채점 원칙
 1. 부분점수 일관성 — 비슷한 풀이는 비슷한 점수
 2. 학생 친화 톤 — 격려 + 정정. "틀렸어요" 같은 부정적 표현 금지. "이 부분 다시 살펴볼까요?" 형태로
-3. 별해 인정 — 다른 경로여도 정답 도달 시 정합으로 인정
-4. 오류 분류: calculation / conceptual / notation
-5. 할루시 방지 — 학생이 쓰지 않은 내용 추측 금지
-6. Actionable feedback — 어느 자리/왜를 명시
-7. 매듭 매핑 (엄격) — step_feedback, error_locations, gap_locations 의 각 항목에서 tool_id 를 채울 때, 반드시 <available_tools> 안에 있는 tool_id 중 하나만 사용하세요. 학생이 그 step 에서 어느 도구를 사용했는지 (또는 사용했어야 하는지) 가 분명하지 않으면 null. 절대로 새 ID 를 만들거나 자유 문자열 금지. <available_tools> 가 비어있으면 모두 null.
+3. 별해 매칭 — 학생 풀이가 <solutions> 안의 어느 별해와 가장 비슷한지 판정해
+   matched_solution_id에 그 별해의 solution_id를 채워주세요. 어느 것과도 비슷하지 않으면 null.
+   별해가 0개면 항상 null.
+4. 정답 처리 — 학생이 매칭 별해의 path와 일치하면서 verified_answer에 도달하면 score 80+ (correct).
+   사소한 계산/표기 오류는 허용. 개념적 오류만 score 크게 차감.
+5. 오류 분류: calculation / conceptual / notation
+6. 할루시 방지 — 학생이 쓰지 않은 내용 추측 금지
+7. Actionable feedback — 어느 자리/왜를 명시
+8. 매듭 매핑 (엄격) — step_feedback, error_locations, gap_locations 의 각 항목에서 tool_id 를 채울 때, 반드시 <available_tools> 안에 있는 tool_id 중 하나만 사용하세요. 매칭된 별해의 path 도구를 우선 매핑. 불명확하면 null. <available_tools> 가 비어있으면 모두 null.
 
 ## 점수 기준
 - 100 = 정답 + 풀이 완전 + 표기 정합
@@ -40,11 +44,20 @@ const REGRADE_PROMPT_TEMPLATE = (problemContent, correctedText, toolsBlock = '')
 ${problemContent || ''}
 </problem>
 
+<verified_answer>
+${verifiedAnswer}
+</verified_answer>
+
+<solutions>
+${solutionsBlock}
+</solutions>
+
 <available_tools>
 ${toolsBlock || '(도구 정보 없음)'}
 </available_tools>
 
-학생 풀이의 각 step 이 어떤 도구를 사용했는지 식별해 step_feedback[].tool_id 에 적어주세요. <available_tools> 안의 ID 만 사용하고, 불명확하면 null.
+학생 풀이가 어느 별해 path와 가장 가까운지 판정해 matched_solution_id에 채우고,
+step_feedback[].tool_id 는 그 별해의 도구로 매핑하세요.
 
 <student_ocr_solution>
 ${correctedText}
@@ -100,7 +113,8 @@ const REGRADE_SCHEMA = {
         required: ['description', 'student_wrote', 'correct_form', 'error_type']
       }
     },
-    alternative_solution: { type: 'string' },
+    matched_solution_id: { type: 'string', description: '학생 풀이와 가장 가까운 별해 solution_id. 매칭 안 되면 null. 별해 0개면 null.' },
+    matched_solution_priority: { type: 'integer', description: '매칭 별해의 priority (UI 표시용). 없으면 null.' },
     confidence: { type: 'integer', minimum: 0, maximum: 100 },
     ocr_quality_concern: { type: 'string' }
   },
@@ -349,13 +363,38 @@ export default function ResultView() {
     if (!attempt || !correctedText.trim()) return;
     setRegrading(true);
     try {
-      // Build tools block from already-fetched tools state
+      // Build tools block
       const toolsBlock = tools.length > 0
         ? tools.map(t => `- tool_id: "${t.tool_id}"\n  name: "${t.name}"\n  goal: "${t.goal || ''}"`).join('\n')
         : '(도구 정보 없음)';
 
+      // Build solutions block (same pattern as ProblemSolve)
+      const parseContentsLocal = (contents) => {
+        try {
+          const blocks = JSON.parse(contents || '[]');
+          return Array.isArray(blocks) ? blocks.map(b => b.text || '').join('\n') : String(contents);
+        } catch { return String(contents || ''); }
+      };
+      const solutionsSlice = solutions.slice(0, 5);
+      const solutionIds = solutionsSlice.map(s => s.solution_id);
+      const solutionsBlock = solutionsSlice.length === 0
+        ? '(별해 데이터 없음)'
+        : solutionsSlice.map(sol => {
+            const body = parseContentsLocal(sol.contents);
+            const steps = solutionSteps
+              .filter(s => s.solution_id === sol.solution_id)
+              .sort((a, b) => a.sequence_order - b.sequence_order);
+            const pathText = steps.map(s => {
+              const toolName = tools.find(t => t.tool_id === s.tool_id)?.name || s.tool_id;
+              return `  Step ${s.sequence_order}: 도구="${s.tool_id}" (${toolName})\n    선택사유: ${s.reason || ''}\n    적용: ${s.application || ''}\n    결과: ${s.appended_info || ''}`;
+            }).join('\n');
+            return `<solution priority="${sol.priority}" id="${sol.solution_id}">\n<body>\n${body}\n</body>\n<path>\n${pathText}\n</path>\n</solution>`;
+          }).join('\n\n');
+
+      const verifiedAnswer = problem?.verified_answer || '(검증된 정답 없음)';
+
       const resultRaw = await base44.integrations.Core.InvokeLLM({
-        prompt: REGRADE_PROMPT_TEMPLATE(attempt.problem_content, correctedText, toolsBlock),
+        prompt: REGRADE_PROMPT_TEMPLATE(attempt.problem_content, correctedText, toolsBlock, solutionsBlock, verifiedAnswer),
         model: 'claude_sonnet_4_6',
         response_json_schema: REGRADE_SCHEMA
       });
@@ -371,6 +410,13 @@ export default function ResultView() {
       result.step_feedback = sanitize(result.step_feedback);
       result.error_locations = sanitize(result.error_locations);
       result.gap_locations = sanitize(result.gap_locations);
+
+      // Sanitize matched_solution_id
+      const validSolIds = new Set(solutionIds);
+      if (!validSolIds.has(result.matched_solution_id)) {
+        result.matched_solution_id = null;
+        result.matched_solution_priority = null;
+      }
 
       await base44.entities.StudentAttempt.update(attempt.id, {
         ocr_corrected_text: correctedText,
