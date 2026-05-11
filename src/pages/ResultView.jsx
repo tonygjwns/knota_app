@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
+import { redirectByRole } from '@/lib/auth-utils';
 import { base44 } from '@/api/base44Client';
 import AppLayout from '@/components/AppLayout';
 import MathRenderer from '@/components/MathRenderer';
@@ -231,10 +232,27 @@ export default function ResultView() {
       const attempts = await base44.entities.StudentAttempt.filter({ id }, '-created_date', 1);
       if (attempts.length > 0) {
         const a = attempts[0];
-        if (user && a.student_id !== user.id && user.role !== 'admin') {
-          toast.error('이 결과를 볼 권한이 없어요');
-          navigate('/home');
-          return;
+        if (user) {
+          const isOwn = a.student_id === user.id;
+          const isAdmin = user.role === 'admin';
+          let isMyStudent = false;
+          if (user.role === 'teacher' && !isOwn) {
+            // Teacher can view their students' attempts
+            // Fetch students who belong to classes the teacher manages
+            try {
+              const allClasses = await base44.entities.Class.filter({ main_teacher_id: user.id }, 'name', 100);
+              const classIds = new Set(allClasses.map(c => c.id));
+              if (classIds.size > 0) {
+                const allStudents = await base44.entities.User.list('full_name', 500);
+                isMyStudent = allStudents.some(s => s.id === a.student_id && classIds.has(s.class_id));
+              }
+            } catch { isMyStudent = false; }
+          }
+          if (!isOwn && !isAdmin && !isMyStudent) {
+            toast.error('이 결과를 볼 권한이 없어요');
+            navigate(redirectByRole(user));
+            return;
+          }
         }
         setAttempt(a);
         if (a.claude_grade_json) {
@@ -467,6 +485,9 @@ export default function ResultView() {
   if (loading) return <AppLayout><InlineLoader message="결과 불러오는 중..." /></AppLayout>;
   if (!attempt) return <AppLayout><div className="text-center py-12 text-muted-foreground">결과를 찾을 수 없어요.</div></AppLayout>;
 
+  // Only the student who submitted can perform write actions
+  const viewerIsOwner = attempt.student_id === user?.id;
+
   const score = attempt.score || 0;
   const scoreColor = score >= 80 ? 'from-emerald-50 to-emerald-100/50 border-emerald-200' :
                      score >= 40 ? 'from-amber-50 to-amber-100/50 border-amber-200' :
@@ -508,7 +529,7 @@ export default function ResultView() {
             {tooltipTool.goal && <p className="text-sm text-muted-foreground mb-2">{tooltipTool.goal}</p>}
             {tooltipTool.description && <p className="text-sm text-foreground">{tooltipTool.description}</p>}
             <div className="flex gap-2 mt-4">
-              {user && (
+              {user && viewerIsOwner && (
                 <Button size="sm" variant="outline" className="flex-1" onClick={() => toggleBookmark(tooltipTool)}>
                   <Star className={`w-3 h-3 mr-1 ${bookmarkedToolIds.has(tooltipTool.tool_id) ? 'fill-amber-500 text-amber-500' : ''}`} />
                   {bookmarkedToolIds.has(tooltipTool.tool_id) ? '즐겨찾기 해제' : '즐겨찾기에 추가'}
@@ -523,10 +544,10 @@ export default function ResultView() {
       <div className="space-y-5 pb-8">
         {/* Back + Problem bookmark */}
         <div className="flex items-center justify-between">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/home')} className="gap-2">
-            <ArrowLeft className="w-4 h-4" /> 홈으로
+          <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="gap-2">
+            <ArrowLeft className="w-4 h-4" /> 뒤로
           </Button>
-          {user && attempt && (
+          {user && attempt && viewerIsOwner && (
             <button
               onClick={toggleProblemBookmark}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border hover:bg-muted transition-colors text-sm"
@@ -566,7 +587,7 @@ export default function ResultView() {
                     <Wrench className="w-3 h-3" />
                     {tool.name}
                   </button>
-                  {user && (
+                  {user && viewerIsOwner && (
                     <button
                       onClick={() => toggleBookmark(tool)}
                       className="px-2 py-1.5 hover:bg-primary/20 rounded-r-full transition-colors"
@@ -630,7 +651,7 @@ export default function ResultView() {
                             <Wrench className="w-3 h-3" />
                             {toolName}
                           </button>
-                          {user && (
+                          {user && viewerIsOwner && (
                             <button
                               onClick={() => toggleBookmark(toolEntity)}
                               className="text-xs bg-amber-200/60 text-amber-800 px-1.5 py-0.5 rounded-r-full hover:bg-amber-200 transition-colors"
@@ -679,7 +700,7 @@ export default function ResultView() {
                             <Wrench className="w-3 h-3" />
                             {toolName}
                           </button>
-                          {user && (
+                          {user && viewerIsOwner && (
                             <button
                               onClick={() => toggleBookmark(toolEntity)}
                               className="text-xs bg-red-200/60 text-red-800 px-1.5 py-0.5 rounded-r-full hover:bg-red-200 transition-colors"
@@ -760,7 +781,7 @@ export default function ResultView() {
           </div>
         )}
 
-        {/* OCR section */}
+        {/* OCR section — 소유자: 편집+재채점, 강사/관리자: 읽기 전용 조회 */}
         <div>
           <button
             className="w-full flex items-center justify-between p-3 bg-muted rounded-xl"
@@ -776,17 +797,19 @@ export default function ResultView() {
                   <pre className="text-sm whitespace-pre-wrap font-mono bg-white rounded-lg p-3 border">
                     {attempt.ocr_corrected_text || attempt.ocr_text || '(OCR 결과 없음)'}
                   </pre>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-3"
-                    onClick={() => {
-                      setCorrectedText(attempt.ocr_corrected_text || attempt.ocr_text || '');
-                      setEditingOCR(true);
-                    }}>
-                    <RotateCcw className="w-4 h-4 mr-2" />
-                    OCR이 잘못됐어요
-                  </Button>
+                  {viewerIsOwner && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-3"
+                      onClick={() => {
+                        setCorrectedText(attempt.ocr_corrected_text || attempt.ocr_text || '');
+                        setEditingOCR(true);
+                      }}>
+                      <RotateCcw className="w-4 h-4 mr-2" />
+                      OCR이 잘못됐어요
+                    </Button>
+                  )}
                 </>
               ) : (
                 <>
@@ -810,8 +833,8 @@ export default function ResultView() {
           )}
         </div>
 
-        {/* 매듭 보강 권유 카드 — remediation 중이 아니면 표시 */}
-        {(attempt.correctness === 'partial' || attempt.correctness === 'wrong') && weakToolIds.length > 0 && attempt.attempt_type !== 'remediation_retry' && attempt.attempt_type !== 'remediation_practice' && !dismissedRemediation && (
+        {/* 매듭 보강 권유 카드 — remediation 중이 아니면 표시 (소유자만) */}
+        {viewerIsOwner && (attempt.correctness === 'partial' || attempt.correctness === 'wrong') && weakToolIds.length > 0 && attempt.attempt_type !== 'remediation_retry' && attempt.attempt_type !== 'remediation_practice' && !dismissedRemediation && (
           <Card className="p-4 border-primary/30 bg-primary/5">
             <div className="flex items-start gap-3 mb-3">
               <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
@@ -848,8 +871,8 @@ export default function ResultView() {
           </Card>
         )}
 
-        {/* Remediation flow buttons */}
-        {attempt.attempt_type === 'remediation_retry' && (
+        {/* Remediation flow buttons — 소유자만 */}
+        {viewerIsOwner && attempt.attempt_type === 'remediation_retry' && (
           <div className="pt-2">
             {attempt.correctness === 'correct' ? (
               <Button size="lg" className="w-full" onClick={() => navigate(`/remediation/${attempt.parent_attempt_id}/practice/0`)}>
@@ -863,7 +886,7 @@ export default function ResultView() {
           </div>
         )}
 
-        {attempt.attempt_type === 'remediation_practice' && (
+        {viewerIsOwner && attempt.attempt_type === 'remediation_practice' && (
           <div className="pt-2">
             <Button size="lg" className="w-full" onClick={() => {
               const parentAttemptId = attempt.parent_attempt_id;
@@ -875,10 +898,10 @@ export default function ResultView() {
         )}
 
         {/* Regular action buttons */}
-        {attempt.attempt_type !== 'remediation_retry' && attempt.attempt_type !== 'remediation_practice' && (
+        {viewerIsOwner && attempt.attempt_type !== 'remediation_retry' && attempt.attempt_type !== 'remediation_practice' && (
           <div className="grid grid-cols-2 gap-2 pt-2">
-            <Button variant="outline" size="sm" className="btn-touch" onClick={() => navigate('/home')}>
-              메인으로
+            <Button variant="outline" size="sm" className="btn-touch" onClick={() => navigate(-1)}>
+              뒤로
             </Button>
             {attempt.assignment_id ? (
               <Button size="sm" className="btn-touch" onClick={() => navigate(`/assignment/${attempt.assignment_id}`)}>
@@ -892,7 +915,7 @@ export default function ResultView() {
             )}
           </div>
         )}
-        {attempt.attempt_type !== 'remediation_retry' && attempt.attempt_type !== 'remediation_practice' && (
+        {viewerIsOwner && attempt.attempt_type !== 'remediation_retry' && attempt.attempt_type !== 'remediation_practice' && (
           <Button size="sm" className="btn-touch w-full mt-2" onClick={handleNextProblem}>
             {attempt.assignment_id ? '다음 문제 (숙제)' : '다음 문제'} <ChevronRight className="w-4 h-4 ml-1" />
           </Button>

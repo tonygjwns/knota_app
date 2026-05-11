@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
+import { redirectByRole } from '@/lib/auth-utils';
 import AppLayout from '@/components/AppLayout';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
@@ -38,10 +39,16 @@ export default function StudentAssignment() {
         if (assignments.length === 0) throw new Error('숙제를 찾을 수 없어요');
         const a = assignments[0];
 
-        // 권한 체크: 학생의 class_id 와 일치해야 함
-        if (!user || a.class_id !== user.class_id) {
+        // 권한 체크: 학생의 class_id 와 일치해야 함 (강사/관리자는 패스)
+        if (!user) {
+          navigate('/');
+          return;
+        }
+        const isAdmin = user.role === 'admin';
+        const isTeacher = user.role === 'teacher';
+        if (!isAdmin && !isTeacher && a.class_id !== user.class_id) {
           toast.error('이 숙제를 볼 권한이 없어요');
-          navigate('/home');
+          navigate(redirectByRole(user));
           return;
         }
 
