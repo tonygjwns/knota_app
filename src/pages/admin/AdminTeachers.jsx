@@ -95,7 +95,8 @@ export default function AdminTeachers() {
   };
 
   const getAcademyName = (id) => academies.find(a => a.id === id)?.name || null;
-  const getClassCount = (userId) => classes.filter(c => c.main_teacher_id === userId).length;
+  const getTeacherClasses = (userId) =>
+    classes.filter(c => c.main_teacher_id === userId || (c.assistant_teacher_ids || []).includes(userId));
 
   const handleSave = async (userId, data) => {
     await base44.entities.User.update(userId, data);
@@ -160,7 +161,6 @@ export default function AdminTeachers() {
 
       <div className="space-y-2">
         {paginated.map(u => {
-          const classCount = getClassCount(u.id);
           const academyName = getAcademyName(u.academy_id);
           const status = u.approval_status || 'pending';
           const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
@@ -177,13 +177,30 @@ export default function AdminTeachers() {
                       <span className={`text-xs px-2 py-0.5 rounded-full border ${cfg.color}`}>{cfg.label}</span>
                     </div>
                     <p className="text-xs text-muted-foreground truncate">{u.email}</p>
-                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                      {academyName && <span className="text-xs text-muted-foreground">{academyName}</span>}
-                      <span className="text-xs text-muted-foreground">담당 학급 {classCount}개</span>
-                    </div>
+                    {academyName && <p className="text-xs text-muted-foreground mt-0.5">🏫 {academyName}</p>}
                     {u.approval_status === 'rejected' && u.rejected_reason && (
                       <p className="text-xs text-red-500 mt-0.5">사유: {u.rejected_reason}</p>
                     )}
+                    {/* 담당 학급 목록 */}
+                    {(() => {
+                      const teacherClasses = getTeacherClasses(u.id);
+                      if (teacherClasses.length === 0) return (
+                        <p className="text-xs text-muted-foreground mt-1">담당 학급 없음</p>
+                      );
+                      return (
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {teacherClasses.map(c => (
+                            <span key={c.id} className={`text-xs px-2 py-0.5 rounded-full border ${
+                              c.main_teacher_id === u.id
+                                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                : 'bg-slate-50 text-slate-600 border-slate-200'
+                            }`}>
+                              {c.name}{c.main_teacher_id !== u.id ? ' (보조)' : ''}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>

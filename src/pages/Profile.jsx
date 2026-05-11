@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { LogOut } from 'lucide-react';
+import { LogOut, ArrowLeft } from 'lucide-react';
 
 const GRADE_OPTIONS = [
   { value: '', label: '선택 안 함' },
@@ -147,6 +147,10 @@ export default function Profile() {
     return (
       <div className="min-h-screen bg-background">
         <div className="max-w-lg mx-auto px-4 py-8">
+          <button onClick={() => navigate(-1)} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors">
+            <ArrowLeft className="w-4 h-4" />
+            뒤로가기
+          </button>
           {content}
         </div>
       </div>

@@ -12,7 +12,7 @@ const ADMIN_NAV = [
   { path: '/admin/teachers', icon: GraduationCap, label: '강사' },
   { path: '/admin/students', icon: Users, label: '학생' },
   { path: '/admin/problems', icon: BookOpen, label: '문제' },
-  { path: '/admin/review', icon: CheckSquare, label: '채점 검토' },
+
 ];
 
 export default function AdminLayout() {
