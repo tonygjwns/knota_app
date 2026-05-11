@@ -15,9 +15,19 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
   const lastPos = useRef(null);
   const isDrawingRef = useRef(false);
   const activePointerIdRef = useRef(null);
+  const lastUpAtRef = useRef(0);
+  const lastUpPosRef = useRef(null);
   const toolRef = useRef(tool);
   const penColorRef = useRef(penColor);
   const penSizeRef = useRef(penSize);
+  const [debugLog, setDebugLog] = useState([]);
+
+  const pushLog = (msg) => {
+    setDebugLog(prev => [
+      `${performance.now().toFixed(0)}ms ${msg}`,
+      ...prev.slice(0, 9),
+    ]);
+  };
 
   // body에 canvas-active 클래스 추가 (페이지 전체 selection 차단)
   useEffect(() => {
@@ -113,31 +123,59 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
     const canvas = canvasRef.current;
     if (!canvas) return;
 
+    const STROKE_MERGE_MS = 150;
+
     const onPointerDown = (e) => {
-      // palm rejection: 이미 그리는 중이면 추가 pointer 무시
       if (activePointerIdRef.current !== null) return;
-      // touch는 isPrimary만 허용, mouse는 좌클릭만, pen은 모두 허용
       if (e.pointerType === 'touch' && !e.isPrimary) return;
       if (e.pointerType === 'mouse' && e.button !== 0) return;
 
+      pushLog(`down ${e.pointerType} id=${e.pointerId} pri=${e.isPrimary}`);
       e.preventDefault();
-      // iOS: 진행 중인 selection 제거 (stroke 끊김 방지)
       const sel = window.getSelection?.();
       if (sel && sel.rangeCount > 0) sel.removeAllRanges();
       activePointerIdRef.current = e.pointerId;
       canvas.setPointerCapture(e.pointerId);
-      saveState();
+
+      const now = performance.now();
       const pos = getPos(e);
+      const isContinuation = e.pointerType === 'pen'
+        && (now - lastUpAtRef.current < STROKE_MERGE_MS)
+        && lastUpPosRef.current !== null;
+
+      if (isContinuation) {
+        // 짧은 lift — 이전 stroke과 이어서 연결
+        const ctx = canvas.getContext('2d');
+        ctx.beginPath();
+        ctx.moveTo(lastUpPosRef.current.x, lastUpPosRef.current.y);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        if (toolRef.current === 'eraser') {
+          ctx.globalCompositeOperation = 'destination-out';
+          ctx.strokeStyle = 'rgba(0,0,0,1)';
+          ctx.lineWidth = eraserSize;
+        } else {
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.strokeStyle = penColorRef.current;
+          ctx.lineWidth = penSizeRef.current;
+        }
+        ctx.stroke();
+        if (toolRef.current === 'eraser') ctx.globalCompositeOperation = 'source-over';
+      } else {
+        saveState();
+        if (toolRef.current === 'pen') {
+          const ctx = canvas.getContext('2d');
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, penSizeRef.current / 2, 0, Math.PI * 2);
+          ctx.fillStyle = penColorRef.current;
+          ctx.fill();
+        }
+      }
+
       lastPos.current = pos;
       isDrawingRef.current = true;
       setIsDrawing(true);
-      const ctx = canvas.getContext('2d');
-      if (toolRef.current === 'pen') {
-        ctx.beginPath();
-        ctx.arc(pos.x, pos.y, penSizeRef.current / 2, 0, Math.PI * 2);
-        ctx.fillStyle = penColorRef.current;
-        ctx.fill();
-      }
     };
 
     const onPointerMove = (e) => {
@@ -180,7 +218,10 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
 
     const onPointerUp = (e) => {
       if (e.pointerId !== activePointerIdRef.current) return;
+      pushLog(`up   ${e.pointerType} id=${e.pointerId}`);
       e.preventDefault();
+      lastUpAtRef.current = performance.now();
+      lastUpPosRef.current = lastPos.current ? { ...lastPos.current } : null;
       activePointerIdRef.current = null;
       isDrawingRef.current = false;
       setIsDrawing(false);
@@ -190,16 +231,27 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
       }
     };
 
+    const onPointerCancel = (e) => {
+      pushLog(`CANCEL ${e.pointerType} id=${e.pointerId}`);
+      if (e.pointerId !== activePointerIdRef.current) return;
+      // cancel은 강제 중단 — merge 정보 reset
+      lastUpAtRef.current = 0;
+      lastUpPosRef.current = null;
+      activePointerIdRef.current = null;
+      isDrawingRef.current = false;
+      setIsDrawing(false);
+    };
+
     canvas.addEventListener('pointerdown', onPointerDown, { passive: false });
     canvas.addEventListener('pointermove', onPointerMove, { passive: false });
     canvas.addEventListener('pointerup', onPointerUp, { passive: false });
-    canvas.addEventListener('pointercancel', onPointerUp, { passive: false });
+    canvas.addEventListener('pointercancel', onPointerCancel, { passive: false });
 
     return () => {
       canvas.removeEventListener('pointerdown', onPointerDown);
       canvas.removeEventListener('pointermove', onPointerMove);
       canvas.removeEventListener('pointerup', onPointerUp);
-      canvas.removeEventListener('pointercancel', onPointerUp);
+      canvas.removeEventListener('pointercancel', onPointerCancel);
     };
   }, [saveState, onImageReady, eraserSize]);
 
@@ -288,6 +340,15 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
                 className="btn-touch flex-1">
           <Plus className="w-4 h-4 mr-1" /> 칸 늘리기
         </Button>
+      </div>
+
+      {/* 진단용 디버그 패널 — 검증 후 제거 */}
+      <div className="text-[10px] font-mono bg-slate-50 border rounded p-2 max-h-32 overflow-auto">
+        <div className="text-muted-foreground mb-1">[debug] pen events:</div>
+        {debugLog.length === 0 && <div className="text-muted-foreground">— 아직 없음 —</div>}
+        {debugLog.map((l, i) => (
+          <div key={i} className={l.includes('CANCEL') ? 'text-red-600 font-bold' : ''}>{l}</div>
+        ))}
       </div>
     </div>
   );

@@ -167,6 +167,9 @@ body.canvas-active {
   user-select: none !important;
   -webkit-touch-callout: none !important;
   -webkit-tap-highlight-color: transparent !important;
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+  touch-action: none !important;
 }
 body.canvas-active * {
   -webkit-user-select: none;
