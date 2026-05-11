@@ -1,8 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { Users, BookOpen, BarChart2, Building, GraduationCap } from 'lucide-react';
+import { Users, BookOpen, BarChart2, Building, GraduationCap, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import UserMenuDropdown from '@/components/UserMenuDropdown';
 
@@ -19,6 +19,7 @@ export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isLoadingAuth } = useAuth();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
     if (!isLoadingAuth && user && user.role !== 'admin') {
@@ -34,6 +35,9 @@ export default function AdminLayout() {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Admin top bar */}
        <header className="bg-slate-900 text-white px-4 py-3 flex items-center gap-3">
+         <button onClick={() => setSidebarOpen(o => !o)} className="p-1 rounded-lg hover:bg-white/10 transition-colors hidden md:flex">
+           {sidebarOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+         </button>
          <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center">
            <span className="text-white text-xs font-bold">관</span>
          </div>
@@ -43,27 +47,28 @@ export default function AdminLayout() {
 
       <div className="flex flex-1">
         {/* Sidebar */}
-        <aside className="w-52 bg-slate-800 text-slate-100 flex flex-col py-4 px-3 hidden md:flex">
-          <nav className="flex flex-col gap-1 flex-1">
-            {ADMIN_NAV.map(item => {
-              const active = item.exact
-                ? location.pathname === item.path
-                : location.pathname.startsWith(item.path) && location.pathname !== '/admin';
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm ${
-                    active ? 'bg-primary text-white' : 'hover:bg-white/10'
-                  }`}>
-                  <item.icon className="w-4 h-4" />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
-
-        </aside>
+        {sidebarOpen && (
+          <aside className="w-52 bg-slate-800 text-slate-100 flex flex-col py-4 px-3 hidden md:flex flex-shrink-0">
+            <nav className="flex flex-col gap-1 flex-1">
+              {ADMIN_NAV.map(item => {
+                const active = item.exact
+                  ? location.pathname === item.path
+                  : location.pathname.startsWith(item.path) && location.pathname !== '/admin';
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm ${
+                      active ? 'bg-primary text-white' : 'hover:bg-white/10'
+                    }`}>
+                    <item.icon className="w-4 h-4" />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </nav>
+          </aside>
+        )}
 
         {/* Mobile admin nav — split into 2 rows if too many items */}
         <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-slate-800 border-t border-slate-700">

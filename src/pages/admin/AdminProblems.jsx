@@ -27,11 +27,25 @@ export default function AdminProblems() {
   const [domainsLoading, setDomainsLoading] = useState(true);
   const [pageLoading, setPageLoading] = useState(false);
 
-  // 최초 도메인 목록만 로드
+  // 최초 도메인 목록 + 각 도메인의 실제 문제 수 로드
   useEffect(() => {
-    base44.entities.Domain.list('name', 100)
-      .then(d => setDomains(d))
-      .finally(() => setDomainsLoading(false));
+    (async () => {
+      try {
+        const d = await base44.entities.Domain.list('name', 100);
+        // 각 도메인의 실제 문제 수를 병렬로 조회
+        const counts = await Promise.all(
+          d.map(domain =>
+            base44.entities.Problem.filter({ domain_id: domain.domain_id }, '-created_date', 1000, 0)
+              .then(res => ({ id: domain.domain_id, count: res.length }))
+              .catch(() => ({ id: domain.domain_id, count: domain.problem_count ?? 0 }))
+          )
+        );
+        const countMap = new Map(counts.map(c => [c.id, c.count]));
+        setDomains(d.map(domain => ({ ...domain, problem_count: countMap.get(domain.domain_id) ?? 0 })));
+      } finally {
+        setDomainsLoading(false);
+      }
+    })();
   }, []);
 
   // 단원 선택 시 문제 로딩

@@ -1,8 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { base44 } from '@/api/base44Client';
-import { BarChart2, Users, BookOpen, RefreshCw, ClipboardList, CheckSquare, Star } from 'lucide-react';
+import { BarChart2, Users, BookOpen, RefreshCw, ClipboardList, CheckSquare, Star, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { TeacherProvider, useTeacher } from '@/lib/TeacherContext';
 import UserMenuDropdown from '@/components/UserMenuDropdown';
@@ -34,6 +34,7 @@ export default function TeacherLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isLoadingAuth } = useAuth();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
     if (isLoadingAuth || !user) return;
@@ -53,6 +54,9 @@ export default function TeacherLayout() {
     <TeacherProvider>
       <div className="min-h-screen bg-background flex flex-col">
         <header className="bg-violet-900 text-white px-4 py-3 flex items-center gap-3">
+           <button onClick={() => setSidebarOpen(o => !o)} className="p-1 rounded-lg hover:bg-white/10 transition-colors hidden md:flex">
+             {sidebarOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+           </button>
            <div className="w-7 h-7 bg-violet-500 rounded-lg flex items-center justify-center">
              <span className="text-white text-xs font-bold">강</span>
            </div>
@@ -62,25 +66,26 @@ export default function TeacherLayout() {
          </header>
 
         <div className="flex flex-1">
-          <aside className="w-52 bg-violet-800 text-violet-100 flex flex-col py-4 px-3 hidden md:flex">
-            <nav className="flex flex-col gap-1 flex-1">
-              {TEACHER_NAV.map(item => {
-                const active = item.exact
-                  ? location.pathname === item.path
-                  : location.pathname.startsWith(item.path) && location.pathname !== '/teacher';
-                return (
-                  <Link key={item.path} to={item.path}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm ${
-                      active ? 'bg-violet-500 text-white' : 'hover:bg-white/10'
-                    }`}>
-                    <item.icon className="w-4 h-4" />
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
-
-          </aside>
+          {sidebarOpen && (
+            <aside className="w-52 bg-violet-800 text-violet-100 flex flex-col py-4 px-3 hidden md:flex flex-shrink-0">
+              <nav className="flex flex-col gap-1 flex-1">
+                {TEACHER_NAV.map(item => {
+                  const active = item.exact
+                    ? location.pathname === item.path
+                    : location.pathname.startsWith(item.path) && location.pathname !== '/teacher';
+                  return (
+                    <Link key={item.path} to={item.path}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm ${
+                        active ? 'bg-violet-500 text-white' : 'hover:bg-white/10'
+                      }`}>
+                      <item.icon className="w-4 h-4" />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </nav>
+            </aside>
+          )}
 
           {/* Mobile nav */}
           <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-violet-800 border-t border-violet-700">

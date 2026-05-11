@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, BookOpen, History, Settings, Menu, X, GraduationCap, Star } from 'lucide-react';
+import { Home, BookOpen, History, Settings, Menu, X, GraduationCap, Star, ChevronLeft, ChevronRight } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import UserMenuDropdown from '@/components/UserMenuDropdown';
@@ -19,6 +19,7 @@ export default function AppLayout({ children }) {
   const isTeacher = user?.role === 'teacher';
   const isStudent = user?.role === 'student';
   const [menuOpen, setMenuOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [orgLabel, setOrgLabel] = useState('');
 
   useEffect(() => {
@@ -111,11 +112,20 @@ export default function AppLayout({ children }) {
       )}
 
       <div className="flex flex-1">
+        {/* Sidebar toggle button (desktop, collapsed state) */}
+        {!sidebarOpen && (
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="hidden md:flex items-center justify-center w-8 h-8 mt-4 ml-2 rounded-lg hover:bg-muted border border-border flex-shrink-0 self-start"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        )}
         {/* Sidebar (desktop) */}
-        <aside className="hidden md:flex w-64 flex-col border-r border-border bg-card sticky top-0 h-screen p-5 gap-2">
+        {sidebarOpen && <aside className="hidden md:flex w-64 flex-col border-r border-border bg-card sticky top-0 h-screen p-5 gap-2 flex-shrink-0">
           {/* 상단 헤더: 로고 + 아바타 드롭다운 */}
           {/* 사이드바 상단: 앱 이름 */}
-          <div className="mb-6 px-2">
+          <div className="mb-6 px-2 flex items-center justify-between">
             <Link to={isAdmin ? '/admin' : isTeacher ? '/teacher' : '/home'} className="flex items-center gap-3">
               <div>
                 <p className="font-bold text-foreground">
@@ -126,6 +136,9 @@ export default function AppLayout({ children }) {
                 </p>
               </div>
             </Link>
+            <button onClick={() => setSidebarOpen(false)} className="p-1 rounded-lg hover:bg-muted transition-colors">
+              <ChevronLeft className="w-4 h-4 text-muted-foreground" />
+            </button>
           </div>
 
           <nav className="flex flex-col gap-1 flex-1">
@@ -160,12 +173,12 @@ export default function AppLayout({ children }) {
               </Link>
             )}
           </div>
-        </aside>
+        </aside>}
 
         {/* Main content */}
         <main className="flex-1 overflow-auto pb-20 md:pb-0">
           {/* 데스크탑 상단 바: 우측에 유저 메뉴 */}
-          <div className="hidden md:flex items-center justify-end px-6 py-3 border-b border-border bg-card/50">
+          <div className="hidden md:flex items-center justify-end px-6 py-3 border-b border-border bg-card/50 gap-2">
             <UserMenuDropdown orgLabel={orgLabel} />
           </div>
           <div className="px-6 py-6 animate-fade-in">
