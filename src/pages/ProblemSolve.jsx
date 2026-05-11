@@ -451,10 +451,10 @@ ${ocrText}
       {stage && <LoadingOverlay stage={stage} />}
 
       {/* 가로 레이아웃: 좌 = 문제, 우 = 풀이 */}
-      <div className="flex flex-col lg:flex-row lg:gap-0 h-full min-h-screen">
+      <div className="flex flex-col lg:flex-row lg:gap-0 lg:h-full">
 
         {/* ── 좌측: 문제 영역 ── */}
-        <div className="lg:w-2/5 lg:border-r border-border flex flex-col">
+        <div className="lg:w-2/5 lg:border-r border-border flex flex-col lg:overflow-hidden">
           {/* Header */}
           <div className="flex items-center gap-2 p-4 border-b border-border">
             <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="btn-touch">
@@ -491,7 +491,7 @@ ${ocrText}
         </div>
 
         {/* ── 우측: 풀이 작성 영역 ── */}
-        <div className="lg:flex-1 flex flex-col">
+        <div className="lg:flex-1 flex flex-col lg:overflow-hidden">
           <div className="p-4 border-b border-border">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="grid grid-cols-2 w-full">

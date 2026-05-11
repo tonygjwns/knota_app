@@ -12,7 +12,7 @@ const NAV_ITEMS = [
   { path: '/bookmarks', icon: Star, label: '즐겨찾기' },
 ];
 
-export default function AppLayout({ children }) {
+export default function AppLayout({ children, fullWidth = false }) {
   const location = useLocation();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
@@ -39,7 +39,7 @@ export default function AppLayout({ children }) {
   }, [user?.academy_id, user?.class_id]);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className={`bg-background flex flex-col ${fullWidth ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
       {/* Top bar (mobile) */}
       <header className="sticky top-0 z-40 bg-card/95 backdrop-blur-sm border-b border-border px-4 py-3 flex items-center justify-between md:hidden">
         <Link to="/home" className="flex items-center gap-2">
@@ -111,7 +111,7 @@ export default function AppLayout({ children }) {
         </div>
       )}
 
-      <div className="flex flex-1">
+      <div className={`flex flex-1 ${fullWidth ? 'overflow-hidden' : ''}`}>
         {/* Sidebar toggle button (desktop, collapsed state) */}
         {!sidebarOpen && (
           <button
@@ -176,14 +176,20 @@ export default function AppLayout({ children }) {
         </aside>}
 
         {/* Main content */}
-        <main className="flex-1 overflow-auto pb-20 md:pb-0">
+        <main className={`flex-1 pb-20 md:pb-0 ${fullWidth ? 'overflow-hidden flex flex-col' : 'overflow-auto'}`}>
           {/* 데스크탑 상단 바: 우측에 유저 메뉴 */}
-          <div className="hidden md:flex items-center justify-end px-6 py-3 border-b border-border bg-card/50 gap-2">
+          <div className="hidden md:flex items-center justify-end px-6 py-3 border-b border-border bg-card/50 gap-2 flex-shrink-0">
             <UserMenuDropdown orgLabel={orgLabel} />
           </div>
-          <div className="px-6 py-6 animate-fade-in">
-            {children}
-          </div>
+          {fullWidth ? (
+            <div className="flex-1 overflow-hidden animate-fade-in">
+              {children}
+            </div>
+          ) : (
+            <div className="px-6 py-6 animate-fade-in">
+              {children}
+            </div>
+          )}
         </main>
       </div>
 
