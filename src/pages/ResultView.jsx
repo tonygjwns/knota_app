@@ -245,8 +245,8 @@ export default function ResultView() {
               // Fetch bookmarks for this student
               if (user) {
                 const [myToolBookmarks, myProblemBookmarks] = await Promise.all([
-                  base44.entities.BookmarkedTool.filter({ student_id: user.id }),
-                  base44.entities.BookmarkedProblem.filter({ student_id: user.id, problem_id: a.problem_id }, '-created_date', 1),
+                  base44.entities.BookmarkedTool.filter({ user_id: user.id }),
+                  base44.entities.BookmarkedProblem.filter({ user_id: user.id, problem_id: a.problem_id }, '-created_date', 1),
                 ]);
                 const bookmarkedSet = new Set(myToolBookmarks.filter(b => toolIds.includes(b.tool_id)).map(b => b.tool_id));
                 const idMap = new Map(myToolBookmarks.map(b => [b.tool_id, b.id]));
@@ -288,7 +288,7 @@ export default function ResultView() {
       toast.success('즐겨찾기 해제했어요');
     } else {
       const created = await base44.entities.BookmarkedTool.create({
-        student_id: user.id,
+        user_id: user.id,
         tool_id: tool.tool_id,
         context_attempt_id: attempt.id,
       });
@@ -307,7 +307,7 @@ export default function ResultView() {
       toast.success('문제 즐겨찾기를 해제했어요');
     } else {
       const created = await base44.entities.BookmarkedProblem.create({
-        student_id: user.id,
+        user_id: user.id,
         problem_id: attempt.problem_id,
         problem_content_preview: (attempt.problem_content || '').slice(0, 100),
         problem_domain: attempt.problem_domain || '',

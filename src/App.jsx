@@ -30,6 +30,7 @@ import TeacherClasses from './pages/teacher/TeacherClasses';
 import TeacherAssignments from './pages/teacher/TeacherAssignments';
 import AssignmentDetail from './pages/teacher/AssignmentDetail';
 import TeacherReview from './pages/teacher/TeacherReview';
+import TeacherProblems from './pages/teacher/TeacherProblems';
 import StudentAssignment from './pages/StudentAssignment';
 import Profile from './pages/Profile';
 import StudentDetail from './pages/shared/StudentDetail';
@@ -112,8 +113,10 @@ const AuthenticatedApp = () => {
         <Route path="classes" element={<TeacherClasses />} />
         <Route path="assignments" element={<TeacherAssignments />} />
         <Route path="assignments/:assignmentId" element={<AssignmentDetail />} />
+        <Route path="problems" element={<TeacherProblems />} />
         <Route path="problems/:problemId" element={<ProblemDetail mode="teacher" />} />
         <Route path="review" element={<TeacherReview />} />
+        <Route path="bookmarks" element={<Bookmarks />} />
       </Route>
 
       <Route path="*" element={<PageNotFound />} />

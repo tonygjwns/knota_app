@@ -2,9 +2,9 @@
   "name": "BookmarkedTool",
   "type": "object",
   "properties": {
-    "student_id": {
+    "user_id": {
       "type": "string",
-      "description": "User ID of the student"
+      "description": "\ubd81\ub9c8\ud06c\ud55c \uc0ac\uc6a9\uc790 ID (\ud559\uc0dd \ub610\ub294 \uac15\uc0ac)"
     },
     "tool_id": {
       "type": "string",
@@ -16,11 +16,11 @@
     },
     "note": {
       "type": "string",
-      "description": "\ud559\uc0dd \uba54\ubaa8 (\uc120\ud0dd)"
+      "description": "\uba54\ubaa8 (\uc120\ud0dd)"
     }
   },
   "required": [
-    "student_id",
+    "user_id",
     "tool_id"
   ]
 }

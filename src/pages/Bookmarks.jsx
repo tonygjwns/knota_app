@@ -23,15 +23,14 @@ export default function Bookmarks() {
   useEffect(() => {
     if (!user) return;
     if (user.role === 'admin') { navigate('/admin', { replace: true }); return; }
-    if (user.role === 'teacher') { navigate('/teacher', { replace: true }); return; }
     loadData();
   }, [user]);
 
   const loadData = async () => {
     setLoading(true);
     const [toolBmarks, probBmarks, allTools, recentAttempts] = await Promise.all([
-      base44.entities.BookmarkedTool.filter({ student_id: user.id }, '-created_date', 100),
-      base44.entities.BookmarkedProblem.filter({ student_id: user.id }, '-created_date', 100),
+      base44.entities.BookmarkedTool.filter({ user_id: user.id }, '-created_date', 100),
+      base44.entities.BookmarkedProblem.filter({ user_id: user.id }, '-created_date', 100),
       base44.entities.MathTool.list('name', 100),
       base44.entities.StudentAttempt.filter({ student_id: user.id }, '-submitted_at', 200),
     ]);
