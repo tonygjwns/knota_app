@@ -53,22 +53,32 @@ export default function TeacherReview() {
     const attempt = queue[current];
     if (!attempt) return;
     setProcessing(true);
-    await base44.entities.StudentAttempt.update(attempt.id, { admin_review_status: 'skipped' });
-    setQueue(prev => prev.filter(a => a.id !== attempt.id));
-    setCurrent(c => Math.min(c, queue.length - 2));
-    setProcessing(false);
-    toast.success('건너뛰었어요');
+    try {
+      await base44.entities.StudentAttempt.update(attempt.id, { admin_review_status: 'skipped' });
+      setQueue(prev => prev.filter(a => a.id !== attempt.id));
+      setCurrent(c => Math.min(c, queue.length - 2));
+      toast.success('건너뛰었어요');
+    } catch (e) {
+      toast.error(e.message || '저장에 실패했어요');
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const handleOk = async () => {
     const attempt = queue[current];
     if (!attempt) return;
     setProcessing(true);
-    await base44.entities.StudentAttempt.update(attempt.id, { admin_review_status: 'ok' });
-    setQueue(prev => prev.filter(a => a.id !== attempt.id));
-    setCurrent(c => Math.min(c, queue.length - 2));
-    setProcessing(false);
-    toast.success('확인됐어요');
+    try {
+      await base44.entities.StudentAttempt.update(attempt.id, { admin_review_status: 'ok' });
+      setQueue(prev => prev.filter(a => a.id !== attempt.id));
+      setCurrent(c => Math.min(c, queue.length - 2));
+      toast.success('확인됐어요');
+    } catch (e) {
+      toast.error(e.message || '저장에 실패했어요');
+    } finally {
+      setProcessing(false);
+    }
   };
 
   if (loading) return <InlineLoader message="검토 목록 불러오는 중..." />;

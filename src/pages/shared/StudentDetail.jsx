@@ -4,10 +4,8 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { ArrowLeft, User } from 'lucide-react';
 import { toast } from 'sonner';
-import MathRenderer from '@/components/MathRenderer';
 
 const GRADE_LABELS = {
   '1': '초등 1학년', '2': '초등 2학년', '3': '초등 3학년', '4': '초등 4학년',
@@ -60,11 +58,11 @@ export default function StudentDetail({ mode }) {
         if (isAdmin && data.student) {
           const s = data.student;
           const [academies, classes] = await Promise.all([
-            s.academy_id ? base44.entities.Academy.list('name', 200) : Promise.resolve([]),
-            s.class_id ? base44.entities.Class.list('name', 500) : Promise.resolve([]),
+            s.academy_id ? base44.entities.Academy.filter({ id: s.academy_id }, '', 1) : Promise.resolve([]),
+            s.class_id ? base44.entities.Class.filter({ id: s.class_id }, '', 1) : Promise.resolve([]),
           ]);
-          setAcademy(academies.find(a => a.id === s.academy_id) || null);
-          setCls(classes.find(c => c.id === s.class_id) || null);
+          setAcademy(academies[0] || null);
+          setCls(classes[0] || null);
         }
       } catch (e) {
         toast.error(e.message || '데이터를 불러오지 못해요');

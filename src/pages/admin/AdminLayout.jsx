@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { Users, BookOpen, CheckSquare, BarChart2, Building, GraduationCap, UserCheck } from 'lucide-react';
+import { Users, BookOpen, BarChart2, Building, GraduationCap } from 'lucide-react';
 import { toast } from 'sonner';
 import UserMenuDropdown from '@/components/UserMenuDropdown';
 

@@ -22,7 +22,6 @@ import AdminUsers from './pages/admin/AdminUsers';
 import AdminTeachers from './pages/admin/AdminTeachers';
 import AdminStudents from './pages/admin/AdminStudents';
 import AdminProblems from './pages/admin/AdminProblems';
-import AdminReview from './pages/admin/AdminReview';
 import AdminAcademies from './pages/admin/AdminAcademies';
 import TeacherLayout from './pages/teacher/TeacherLayout';
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
@@ -102,7 +101,6 @@ const AuthenticatedApp = () => {
         <Route path="students/:userId" element={<StudentDetail mode="admin" />} />
         <Route path="problems" element={<AdminProblems />} />
         <Route path="problems/:problemId" element={<ProblemDetail mode="admin" />} />
-        <Route path="review" element={<AdminReview />} />
         <Route path="academies" element={<AdminAcademies />} />
       </Route>
 
