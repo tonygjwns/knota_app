@@ -123,25 +123,33 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const STROKE_MERGE_MS = 150;
+    const STROKE_MERGE_MS = 600;
+    const STROKE_MERGE_DIST = 40;
 
     const onPointerDown = (e) => {
-      if (activePointerIdRef.current !== null) return;
-      if (e.pointerType === 'touch' && !e.isPrimary) return;
-      if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (activePointerIdRef.current !== null) return;
+    if (e.pointerType === 'touch' && !e.isPrimary) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
 
-      pushLog(`down ${e.pointerType} id=${e.pointerId} pri=${e.isPrimary}`);
-      e.preventDefault();
-      const sel = window.getSelection?.();
-      if (sel && sel.rangeCount > 0) sel.removeAllRanges();
-      activePointerIdRef.current = e.pointerId;
-      canvas.setPointerCapture(e.pointerId);
+    e.preventDefault();
+    const sel = window.getSelection?.();
+    if (sel && sel.rangeCount > 0) sel.removeAllRanges();
+    activePointerIdRef.current = e.pointerId;
+    canvas.setPointerCapture(e.pointerId);
 
-      const now = performance.now();
-      const pos = getPos(e);
-      const isContinuation = e.pointerType === 'pen'
-        && (now - lastUpAtRef.current < STROKE_MERGE_MS)
-        && lastUpPosRef.current !== null;
+    const now = performance.now();
+    const pos = getPos(e);
+    const dx = lastUpPosRef.current ? pos.x - lastUpPosRef.current.x : Infinity;
+    const dy = lastUpPosRef.current ? pos.y - lastUpPosRef.current.y : Infinity;
+    const dist = Math.hypot(dx, dy);
+    const isContinuation = e.pointerType === 'pen'
+      && (now - lastUpAtRef.current < STROKE_MERGE_MS)
+      && lastUpPosRef.current !== null
+      && dist < STROKE_MERGE_DIST;
+
+    pushLog(`down ${e.pointerType} id=${e.pointerId} pri=${e.isPrimary} ${
+      isContinuation ? `MERGE dist=${dist.toFixed(0)}` : `NEW dist=${dist === Infinity ? '∞' : dist.toFixed(0)}`
+    }`);
 
       if (isContinuation) {
         // 짧은 lift — 이전 stroke과 이어서 연결
