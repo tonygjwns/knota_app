@@ -13,20 +13,27 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
   const [eraserSize] = useState(20);
   const [canvasHeight, setCanvasHeight] = useState(PAGE_HEIGHT);
   const lastPos = useRef(null);
+  const isDrawingRef = useRef(false);
+  const toolRef = useRef(tool);
+  const penColorRef = useRef(penColor);
+  const penSizeRef = useRef(penSize);
 
-  // Get position relative to CANVAS logical coordinates (accounts for DPR scaling)
+  // Keep refs in sync
+  useEffect(() => { toolRef.current = tool; }, [tool]);
+  useEffect(() => { penColorRef.current = penColor; }, [penColor]);
+  useEffect(() => { penSizeRef.current = penSize; }, [penSize]);
+
+  // Get position from PointerEvent relative to canvas logical coordinates
   const getPos = (e) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
-    // canvas.width/height are physical pixels; rect.width/height are CSS pixels
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
-    if (e.touches && e.touches.length > 0) {
-      const t = e.touches[0];
-      return { x: (t.clientX - rect.left) * scaleX, y: (t.clientY - rect.top) * scaleY };
-    }
-    return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY,
+    };
   };
 
   // Initialize canvas size based on wrapper width
@@ -37,7 +44,6 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
     const dpr = window.devicePixelRatio || 1;
     const cssWidth = wrapper.clientWidth;
     const cssHeight = canvasHeight;
-    // Only resize if actually changed to avoid clearing unnecessarily
     if (canvas.width === Math.round(cssWidth * dpr) && canvas.height === Math.round(cssHeight * dpr)) return;
     const ctx = canvas.getContext('2d');
     const data = canvas.toDataURL();
@@ -51,12 +57,8 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
     }
   }, [canvasHeight]);
 
-  // Run initCanvas whenever height changes
-  useEffect(() => {
-    initCanvas();
-  }, [initCanvas]);
+  useEffect(() => { initCanvas(); }, [initCanvas]);
 
-  // ResizeObserver for width changes
   useEffect(() => {
     const wrapper = wrapperRef.current;
     if (!wrapper) return;
@@ -79,9 +81,7 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
     const cssWidth = wrapper.clientWidth;
     const oldData = canvas.toDataURL();
     const newCssHeight = canvasHeight + PAGE_HEIGHT;
-
     setCanvasHeight(newCssHeight);
-
     requestAnimationFrame(() => {
       const ctx = canvas.getContext('2d');
       canvas.width = Math.round(cssWidth * dpr);
@@ -96,55 +96,75 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
     });
   };
 
-  const startDraw = useCallback((e) => {
-    e.preventDefault();
+  // Attach pointer events via addEventListener with passive:false to allow preventDefault
+  useEffect(() => {
     const canvas = canvasRef.current;
-    saveState();
-    const pos = getPos(e);
-    lastPos.current = pos;
-    setIsDrawing(true);
-    const ctx = canvas.getContext('2d');
-    if (tool === 'pen') {
+    if (!canvas) return;
+
+    const onPointerDown = (e) => {
+      e.preventDefault();
+      canvas.setPointerCapture(e.pointerId);
+      saveState();
+      const pos = getPos(e);
+      lastPos.current = pos;
+      isDrawingRef.current = true;
+      setIsDrawing(true);
+      const ctx = canvas.getContext('2d');
+      if (toolRef.current === 'pen') {
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, penSizeRef.current / 2, 0, Math.PI * 2);
+        ctx.fillStyle = penColorRef.current;
+        ctx.fill();
+      }
+    };
+
+    const onPointerMove = (e) => {
+      if (!isDrawingRef.current) return;
+      e.preventDefault();
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      const pos = getPos(e);
       ctx.beginPath();
-      ctx.arc(pos.x, pos.y, penSize / 2, 0, Math.PI * 2);
-      ctx.fillStyle = penColor;
-      ctx.fill();
-    }
-  }, [penColor, penSize, tool, saveState]);
+      ctx.moveTo(lastPos.current.x, lastPos.current.y);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      if (toolRef.current === 'eraser') {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.strokeStyle = 'rgba(0,0,0,1)';
+        ctx.lineWidth = eraserSize;
+      } else {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = penColorRef.current;
+        ctx.lineWidth = penSizeRef.current;
+      }
+      ctx.stroke();
+      if (toolRef.current === 'eraser') ctx.globalCompositeOperation = 'source-over';
+      lastPos.current = pos;
+    };
 
-  const draw = useCallback((e) => {
-    if (!isDrawing) return;
-    e.preventDefault();
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    const pos = getPos(e);
-    ctx.beginPath();
-    ctx.moveTo(lastPos.current.x, lastPos.current.y);
-    ctx.lineTo(pos.x, pos.y);
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    if (tool === 'eraser') {
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.strokeStyle = 'rgba(0,0,0,1)';
-      ctx.lineWidth = eraserSize;
-    } else {
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.strokeStyle = penColor;
-      ctx.lineWidth = penSize;
-    }
-    ctx.stroke();
-    if (tool === 'eraser') ctx.globalCompositeOperation = 'source-over';
-    lastPos.current = pos;
-  }, [isDrawing, penColor, penSize, tool, eraserSize]);
+    const onPointerUp = (e) => {
+      e.preventDefault();
+      isDrawingRef.current = false;
+      setIsDrawing(false);
+      const canvas = canvasRef.current;
+      if (onImageReady && canvas) {
+        canvas.toBlob(blob => { if (blob) onImageReady(blob); }, 'image/jpeg', 0.7);
+      }
+    };
 
-  const stopDraw = useCallback(() => {
-    setIsDrawing(false);
-    if (onImageReady && canvasRef.current) {
-      canvasRef.current.toBlob(blob => {
-        if (blob) onImageReady(blob);
-      }, 'image/jpeg', 0.7);
-    }
-  }, [onImageReady]);
+    canvas.addEventListener('pointerdown', onPointerDown, { passive: false });
+    canvas.addEventListener('pointermove', onPointerMove, { passive: false });
+    canvas.addEventListener('pointerup', onPointerUp, { passive: false });
+    canvas.addEventListener('pointercancel', onPointerUp, { passive: false });
+
+    return () => {
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('pointerup', onPointerUp);
+      canvas.removeEventListener('pointercancel', onPointerUp);
+    };
+  }, [saveState, onImageReady, eraserSize]);
 
   const undo = () => {
     if (history.length === 0) return;
@@ -170,7 +190,7 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
   };
 
   const isEmpty = history.length === 0;
-  const cursorClass = tool === 'eraser' ? 'cursor-cell' : 'drawing-canvas';
+  const cursorClass = tool === 'eraser' ? 'cursor-cell' : 'cursor-crosshair';
 
   return (
     <div className="flex flex-col gap-3">
@@ -197,14 +217,7 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
         <canvas
           ref={canvasRef}
           className={cursorClass}
-          style={{ width: '100%', height: canvasHeight, display: 'block' }}
-          onMouseDown={startDraw}
-          onMouseMove={draw}
-          onMouseUp={stopDraw}
-          onMouseLeave={stopDraw}
-          onTouchStart={startDraw}
-          onTouchMove={draw}
-          onTouchEnd={stopDraw}
+          style={{ width: '100%', height: canvasHeight, display: 'block', touchAction: 'none' }}
         />
       </div>
 
