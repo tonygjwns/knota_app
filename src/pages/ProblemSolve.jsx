@@ -527,7 +527,21 @@ ${ocrText}
           {/* 풀이 영역 — 스크롤 가능 */}
           <div className="flex-1 overflow-y-auto p-4">
             {activeTab === 'canvas' && (
-              <DrawingCanvas onImageReady={setCanvasBlob} height={600} />
+              <div className="space-y-3">
+                <DrawingCanvas onImageReady={setCanvasBlob} height={600} />
+                {/* 모바일 전용: 캔버스 바로 아래 제출 버튼 */}
+                <div className="lg:hidden">
+                  {error && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex gap-2">
+                      <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                      <p className="text-red-800 text-sm">{error}</p>
+                    </div>
+                  )}
+                  <Button className="w-full btn-touch" size="lg" onClick={handleSubmit}>
+                    <Send className="w-4 h-4 mr-2" /> 제출
+                  </Button>
+                </div>
+              </div>
             )}
             {activeTab === 'photo' && (
               <div className="space-y-3">
@@ -560,6 +574,20 @@ ${ocrText}
                   className="hidden"
                   onChange={handlePhotoSelect}
                 />
+                {/* 모바일 전용: 사진 업로드 후 바로 제출 */}
+                {photoFile && (
+                  <div className="lg:hidden">
+                    {error && (
+                      <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex gap-2">
+                        <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                        <p className="text-red-800 text-sm">{error}</p>
+                      </div>
+                    )}
+                    <Button className="w-full btn-touch" size="lg" onClick={handleSubmit}>
+                      <Send className="w-4 h-4 mr-2" /> 제출
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </div>

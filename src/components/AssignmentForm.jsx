@@ -118,6 +118,9 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
   const [selectedToolPreviewIds, setSelectedToolPreviewIds] = useState(new Set());
   const [tools, setTools] = useState([]);
   const [toolsLoading, setToolsLoading] = useState(true);
+  const [toolDifficultyMin, setToolDifficultyMin] = useState('');
+  const [toolDifficultyMax, setToolDifficultyMax] = useState('');
+  const [toolMinSolutions, setToolMinSolutions] = useState('');
 
   // 단원별 출제
   const [selectedDomain, setSelectedDomain] = useState('');
@@ -126,6 +129,9 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
   const [selectedDomainPreviewIds, setSelectedDomainPreviewIds] = useState(new Set());
   const [domains, setDomains] = useState([]);
   const [domainsLoading, setDomainsLoading] = useState(true);
+  const [domainDifficultyMin, setDomainDifficultyMin] = useState('');
+  const [domainDifficultyMax, setDomainDifficultyMax] = useState('');
+  const [domainMinSolutions, setDomainMinSolutions] = useState('');
 
   // 직접 선택
   const [searchQuery, setSearchQuery] = useState('');
@@ -174,28 +180,39 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
     init();
   }, [preselectedToolId]);
 
+  // 공통 필터 함수
+  const applyFilters = (problems, diffMin, diffMax, minSolutions) => {
+    return problems.filter(p => {
+      if (diffMin !== '' && (p.difficulty || 0) < Number(diffMin)) return false;
+      if (diffMax !== '' && (p.difficulty || 0) > Number(diffMax)) return false;
+      return true;
+    });
+  };
+
   // 도구별 미리보기 재생성
   const regenerateToolPreview = useCallback(() => {
     if (!selectedTool) return;
-    const filtered = allProblems.filter(p => {
+    const base = allProblems.filter(p => {
       const toolIds = p.tool_ids ? JSON.parse(p.tool_ids) : [];
       return toolIds.includes(selectedTool);
     });
+    const filtered = applyFilters(base, toolDifficultyMin, toolDifficultyMax, toolMinSolutions);
     const shuffled = filtered.sort(() => Math.random() - 0.5).slice(0, toolCount);
     setToolPreview(shuffled);
     setSelectedToolPreviewIds(new Set(shuffled.map(p => p.id)));
-  }, [selectedTool, toolCount, allProblems]);
+  }, [selectedTool, toolCount, allProblems, toolDifficultyMin, toolDifficultyMax, toolMinSolutions]);
 
   React.useEffect(() => { regenerateToolPreview(); }, [selectedTool, toolCount, regenerateToolPreview]);
 
   // 단원별 미리보기 재생성
   const regenerateDomainPreview = useCallback(() => {
     if (!selectedDomain) return;
-    const filtered = allProblems.filter(p => p.domain_id === selectedDomain);
+    const base = allProblems.filter(p => p.domain_id === selectedDomain);
+    const filtered = applyFilters(base, domainDifficultyMin, domainDifficultyMax, domainMinSolutions);
     const shuffled = filtered.sort(() => Math.random() - 0.5).slice(0, domainCount);
     setDomainPreview(shuffled);
     setSelectedDomainPreviewIds(new Set(shuffled.map(p => p.id)));
-  }, [selectedDomain, domainCount, allProblems]);
+  }, [selectedDomain, domainCount, allProblems, domainDifficultyMin, domainDifficultyMax, domainMinSolutions]);
 
   React.useEffect(() => { regenerateDomainPreview(); }, [selectedDomain, domainCount, regenerateDomainPreview]);
 
@@ -329,19 +346,32 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
                         </SelectContent>
                       </Select>
                       {selectedTool && (
-                        <>
-                          <div className="flex justify-between items-center">
-                            <label className="text-sm font-medium">문제 수</label>
-                            <div className="flex items-center gap-2">
-                              <Input type="number" min={1} max={50} value={toolCount}
-                                onChange={e => setToolCount(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
-                                className="w-20 h-8" />
-                              <span className="text-sm text-muted-foreground">개</span>
-                              <Button variant="outline" size="sm" onClick={regenerateToolPreview} className="gap-1">
-                                <RotateCcw className="w-4 h-4" />다시 뽑기
-                              </Button>
-                            </div>
-                          </div>
+                         <>
+                           {/* 필터 */}
+                           <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+                             <p className="text-xs font-medium text-muted-foreground">필터 (선택)</p>
+                             <div className="flex gap-2 items-center">
+                               <span className="text-xs text-muted-foreground w-14">난이도</span>
+                               <Input type="number" min={1} max={5} placeholder="최소" value={toolDifficultyMin}
+                                 onChange={e => setToolDifficultyMin(e.target.value)} className="w-16 h-7 text-xs" />
+                               <span className="text-xs">~</span>
+                               <Input type="number" min={1} max={5} placeholder="최대" value={toolDifficultyMax}
+                                 onChange={e => setToolDifficultyMax(e.target.value)} className="w-16 h-7 text-xs" />
+                               <span className="text-xs text-muted-foreground">(1-5)</span>
+                             </div>
+                           </div>
+                           <div className="flex justify-between items-center">
+                             <label className="text-sm font-medium">문제 수</label>
+                             <div className="flex items-center gap-2">
+                               <Input type="number" min={1} max={50} value={toolCount}
+                                 onChange={e => setToolCount(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
+                                 className="w-20 h-8" />
+                               <span className="text-sm text-muted-foreground">개</span>
+                               <Button variant="outline" size="sm" onClick={regenerateToolPreview} className="gap-1">
+                                 <RotateCcw className="w-4 h-4" />다시 뽑기
+                               </Button>
+                             </div>
+                           </div>
                           <div>
                             <div className="flex justify-between items-center mb-2">
                               <p className="text-xs text-muted-foreground">미리보기 ({toolPreview.length}개)</p>
@@ -382,19 +412,32 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
                         </SelectContent>
                       </Select>
                       {selectedDomain && (
-                        <>
-                          <div className="flex justify-between items-center">
-                            <label className="text-sm font-medium">문제 수</label>
-                            <div className="flex items-center gap-2">
-                              <Input type="number" min={1} max={50} value={domainCount}
-                                onChange={e => setDomainCount(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
-                                className="w-20 h-8" />
-                              <span className="text-sm text-muted-foreground">개</span>
-                              <Button variant="outline" size="sm" onClick={regenerateDomainPreview} className="gap-1">
-                                <RotateCcw className="w-4 h-4" />다시 뽑기
-                              </Button>
-                            </div>
-                          </div>
+                         <>
+                           {/* 필터 */}
+                           <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+                             <p className="text-xs font-medium text-muted-foreground">필터 (선택)</p>
+                             <div className="flex gap-2 items-center">
+                               <span className="text-xs text-muted-foreground w-14">난이도</span>
+                               <Input type="number" min={1} max={5} placeholder="최소" value={domainDifficultyMin}
+                                 onChange={e => setDomainDifficultyMin(e.target.value)} className="w-16 h-7 text-xs" />
+                               <span className="text-xs">~</span>
+                               <Input type="number" min={1} max={5} placeholder="최대" value={domainDifficultyMax}
+                                 onChange={e => setDomainDifficultyMax(e.target.value)} className="w-16 h-7 text-xs" />
+                               <span className="text-xs text-muted-foreground">(1-5)</span>
+                             </div>
+                           </div>
+                           <div className="flex justify-between items-center">
+                             <label className="text-sm font-medium">문제 수</label>
+                             <div className="flex items-center gap-2">
+                               <Input type="number" min={1} max={50} value={domainCount}
+                                 onChange={e => setDomainCount(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
+                                 className="w-20 h-8" />
+                               <span className="text-sm text-muted-foreground">개</span>
+                               <Button variant="outline" size="sm" onClick={regenerateDomainPreview} className="gap-1">
+                                 <RotateCcw className="w-4 h-4" />다시 뽑기
+                               </Button>
+                             </div>
+                           </div>
                           <div>
                             <div className="flex justify-between items-center mb-2">
                               <p className="text-xs text-muted-foreground">미리보기 ({domainPreview.length}개)</p>

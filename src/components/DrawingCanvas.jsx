@@ -5,7 +5,7 @@ import { Pencil, Eraser, Undo2, Trash2, Plus } from 'lucide-react';
 
 const PAGE_HEIGHT = 400;
 
-export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penSize = 3 }) {
+export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penSize = 1.5 }) {
   const canvasRef = useRef(null);
   const wrapperRef = useRef(null);
   const padRef = useRef(null);
