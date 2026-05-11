@@ -17,6 +17,7 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
   const activePointerIdRef = useRef(null);
   const lastUpAtRef = useRef(0);
   const lastUpPosRef = useRef(null);
+  const moveCountRef = useRef(0);
   const toolRef = useRef(tool);
   const penColorRef = useRef(penColor);
   const penSizeRef = useRef(penSize);
@@ -123,36 +124,35 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const STROKE_MERGE_MS = 600;
-    const STROKE_MERGE_DIST = 40;
+    const STROKE_MERGE_MS = 1500;
+    const STROKE_MERGE_DIST = 80;
 
     const onPointerDown = (e) => {
-    if (activePointerIdRef.current !== null) return;
-    if (e.pointerType === 'touch' && !e.isPrimary) return;
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
+      if (activePointerIdRef.current !== null) return;
+      if (e.pointerType === 'touch' && !e.isPrimary) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
 
-    e.preventDefault();
-    const sel = window.getSelection?.();
-    if (sel && sel.rangeCount > 0) sel.removeAllRanges();
-    activePointerIdRef.current = e.pointerId;
-    canvas.setPointerCapture(e.pointerId);
+      e.preventDefault();
+      const sel = window.getSelection?.();
+      if (sel && sel.rangeCount > 0) sel.removeAllRanges();
+      activePointerIdRef.current = e.pointerId;
+      canvas.setPointerCapture(e.pointerId);
+      moveCountRef.current = 0;
 
-    const now = performance.now();
-    const pos = getPos(e);
-    const dx = lastUpPosRef.current ? pos.x - lastUpPosRef.current.x : Infinity;
-    const dy = lastUpPosRef.current ? pos.y - lastUpPosRef.current.y : Infinity;
-    const dist = Math.hypot(dx, dy);
-    const isContinuation = e.pointerType === 'pen'
-      && (now - lastUpAtRef.current < STROKE_MERGE_MS)
-      && lastUpPosRef.current !== null
-      && dist < STROKE_MERGE_DIST;
+      const now = performance.now();
+      const pos = getPos(e);
+      const dx = lastUpPosRef.current ? pos.x - lastUpPosRef.current.x : Infinity;
+      const dy = lastUpPosRef.current ? pos.y - lastUpPosRef.current.y : Infinity;
+      const dist = Math.hypot(dx, dy);
+      const timeGap = lastUpAtRef.current > 0 ? (now - lastUpAtRef.current).toFixed(0) : '∞';
+      const isContinuation = e.pointerType === 'pen'
+        && (now - lastUpAtRef.current < STROKE_MERGE_MS)
+        && lastUpPosRef.current !== null
+        && dist < STROKE_MERGE_DIST;
 
-    pushLog(`down ${e.pointerType} id=${e.pointerId} pri=${e.isPrimary} ${
-      isContinuation ? `MERGE dist=${dist.toFixed(0)}` : `NEW dist=${dist === Infinity ? '∞' : dist.toFixed(0)}`
-    }`);
+      pushLog(`down ${e.pointerType} ${isContinuation ? 'MERGE' : 'NEW'} gap=${timeGap}ms dist=${dist === Infinity ? '∞' : dist.toFixed(0)}px`);
 
       if (isContinuation) {
-        // 짧은 lift — 이전 stroke과 이어서 연결
         const ctx = canvas.getContext('2d');
         ctx.beginPath();
         ctx.moveTo(lastUpPosRef.current.x, lastUpPosRef.current.y);
@@ -171,14 +171,8 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
         ctx.stroke();
         if (toolRef.current === 'eraser') ctx.globalCompositeOperation = 'source-over';
       } else {
+        // 새 stroke — dot 없이 saveState만 (dot은 짧은 false up에서 토막 남김)
         saveState();
-        if (toolRef.current === 'pen') {
-          const ctx = canvas.getContext('2d');
-          ctx.beginPath();
-          ctx.arc(pos.x, pos.y, penSizeRef.current / 2, 0, Math.PI * 2);
-          ctx.fillStyle = penColorRef.current;
-          ctx.fill();
-        }
       }
 
       lastPos.current = pos;
@@ -221,12 +215,13 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
         ctx.stroke();
         if (toolRef.current === 'eraser') ctx.globalCompositeOperation = 'source-over';
         lastPos.current = pos;
+        moveCountRef.current += 1;
       }
     };
 
     const onPointerUp = (e) => {
       if (e.pointerId !== activePointerIdRef.current) return;
-      pushLog(`up   ${e.pointerType} id=${e.pointerId}`);
+      pushLog(`up   ${e.pointerType} moves=${moveCountRef.current}`);
       e.preventDefault();
       lastUpAtRef.current = performance.now();
       lastUpPosRef.current = lastPos.current ? { ...lastPos.current } : null;
@@ -355,7 +350,11 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
         <div className="text-muted-foreground mb-1">[debug] pen events:</div>
         {debugLog.length === 0 && <div className="text-muted-foreground">— 아직 없음 —</div>}
         {debugLog.map((l, i) => (
-          <div key={i} className={l.includes('CANCEL') ? 'text-red-600 font-bold' : ''}>{l}</div>
+          <div key={i} className={
+            l.includes('CANCEL') ? 'text-red-600 font-bold' :
+            l.includes('MERGE') ? 'text-emerald-600' :
+            l.includes('moves=0') ? 'text-amber-600' : ''
+          }>{l}</div>
         ))}
       </div>
     </div>
