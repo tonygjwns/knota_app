@@ -5,9 +5,10 @@ import { useAuth } from '@/lib/AuthContext';
 import { useTeacher } from '@/lib/TeacherContext';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
-import { ArrowLeft, ChevronDown, ChevronUp, User, Star, Wrench } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import MathRenderer from '@/components/MathRenderer';
+import SolutionCard from '@/components/SolutionCard';
 
 const parseProblemText = (content) => {
   try {
@@ -18,94 +19,6 @@ const parseProblemText = (content) => {
     return String(content || '');
   }
 };
-
-const parseContents = (c) => {
-  try {
-    const arr = JSON.parse(c || '[]');
-    return arr.map(b => b.text || '').join('\n\n');
-  } catch { return c || ''; }
-};
-
-// ── 별해 카드 (accordion) ──
-function SolutionCard({ solution, steps, toolMap, defaultOpen }) {
-  const [open, setOpen] = useState(defaultOpen);
-
-  const sortedSteps = [...steps].sort((a, b) => a.sequence_order - b.sequence_order);
-  const bodyText = parseContents(solution.contents);
-
-  return (
-    <div className="rounded-xl border overflow-hidden">
-      {/* 헤더 */}
-      <button
-        className="w-full p-4 flex items-center justify-between bg-muted/30 hover:bg-muted/50 transition-colors text-left"
-        onClick={() => setOpen(o => !o)}
-      >
-        <div className="flex items-center gap-2">
-          <span className="font-semibold text-sm">풀이 #{solution.priority}</span>
-          {solution.priority === 1 && (
-            <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">대표</span>
-          )}
-          <span className="text-xs text-muted-foreground">({sortedSteps.length}단계)</span>
-        </div>
-        {open ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-      </button>
-
-      {open && (
-        <div className="p-4 space-y-4 border-t">
-          {/* 풀이 본문 */}
-          {bodyText && (
-            <div className="prose prose-sm max-w-none">
-              <MathRenderer content={bodyText} />
-            </div>
-          )}
-
-          {/* 단계별 도구 흐름 */}
-          {sortedSteps.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">단계별 도구 흐름</p>
-              <div className="space-y-2">
-                {sortedSteps.map(step => {
-                  const tool = toolMap.get(step.tool_id);
-                  return (
-                    <div key={step.id} className="rounded-lg border bg-background p-3 space-y-2">
-                      {/* step 헤더 */}
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground font-mono flex-shrink-0">Step {step.sequence_order}</span>
-                        {tool && (
-                          <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                            <Wrench className="w-3 h-3" />
-                            {tool.name}
-                          </span>
-                        )}
-                        {!tool && step.tool_id && (
-                          <span className="text-xs text-muted-foreground font-mono">{step.tool_id}</span>
-                        )}
-                      </div>
-                      {/* 선택 사유 */}
-                      {step.reason && (
-                        <p className="text-xs text-muted-foreground leading-relaxed">{step.reason}</p>
-                      )}
-                      {/* 적용 */}
-                      {step.application && (
-                        <div className="bg-muted/40 rounded-lg p-2">
-                          <MathRenderer content={step.application} />
-                        </div>
-                      )}
-                      {/* 결과 요약 */}
-                      {step.appended_info && (
-                        <p className="text-xs text-muted-foreground italic">{step.appended_info}</p>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function ProblemDetail({ mode = 'admin' }) {
   const { problemId } = useParams();

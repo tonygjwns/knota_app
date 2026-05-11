@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { ChevronDown, ChevronUp, AlertTriangle, ArrowLeft, RotateCcw, ChevronRight, Clock, Wrench, Star, BookOpen } from 'lucide-react';
+import SolutionCard from '@/components/SolutionCard';
 import { toast } from 'sonner';
 
 const REGRADE_PROMPT_TEMPLATE = (problemContent, correctedText, toolsBlock = '') => `당신은 한국 K-12 수학 풀이 채점 전문가입니다.
@@ -202,6 +203,9 @@ export default function ResultView() {
   const [bookmarkIdMap, setBookmarkIdMap] = useState(new Map());
   const [problemBookmarked, setProblemBookmarked] = useState(false);
   const [problemBookmarkId, setProblemBookmarkId] = useState(null);
+  const [solutions, setSolutions] = useState([]);
+  const [solutionSteps, setSolutionSteps] = useState([]);
+  const [showMatchedSolution, setShowMatchedSolution] = useState(false);
 
   useEffect(() => {
     loadAttempt();
@@ -239,24 +243,42 @@ export default function ResultView() {
               const parsed = JSON.parse(prob.tool_ids || '[]');
               if (Array.isArray(parsed)) toolIds = parsed.filter(Boolean);
             } catch {}
+            // Fetch tools + solutions + bookmarks in parallel
+            const fetchPromises = [
+              toolIds.length > 0 ? base44.entities.MathTool.list('name', 100) : Promise.resolve([]),
+              base44.entities.Solution.filter({ problem_id: prob.problem_id }, 'priority', 20),
+            ];
+            if (user) {
+              fetchPromises.push(
+                base44.entities.BookmarkedTool.filter({ user_id: user.id }),
+                base44.entities.BookmarkedProblem.filter({ user_id: user.id, problem_id: a.problem_id }, '-created_date', 1),
+              );
+            }
+            const [allTools, sols, myToolBookmarks, myProblemBookmarks] = await Promise.all(fetchPromises);
+
             if (toolIds.length > 0) {
-              const allTools = await base44.entities.MathTool.list('name', 100);
-              setTools(allTools.filter(t => toolIds.includes(t.tool_id)));
-              // Fetch bookmarks for this student
-              if (user) {
-                const [myToolBookmarks, myProblemBookmarks] = await Promise.all([
-                  base44.entities.BookmarkedTool.filter({ user_id: user.id }),
-                  base44.entities.BookmarkedProblem.filter({ user_id: user.id, problem_id: a.problem_id }, '-created_date', 1),
-                ]);
-                const bookmarkedSet = new Set(myToolBookmarks.filter(b => toolIds.includes(b.tool_id)).map(b => b.tool_id));
-                const idMap = new Map(myToolBookmarks.map(b => [b.tool_id, b.id]));
-                setBookmarkedToolIds(bookmarkedSet);
-                setBookmarkIdMap(idMap);
-                if (myProblemBookmarks.length > 0) {
-                  setProblemBookmarked(true);
-                  setProblemBookmarkId(myProblemBookmarks[0].id);
-                }
-              }
+              setTools((allTools || []).filter(t => toolIds.includes(t.tool_id)));
+            }
+
+            // Solutions + steps
+            if (sols && sols.length > 0) {
+              setSolutions(sols);
+              const stepArrays = await Promise.all(
+                sols.map(s => base44.entities.SolutionStep.filter({ solution_id: s.solution_id }, 'sequence_order', 50))
+              );
+              setSolutionSteps(stepArrays.flat());
+            }
+
+            // Bookmarks
+            if (user && myToolBookmarks) {
+              const bookmarkedSet = new Set(myToolBookmarks.filter(b => toolIds.includes(b.tool_id)).map(b => b.tool_id));
+              const idMap = new Map(myToolBookmarks.map(b => [b.tool_id, b.id]));
+              setBookmarkedToolIds(bookmarkedSet);
+              setBookmarkIdMap(idMap);
+            }
+            if (user && myProblemBookmarks && myProblemBookmarks.length > 0) {
+              setProblemBookmarked(true);
+              setProblemBookmarkId(myProblemBookmarks[0].id);
             }
           }
         }
@@ -407,6 +429,15 @@ export default function ResultView() {
   const steps = grading?.step_feedback || [];
   const gaps = grading?.gap_locations || [];
   const errors = grading?.error_locations || [];
+
+  // toolMap for SolutionCard
+  const toolMapForSolution = new Map(tools.map(t => [t.tool_id, t]));
+
+  // matched solution
+  const matchedSolution = grading?.matched_solution_id
+    ? solutions.find(s => s.solution_id === grading.matched_solution_id)
+    : null;
+  const otherSolutions = solutions.filter(s => s.solution_id !== grading?.matched_solution_id);
 
   // Unique tool_ids from errors/gaps for "이 매듭 더 연습하기"
   const weakToolIds = [...new Set([
@@ -632,20 +663,54 @@ export default function ResultView() {
           </div>
         )}
 
-        {/* Alternative solution */}
-        {grading?.alternative_solution && (
-          <div>
+        {/* 매칭된 별해 배너 */}
+        {matchedSolution && (
+          <div className="rounded-xl border border-primary/30 bg-primary/5 overflow-hidden">
             <button
-              className="w-full flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-xl"
-              onClick={() => setShowAlt(o => !o)}>
-              <span className="font-medium text-blue-800">이런 방법도 있어요! 💡</span>
-              {showAlt ? <ChevronUp className="w-4 h-4 text-blue-600" /> : <ChevronDown className="w-4 h-4 text-blue-600" />}
+              className="w-full p-4 flex items-center justify-between text-left"
+              onClick={() => setShowMatchedSolution(o => !o)}
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🎯</span>
+                <span className="font-medium text-foreground">풀이 #{matchedSolution.priority} 방식으로 푸셨네요!</span>
+                {matchedSolution.priority === 1 && (
+                  <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">대표</span>
+                )}
+              </div>
+              {showMatchedSolution ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
             </button>
-            {showAlt && (
-              <div className="bg-blue-50/50 border border-blue-100 border-t-0 rounded-b-xl p-4">
-                <MathRenderer content={grading.alternative_solution} className="text-sm" />
+            {showMatchedSolution && (
+              <div className="border-t px-4 pb-4 pt-2">
+                <SolutionCard
+                  solution={matchedSolution}
+                  steps={solutionSteps.filter(s => s.solution_id === matchedSolution.solution_id)}
+                  toolMap={toolMapForSolution}
+                  defaultOpen={true}
+                />
               </div>
             )}
+          </div>
+        )}
+
+        {/* 다른 풀이도 있어요 */}
+        {otherSolutions.length > 0 && (
+          <div>
+            <h2 className="text-base font-semibold mb-3 flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-primary" />
+              다른 풀이도 있어요
+              <span className="text-xs text-muted-foreground font-normal">({otherSolutions.length}개)</span>
+            </h2>
+            <div className="space-y-2">
+              {otherSolutions.map(sol => (
+                <SolutionCard
+                  key={sol.id}
+                  solution={sol}
+                  steps={solutionSteps.filter(s => s.solution_id === sol.solution_id)}
+                  toolMap={toolMapForSolution}
+                  defaultOpen={false}
+                />
+              ))}
+            </div>
           </div>
         )}
 

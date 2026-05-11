@@ -32,27 +32,12 @@ const OCR_SYSTEM_PROMPT = `당신은 한국 K-12 수학 손글씨 풀이 OCR 전
   "notes": "특이사항 (있을 경우)"
 }`;
 
-function formatSolutionPath(solutionPath) {
-  if (!solutionPath || (Array.isArray(solutionPath) && solutionPath.length === 0)) {
-    return '(정답 풀이 path 없음)';
-  }
-  if (typeof solutionPath === 'string') {
-    try {
-      const parsed = JSON.parse(solutionPath);
-      if (Array.isArray(parsed)) return formatSolutionPath(parsed);
-    } catch {}
-    return solutionPath;
-  }
-  const sorted = [...solutionPath].sort((a, b) => (a.sequence_order ?? 0) - (b.sequence_order ?? 0));
-  return sorted.map((step, i) => {
-    const n = step.sequence_order ?? (i + 1);
-    const toolName = step.tool_name || step.tool_id || '(도구 미상)';
-    return `Step ${n}: 도구 = "${toolName}"
-  - 사유: ${step.reason || ''}
-  - 적용: ${step.application || ''}
-  - 결과: ${step.appended_info || ''}`;
-  }).join('\n\n');
-}
+const parseContents = (c) => {
+  try {
+    const arr = JSON.parse(c || '[]');
+    return arr.map(b => b.text || '').join('\n\n');
+  } catch { return c || ''; }
+};
 
 export default function ProblemSolve() {
   const { id } = useParams();
@@ -88,7 +73,7 @@ export default function ProblemSolve() {
         setProblem(p[0]);
         // Check bookmark status
         if (user) {
-          const existing = await base44.entities.BookmarkedProblem.filter({ student_id: user.id, problem_id: p[0].id }, '-created_date', 1);
+          const existing = await base44.entities.BookmarkedProblem.filter({ user_id: user.id, problem_id: p[0].id }, '-created_date', 1);
           if (existing.length > 0) {
             setIsBookmarked(true);
             setBookmarkId(existing[0].id);
@@ -114,7 +99,7 @@ export default function ProblemSolve() {
     } else {
       const problemText = parseProblemText(problem.content);
       const created = await base44.entities.BookmarkedProblem.create({
-        student_id: user.id,
+        user_id: user.id,
         problem_id: problem.id,
         problem_content_preview: problemText.slice(0, 100),
         problem_domain: problem.domain_name || '',
@@ -231,53 +216,98 @@ ${OCR_SYSTEM_PROMPT}`;
       setStage('grading');
       const problemText = parseProblemText(problem.content);
 
-      // Fetch relevant tools for this problem and build tools block
+      // Fetch tools + solutions in parallel
       const toolIds = (() => { try { return JSON.parse(problem.tool_ids || '[]'); } catch { return []; } })();
+      const [allTools, allSolutions] = await Promise.all([
+        toolIds.length > 0 ? base44.entities.MathTool.list('name', 100) : Promise.resolve([]),
+        base44.entities.Solution.filter({ problem_id: problem.problem_id }, 'priority', 20),
+      ]);
+
+      let relevantTools = [];
       let toolsBlock = '(이 문제에 매핑된 도구 없음)';
       if (toolIds.length > 0) {
-        const allTools = await base44.entities.MathTool.list('name', 100);
-        const relevantTools = allTools.filter(t => toolIds.includes(t.tool_id));
+        relevantTools = allTools.filter(t => toolIds.includes(t.tool_id));
         if (relevantTools.length > 0) {
           toolsBlock = relevantTools.map(t =>
             `- tool_id: "${t.tool_id}"\n  name: "${t.name}"\n  goal: "${t.goal || ''}"`
           ).join('\n');
         }
-        // Store for sanitization after grading
-        window.__relevantToolIds = new Set(relevantTools.map(t => t.tool_id));
-      } else {
-        window.__relevantToolIds = new Set();
       }
+      window.__relevantToolIds = new Set(relevantTools.map(t => t.tool_id));
+
+      // Fetch solution steps (up to 5 solutions)
+      const solutions = allSolutions.slice(0, 5);
+      const solutionIds = solutions.map(s => s.solution_id);
+      const stepsBySol = new Map();
+      if (solutionIds.length > 0) {
+        const stepArrays = await Promise.all(
+          solutionIds.map(sid =>
+            base44.entities.SolutionStep.filter({ solution_id: sid }, 'sequence_order', 50)
+          )
+        );
+        solutionIds.forEach((sid, i) => stepsBySol.set(sid, stepArrays[i]));
+      }
+
+      // Build solutions block for prompt
+      const solutionsBlock = solutions.length === 0
+        ? '(별해 데이터 없음)'
+        : solutions.map(sol => {
+            const body = parseContents(sol.contents);
+            const steps = (stepsBySol.get(sol.solution_id) || [])
+              .sort((a, b) => a.sequence_order - b.sequence_order);
+            const pathText = steps.map(s => {
+              const toolName = relevantTools.find(t => t.tool_id === s.tool_id)?.name || s.tool_id;
+              return `  Step ${s.sequence_order}: 도구="${s.tool_id}" (${toolName})
+    선택사유: ${s.reason || ''}
+    적용: ${s.application || ''}
+    결과: ${s.appended_info || ''}`;
+            }).join('\n');
+            return `<solution priority="${sol.priority}" id="${sol.solution_id}">
+<body>
+${body}
+</body>
+<path>
+${pathText}
+</path>
+</solution>`;
+          }).join('\n\n');
 
       const gradingPrompt = `당신은 한국 K-12 수학 풀이 채점 전문가입니다.
 
-학생의 손글씨 풀이(OCR 추출 결과)를 받아, problem + verified_answer + agent_solution + 정답 풀이 path와 비교해 채점합니다. 출력은 GradingOutput 스키마 JSON.
+학생의 손글씨 풀이(OCR)를 받아, problem + verified_answer + 큐레이션된 별해 N개와
+비교해 채점합니다. 출력은 GradingOutput JSON.
 
 ## 채점 원칙
 1. 부분점수 일관성 — 비슷한 풀이는 비슷한 점수
-2. 학생 친화 톤 — 격려 + 정정. "틀렸어요" 같은 부정적 표현 금지. "이 부분 다시 살펴볼까요?" 형태로
-3. 별해 인정 — 학생 풀이가 verified_answer와 다른 경로여도 정답 도달 시 정합으로 인정
-4. 정답 처리 원칙 — 최종 답이 verified_answer와 일치하고, 풀이 흐름이 논리적으로 이어진다면 중간 step에 사소한 계산 오류나 표기 오류가 있더라도 score 80 이상 부여 (correct). 단, 특정 step에서 개념적으로 명확히 잘못된 부분(conceptual error)이 있다면 그 step의 상태를 'wrong'으로 명시하되, 전체 정답 인정은 유지.
+2. 학생 친화 톤 — 격려 + 정정. 부정 표현 금지 ("틀렸어요" X)
+3. 별해 매칭 — 학생 풀이가 <solutions> 안의 어느 별해와 가장 비슷한지 판정해
+   matched_solution_id에 그 별해의 solution_id를 채워주세요. 어느 것과도 비슷하지 않으면 null.
+   별해가 0개면 항상 null.
+4. 정답 처리 — 학생이 매칭 별해의 path와 일치하면서 verified_answer에 도달하면 score 80+ (correct).
+   사소한 계산/표기 오류는 허용. 개념적 오류만 score 크게 차감.
 5. 오류 분류:
-   - calculation = 산수/부호/정리 오류 (소소함 — 점수 약간 ↓)
-   - conceptual = 개념/공식 오류 (큼 — 점수 많이 ↓)
-   - notation = 표기 오류 (작음 — 점수 약간 ↓)
-5. 할루시 방지 — 학생이 쓰지 않은 내용 추측 금지. 확신 없으면 confidence ↓
-6. OCR 검증 — OCR 결과가 의심스러우면 ocr_quality_concern에 구체적 우려 텍스트 명시
-7. Actionable feedback — "다시 살펴봐요" 같은 모호한 말 금지. 어느 자리/왜를 step_feedback, gap_locations, error_locations에 명시
-8. 매듭 매핑 (엄격) — step_feedback, error_locations, gap_locations 의 각 항목에서 tool_id 를 채울 때, 반드시 <available_tools> 안에 있는 tool_id 중 하나만 사용하세요. 학생이 그 step 에서 어느 도구를 사용했는지 (또는 사용했어야 하는지) 가 분명하지 않으면 null. 절대로 새 ID 를 만들거나 자유 문자열 금지. <available_tools> 가 비어있으면 모두 null.
+   - calculation = 산수/부호 오류 (소소)
+   - conceptual = 개념/공식 오류 (큼)
+   - notation = 표기 오류 (작음)
+6. 할루시 방지 — 학생이 안 쓴 내용 추측 금지. 확신 없으면 confidence ↓
+7. OCR 검증 — 의심스러우면 ocr_quality_concern에 명시
+8. Actionable feedback — 모호한 표현 금지. 어느 자리/왜를 명시.
+9. 매듭 매핑 — step_feedback/error_locations/gap_locations 의 tool_id는 반드시
+   <available_tools> 안 ID만 사용. 매칭된 별해의 path 도구를 우선 매핑.
+   불명확하면 null.
 
 ## 점수 기준
-- 100 = 정답 + 풀이 완전 + 표기 정합
-- 80-99 = 정답 + 풀이 정합 + 사소한 오류 (산수/표기)
-- 60-79 = 정답 도달 + 풀이 일부 누락 (공백)
-- 40-59 = 풀이 일부 정합 + 정답 미도달
-- 20-39 = 풀이 일부 정합 + 다수 오류
-- 1-19 = 풀이 형식만 일부 정합
-- 0 = 풀이 없음 / 완전 오답
+- 100 = 정답 + 풀이 완전
+- 80-99 = 정답 + 사소 오류
+- 60-79 = 정답 + 일부 누락
+- 40-59 = 풀이 일부 + 정답 미도달
+- 20-39 = 풀이 일부 + 다수 오류
+- 1-19 = 형식만
+- 0 = 풀이 없음
 
 ## 톤
-정합 표현: "잘 풀었어요!", "여기까지 정합!", "이 부분 다시 살펴볼까요?", "별해도 가능해요"
-금지 표현: "틀렸어요", "X", "잘못했어요"
+정합: "잘 풀었어요!", "이 부분 다시 살펴볼까요?", "다른 방법도 시도해보세요"
+금지: "틀렸어요", "X", "잘못했어요"
 
 <problem>
 ${problemText}
@@ -287,25 +317,22 @@ ${problemText}
 ${problem.verified_answer || '(검증된 정답 없음)'}
 </verified_answer>
 
-<agent_solution>
-${problem.agent_solution || '(agent 풀이 없음)'}
-</agent_solution>
-
-<correct_solution_path>
-${formatSolutionPath(problem.solution_path)}
-</correct_solution_path>
+<solutions>
+${solutionsBlock}
+</solutions>
 
 <available_tools>
 ${toolsBlock}
 </available_tools>
 
-학생 풀이의 각 step 이 어떤 도구를 사용했는지 식별해 step_feedback[].tool_id 에 적어주세요 (correct / partial / missing / wrong 모두 적용). correct_solution_path 의 Step N: 도구 = "X" 와 매칭하면 됩니다.
+학생 풀이가 어느 별해 path와 가장 가까운지 판정해 matched_solution_id에 채우고,
+step_feedback[].tool_id 는 그 별해의 도구로 매핑하세요.
 
 <student_ocr_solution>
 ${ocrText}
 </student_ocr_solution>
 
-위 학생 풀이를 GradingOutput JSON 스키마 양식으로 채점해 주세요.`;
+위 학생 풀이를 GradingOutput 양식으로 채점해 주세요.`;
 
       const gradeRaw = await base44.integrations.Core.InvokeLLM({
         prompt: gradingPrompt,
@@ -359,7 +386,8 @@ ${ocrText}
                 required: ['description', 'student_wrote', 'correct_form', 'error_type']
               }
             },
-            alternative_solution: { type: 'string' },
+            matched_solution_id: { type: 'string', description: '학생 풀이와 가장 가까운 별해 solution_id. 매칭 안 되면 null. 별해 0개면 null.' },
+            matched_solution_priority: { type: 'integer', description: '매칭 별해의 priority (UI 표시용). 없으면 null.' },
             confidence: { type: 'integer', minimum: 0, maximum: 100 },
             ocr_quality_concern: { type: 'string' }
           },
@@ -378,6 +406,13 @@ ${ocrText}
       gradeResult.step_feedback = sanitize(gradeResult.step_feedback);
       gradeResult.error_locations = sanitize(gradeResult.error_locations);
       gradeResult.gap_locations = sanitize(gradeResult.gap_locations);
+
+      // Sanitize matched_solution_id
+      const validSolIds = new Set(solutionIds);
+      if (!validSolIds.has(gradeResult.matched_solution_id)) {
+        gradeResult.matched_solution_id = null;
+        gradeResult.matched_solution_priority = null;
+      }
 
       // Save attempt — ocr_corrected_text는 학생이 직접 수정할 때만 저장 (기본 흐름은 null)
       const attempt = await base44.entities.StudentAttempt.create({
