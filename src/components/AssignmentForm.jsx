@@ -163,7 +163,10 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
         const bookmarks = await base44.entities.BookmarkedProblem.filter({ user_id: me.id }, '-created_date', 200);
         // bookmark에 실제 문제 데이터 병합
         const bmProblemIds = bookmarks.map(b => b.problem_id);
-        const bmProblems = problemsData.filter(p => bmProblemIds.includes(p.id));
+        // problem_id는 Problem 엔티티의 id(UUID) 또는 problem_id 필드값 둘 다 허용
+        const bmProblems = problemsData.filter(p =>
+          bmProblemIds.includes(p.id) || bmProblemIds.includes(p.problem_id)
+        );
         setBookmarkedProblems(bmProblems);
       } catch { /* silent */ }
       setBookmarksLoading(false);
@@ -347,7 +350,7 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
                                 <Button variant="ghost" size="sm" onClick={deselectAllToolPreview} className="h-6 text-xs">전체 해제</Button>
                               </div>
                             </div>
-                            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
                               {toolPreview.map(p => (
                                 <ProblemCard key={p.id} problem={p}
                                   checked={selectedToolPreviewIds.has(p.id)}
@@ -400,7 +403,7 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
                                 <Button variant="ghost" size="sm" onClick={deselectAllDomainPreview} className="h-6 text-xs">전체 해제</Button>
                               </div>
                             </div>
-                            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
                               {domainPreview.map(p => (
                                 <ProblemCard key={p.id} problem={p}
                                   checked={selectedDomainPreviewIds.has(p.id)}
@@ -430,7 +433,7 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
                         <Input placeholder="문제 검색 (내용, 단원)..." value={searchQuery}
                           onChange={e => setSearchQuery(e.target.value)} className="pl-10" />
                       </div>
-                      <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                      <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
                         {searchResults.map(p => (
                           <ProblemCard key={p.id} problem={p}
                             checked={selectedProblems.includes(p.id)}
@@ -460,7 +463,7 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
                               <Button variant="ghost" size="sm" onClick={deselectAllBookmarks} className="h-6 text-xs">전체 해제</Button>
                             </div>
                           </div>
-                          <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                          <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
                             {bookmarkedProblems.map(p => (
                               <ProblemCard key={p.id} problem={p}
                                 checked={selectedBookmarkIds.has(p.id)}
