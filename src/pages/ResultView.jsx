@@ -31,6 +31,13 @@ const REGRADE_PROMPT_TEMPLATE = (problemContent, correctedText, toolsBlock = '',
 6. 할루시 방지 — 학생이 쓰지 않은 내용 추측 금지
 7. Actionable feedback — 어느 자리/왜를 명시
 8. 매듭 매핑 (엄격) — step_feedback, error_locations, gap_locations 의 각 항목에서 tool_id 를 채울 때, 반드시 <available_tools> 안에 있는 tool_id 중 하나만 사용하세요. 매칭된 별해의 path 도구를 우선 매핑. 불명확하면 null. <available_tools> 가 비어있으면 모두 null.
+9. 학생 step → 정해 step 매핑 (매우 중요):
+   - 정해 path는 N개의 step (Step 1 = 도구 X, Step 2 = 도구 Y, …)
+   - 학생 풀이는 M개의 step. 일반적으로 N ≠ M.
+   - 각 학생 step에 대해 어느 정해 step에 해당하는지 matched_solution_step_number 에 채우기 (1부터 시작, 매칭 안 되면 null).
+   - 여러 학생 step이 같은 정해 step에 매핑 가능 (N:1).
+   - tool_id는 반드시 매핑된 정해 step의 도구만 사용. 다른 도구 부여 금지.
+   - matched_solution_id가 null이면 모든 step의 matched_solution_step_number도 null.
 
 ## 점수 기준
 - 100 = 정답 + 풀이 완전 + 표기 정합
@@ -79,11 +86,15 @@ const REGRADE_SCHEMA = {
         type: 'object',
         properties: {
           step_number: { type: 'integer', minimum: 1 },
+          matched_solution_step_number: {
+            type: 'integer',
+            description: '이 학생 step이 매칭된 별해의 어느 step(sequence_order)에 해당하는지. 매칭 안 되면 null. matched_solution_id가 null이면 항상 null.'
+          },
           student_step: { type: 'string' },
           status: { type: 'string', enum: ['correct', 'partial', 'missing', 'wrong'] },
           comment: { type: 'string' },
           correction: { type: 'string' },
-          tool_id: { type: 'string', description: 'available_tools 안의 ID 또는 null. 자유 문자열 금지.' }
+          tool_id: { type: 'string', description: '매칭된 별해 path의 step의 tool_id. matched_solution_step_number와 일치해야 함. 없으면 null.' }
         },
         required: ['step_number', 'student_step', 'status', 'comment']
       }
@@ -436,6 +447,20 @@ export default function ResultView() {
         result.matched_solution_priority = null;
       }
 
+      // Sanitize matched_solution_step_number
+      const matchedSolId = result.matched_solution_id;
+      let validSolStepNums = new Set();
+      if (matchedSolId) {
+        const matchedSteps = solutionSteps.filter(s => s.solution_id === matchedSolId);
+        validSolStepNums = new Set(matchedSteps.map(s => s.sequence_order));
+      }
+      result.step_feedback = (result.step_feedback || []).map(sf => ({
+        ...sf,
+        matched_solution_step_number: validSolStepNums.has(sf.matched_solution_step_number)
+          ? sf.matched_solution_step_number
+          : null,
+      }));
+
       await base44.entities.StudentAttempt.update(attempt.id, {
         ocr_corrected_text: correctedText,
         claude_grade_json: JSON.stringify(result),
@@ -621,12 +646,54 @@ export default function ResultView() {
           </div>
         )}
 
-        {/* Step feedback */}
+        {/* Step feedback with grouping by matched_solution_step_number */}
         {steps.length > 0 && (
           <div>
             <h2 className="text-lg font-semibold mb-3">단계별 피드백</h2>
             <div className="space-y-2">
-              {steps.map((step, i) => <StepCard key={i} step={step} getToolName={getToolName} onToolClick={handleToolChipClick} onBookmarkTool={(toolId) => { const t = tools.find(t => t.tool_id === toolId); if (t) toggleBookmark(t); }} bookmarkedToolIds={bookmarkedToolIds} />)}
+              {(() => {
+                // Group steps by matched_solution_step_number
+                const stepGroups = [];
+                let current = null;
+                for (const sf of steps) {
+                  const key = sf.matched_solution_step_number ?? null;
+                  if (current && current.key === key) {
+                    current.items.push(sf);
+                  } else {
+                    current = { key, items: [sf] };
+                    stepGroups.push(current);
+                  }
+                }
+
+                return stepGroups.map((g, gi) => {
+                  const solStep = matchedSolution && g.key
+                    ? solutionSteps.find(s => s.solution_id === matchedSolution.solution_id && s.sequence_order === g.key)
+                    : null;
+                  const toolName = solStep ? getToolName(solStep.tool_id) : null;
+
+                  return (
+                    <div key={gi} className="space-y-2">
+                      {/* Group header — show only if multiple items and matched solution exists */}
+                      {g.items.length > 1 && solStep && toolName && (
+                        <div className="text-xs text-muted-foreground flex items-center gap-2 pl-1">
+                          <span>📍 정해 Step {g.key} — {toolName} (학생 풀이 {g.items.length}줄에 해당)</span>
+                        </div>
+                      )}
+                      {/* Individual step cards */}
+                      {g.items.map((step, i) => (
+                        <StepCard
+                          key={`${gi}-${i}`}
+                          step={step}
+                          getToolName={getToolName}
+                          onToolClick={handleToolChipClick}
+                          onBookmarkTool={(toolId) => { const t = tools.find(t => t.tool_id === toolId); if (t) toggleBookmark(t); }}
+                          bookmarkedToolIds={bookmarkedToolIds}
+                        />
+                      ))}
+                    </div>
+                  );
+                });
+              })()}
             </div>
           </div>
         )}

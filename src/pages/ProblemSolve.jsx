@@ -295,6 +295,13 @@ ${pathText}
 9. 매듭 매핑 — step_feedback/error_locations/gap_locations 의 tool_id는 반드시
    <available_tools> 안 ID만 사용. 매칭된 별해의 path 도구를 우선 매핑.
    불명확하면 null.
+10. 학생 step → 정해 step 매핑 (매우 중요):
+    - 정해 path는 N개의 step (Step 1 = 도구 X, Step 2 = 도구 Y, …)
+    - 학생 풀이는 M개의 step. 일반적으로 N ≠ M.
+    - 각 학생 step에 대해 어느 정해 step에 해당하는지 matched_solution_step_number 에 채우기 (1부터 시작, 매칭 안 되면 null).
+    - 여러 학생 step이 같은 정해 step에 매핑 가능 (N:1).
+    - tool_id는 반드시 매핑된 정해 step의 도구만 사용. 다른 도구 부여 금지.
+    - matched_solution_id가 null이면 모든 step의 matched_solution_step_number도 null.
 
 ## 점수 기준
 - 100 = 정답 + 풀이 완전
@@ -351,11 +358,15 @@ ${ocrText}
                 type: 'object',
                 properties: {
                   step_number: { type: 'integer', minimum: 1 },
+                  matched_solution_step_number: {
+                    type: 'integer',
+                    description: '이 학생 step이 매칭된 별해의 어느 step(sequence_order)에 해당하는지. 매칭 안 되면 null. matched_solution_id가 null이면 항상 null.'
+                  },
                   student_step: { type: 'string' },
                   status: { type: 'string', enum: ['correct', 'partial', 'missing', 'wrong'] },
                   comment: { type: 'string' },
                   correction: { type: 'string' },
-                  tool_id: { type: 'string', description: 'available_tools 안의 ID 또는 null. 자유 문자열 금지.' }
+                  tool_id: { type: 'string', description: '매칭된 별해 path의 step의 tool_id. matched_solution_step_number와 일치해야 함. 없으면 null.' }
                 },
                 required: ['step_number', 'student_step', 'status', 'comment']
               }
@@ -413,6 +424,20 @@ ${ocrText}
         gradeResult.matched_solution_id = null;
         gradeResult.matched_solution_priority = null;
       }
+
+      // Sanitize matched_solution_step_number
+      const matchedSolId = gradeResult.matched_solution_id;
+      let validSolStepNums = new Set();
+      if (matchedSolId) {
+        const matchedSteps = stepsBySol.get(matchedSolId) || [];
+        validSolStepNums = new Set(matchedSteps.map(s => s.sequence_order));
+      }
+      gradeResult.step_feedback = (gradeResult.step_feedback || []).map(sf => ({
+        ...sf,
+        matched_solution_step_number: validSolStepNums.has(sf.matched_solution_step_number)
+          ? sf.matched_solution_step_number
+          : null,
+      }));
 
       // Save attempt — ocr_corrected_text는 학생이 직접 수정할 때만 저장 (기본 흐름은 null)
       const attempt = await base44.entities.StudentAttempt.create({
