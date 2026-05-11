@@ -24,10 +24,16 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
   useEffect(() => { penSizeRef.current = penSize; }, [penSize]);
 
   // Get position from PointerEvent relative to canvas logical coordinates
-  // offsetX/offsetY are CSS-pixel coords relative to the canvas element itself
-  // ctx is already scaled by dpr via ctx.scale(dpr,dpr), so pass CSS pixels directly
+  // Use getBoundingClientRect for cross-platform accuracy (offsetX unreliable on iOS)
+  // ctx is already scaled by dpr via ctx.scale(dpr,dpr), so return CSS pixels
   const getPos = (e) => {
-    return { x: e.offsetX, y: e.offsetY };
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left) * (canvas.width / rect.width / (window.devicePixelRatio || 1)),
+      y: (e.clientY - rect.top) * (canvas.height / rect.height / (window.devicePixelRatio || 1)),
+    };
   };
 
   // Initialize canvas size based on wrapper width
