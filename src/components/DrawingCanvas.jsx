@@ -14,6 +14,7 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
   const [canvasHeight, setCanvasHeight] = useState(PAGE_HEIGHT);
   const lastPos = useRef(null);
   const isDrawingRef = useRef(false);
+  const activePointerIdRef = useRef(null);
   const toolRef = useRef(tool);
   const penColorRef = useRef(penColor);
   const penSizeRef = useRef(penSize);
@@ -62,7 +63,10 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
   useEffect(() => {
     const wrapper = wrapperRef.current;
     if (!wrapper) return;
-    const ro = new ResizeObserver(() => { initCanvas(); });
+    const ro = new ResizeObserver(() => {
+      if (isDrawingRef.current) return; // 드로잉 중엔 canvas reset 안 함
+      initCanvas();
+    });
     ro.observe(wrapper);
     return () => ro.disconnect();
   }, [initCanvas]);
@@ -102,7 +106,14 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
     if (!canvas) return;
 
     const onPointerDown = (e) => {
+      // palm rejection: 이미 그리는 중이면 추가 pointer 무시
+      if (activePointerIdRef.current !== null) return;
+      // touch는 isPrimary만 허용, mouse는 좌클릭만, pen은 모두 허용
+      if (e.pointerType === 'touch' && !e.isPrimary) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+
       e.preventDefault();
+      activePointerIdRef.current = e.pointerId;
       canvas.setPointerCapture(e.pointerId);
       saveState();
       const pos = getPos(e);
@@ -120,31 +131,46 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
 
     const onPointerMove = (e) => {
       if (!isDrawingRef.current) return;
+      if (e.pointerId !== activePointerIdRef.current) return; // palm 차단
       e.preventDefault();
       const canvas = canvasRef.current;
       const ctx = canvas.getContext('2d');
-      const pos = getPos(e);
-      ctx.beginPath();
-      ctx.moveTo(lastPos.current.x, lastPos.current.y);
-      ctx.lineTo(pos.x, pos.y);
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      if (toolRef.current === 'eraser') {
-        ctx.globalCompositeOperation = 'destination-out';
-        ctx.strokeStyle = 'rgba(0,0,0,1)';
-        ctx.lineWidth = eraserSize;
-      } else {
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.strokeStyle = penColorRef.current;
-        ctx.lineWidth = penSizeRef.current;
+
+      // getCoalescedEvents: 빠른 stroke의 중간 점 보강
+      const events = (typeof e.getCoalescedEvents === 'function' && e.getCoalescedEvents().length > 0)
+        ? e.getCoalescedEvents()
+        : [e];
+
+      for (const ev of events) {
+        const pos = getPos(ev);
+        ctx.beginPath();
+        ctx.moveTo(lastPos.current.x, lastPos.current.y);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        if (toolRef.current === 'eraser') {
+          ctx.globalCompositeOperation = 'destination-out';
+          ctx.strokeStyle = 'rgba(0,0,0,1)';
+          ctx.lineWidth = eraserSize;
+        } else {
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.strokeStyle = penColorRef.current;
+          // Apple Pencil 압력 반영 (pressure 미지원 환경은 기존 크기 유지)
+          const width = (ev.pointerType === 'pen' && ev.pressure > 0)
+            ? penSizeRef.current * (0.6 + ev.pressure * 0.8)
+            : penSizeRef.current;
+          ctx.lineWidth = width;
+        }
+        ctx.stroke();
+        if (toolRef.current === 'eraser') ctx.globalCompositeOperation = 'source-over';
+        lastPos.current = pos;
       }
-      ctx.stroke();
-      if (toolRef.current === 'eraser') ctx.globalCompositeOperation = 'source-over';
-      lastPos.current = pos;
     };
 
     const onPointerUp = (e) => {
+      if (e.pointerId !== activePointerIdRef.current) return;
       e.preventDefault();
+      activePointerIdRef.current = null;
       isDrawingRef.current = false;
       setIsDrawing(false);
       const canvas = canvasRef.current;
@@ -207,7 +233,13 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
 
       <div ref={wrapperRef}
            className="relative bg-white border-2 border-dashed border-border rounded-xl overflow-hidden"
-           style={{ height: canvasHeight }}>
+           style={{
+             height: canvasHeight,
+             userSelect: 'none',
+             WebkitUserSelect: 'none',
+             WebkitTouchCallout: 'none',
+             touchAction: 'none',
+           }}>
         {isEmpty && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground pointer-events-none select-none">
             <Pencil className="w-8 h-8 mb-2 opacity-30" />
@@ -217,7 +249,14 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
         <canvas
           ref={canvasRef}
           className={cursorClass}
-          style={{ width: '100%', height: canvasHeight, display: 'block', touchAction: 'none' }}
+          onContextMenu={(e) => e.preventDefault()}
+          style={{
+            width: '100%', height: canvasHeight, display: 'block',
+            touchAction: 'none',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+            WebkitTouchCallout: 'none',
+          }}
         />
       </div>
 
