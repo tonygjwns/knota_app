@@ -237,9 +237,14 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
     const onPointerCancel = (e) => {
       pushLog(`CANCEL ${e.pointerType} id=${e.pointerId}`);
       if (e.pointerId !== activePointerIdRef.current) return;
-      // cancel은 강제 중단 — merge 정보 reset
-      lastUpAtRef.current = 0;
-      lastUpPosRef.current = null;
+      // 펜의 CANCEL은 false-positive 가능성 큼 — merge 정보 보존해서 다음 down이 MERGE될 수 있게
+      if (e.pointerType === 'pen' && lastPos.current) {
+        lastUpAtRef.current = performance.now();
+        lastUpPosRef.current = { ...lastPos.current };
+      } else {
+        lastUpAtRef.current = 0;
+        lastUpPosRef.current = null;
+      }
       activePointerIdRef.current = null;
       isDrawingRef.current = false;
       setIsDrawing(false);
@@ -250,11 +255,20 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
     canvas.addEventListener('pointerup', onPointerUp, { passive: false });
     canvas.addEventListener('pointercancel', onPointerCancel, { passive: false });
 
+    // iOS: touch event를 명시적 차단 → scroll/gesture 인식 억제 → CANCEL 발생 빈도 감소
+    const stopTouch = (e) => { e.preventDefault(); e.stopPropagation(); };
+    canvas.addEventListener('touchstart', stopTouch, { passive: false });
+    canvas.addEventListener('touchmove', stopTouch, { passive: false });
+    canvas.addEventListener('touchend', stopTouch, { passive: false });
+
     return () => {
       canvas.removeEventListener('pointerdown', onPointerDown);
       canvas.removeEventListener('pointermove', onPointerMove);
       canvas.removeEventListener('pointerup', onPointerUp);
       canvas.removeEventListener('pointercancel', onPointerCancel);
+      canvas.removeEventListener('touchstart', stopTouch);
+      canvas.removeEventListener('touchmove', stopTouch);
+      canvas.removeEventListener('touchend', stopTouch);
     };
   }, [saveState, onImageReady, eraserSize]);
 
@@ -300,6 +314,7 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
       <div ref={wrapperRef}
            className="relative bg-white border-2 border-dashed border-border rounded-xl overflow-hidden"
            onSelectStart={(e) => e.preventDefault()}
+           onTouchMove={(e) => e.preventDefault()}
            style={{
              height: canvasHeight,
              userSelect: 'none',
