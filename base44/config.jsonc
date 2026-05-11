@@ -1,0 +1,9 @@
+{
+  "name": "\ub9e4\uc2a4\uc5c5 (MathUp)",
+  "site": {
+    "installCommand": "npm install",
+    "buildCommand": "npm run build",
+    "serveCommand": "npm run dev",
+    "outputDirectory": "./dist"
+  }
+}
