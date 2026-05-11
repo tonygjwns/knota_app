@@ -160,3 +160,23 @@
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0);
 }
+
+/* 캔버스 페이지 전용 — DrawingCanvas 마운트 시 body에 적용되어 페이지 전체 selection 차단 */
+body.canvas-active {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+body.canvas-active * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+/* 입력 필드는 텍스트 선택 가능하게 유지 */
+body.canvas-active input,
+body.canvas-active textarea,
+body.canvas-active [contenteditable] {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}

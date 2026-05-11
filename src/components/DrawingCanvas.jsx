@@ -19,6 +19,14 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
   const penColorRef = useRef(penColor);
   const penSizeRef = useRef(penSize);
 
+  // body에 canvas-active 클래스 추가 (페이지 전체 selection 차단)
+  useEffect(() => {
+    document.body.classList.add('canvas-active');
+    return () => {
+      document.body.classList.remove('canvas-active');
+    };
+  }, []);
+
   // Keep refs in sync
   useEffect(() => { toolRef.current = tool; }, [tool]);
   useEffect(() => { penColorRef.current = penColor; }, [penColor]);
@@ -113,6 +121,9 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
       if (e.pointerType === 'mouse' && e.button !== 0) return;
 
       e.preventDefault();
+      // iOS: 진행 중인 selection 제거 (stroke 끊김 방지)
+      const sel = window.getSelection?.();
+      if (sel && sel.rangeCount > 0) sel.removeAllRanges();
       activePointerIdRef.current = e.pointerId;
       canvas.setPointerCapture(e.pointerId);
       saveState();
@@ -233,6 +244,7 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
 
       <div ref={wrapperRef}
            className="relative bg-white border-2 border-dashed border-border rounded-xl overflow-hidden"
+           onSelectStart={(e) => e.preventDefault()}
            style={{
              height: canvasHeight,
              userSelect: 'none',
@@ -249,6 +261,9 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
         <canvas
           ref={canvasRef}
           className={cursorClass}
+          draggable={false}
+          onDragStart={(e) => e.preventDefault()}
+          onSelectStart={(e) => e.preventDefault()}
           onContextMenu={(e) => e.preventDefault()}
           style={{
             width: '100%', height: canvasHeight, display: 'block',
