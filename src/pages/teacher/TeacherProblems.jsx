@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { ArrowLeft, BookOpen, Wrench, Star, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
-import MathRenderer from '@/components/MathRenderer';
 
 export default function TeacherProblems() {
   const { user } = useAuth();
@@ -21,8 +20,9 @@ export default function TeacherProblems() {
   const [domains, setDomains] = useState([]);
   const [tools, setTools] = useState([]);
   const [problems, setProblems] = useState([]);
+  const [solutionCountMap, setSolutionCountMap] = useState(new Map()); // problem_id → count
   const [bookmarkedProblemIds, setBookmarkedProblemIds] = useState(new Set());
-  const [bookmarkIdMap, setBookmarkIdMap] = useState(new Map()); // problemId → bookmarkRecordId
+  const [bookmarkIdMap, setBookmarkIdMap] = useState(new Map());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -31,23 +31,44 @@ export default function TeacherProblems() {
 
   const loadBase = async () => {
     setLoading(true);
-    const [allDomains, allTools, allProblems, myBookmarks] = await Promise.all([
-      base44.entities.Domain.list('name', 50),
-      base44.entities.MathTool.list('name', 200),
-      base44.entities.Problem.list('-created_date', 1000),
-      base44.entities.BookmarkedProblem.filter({ user_id: user.id }, '-created_date', 500),
-    ]);
-    setDomains(allDomains);
-    setTools(allTools);
-    setProblems(allProblems);
-    const bSet = new Set(myBookmarks.map(b => b.problem_id));
-    const bMap = new Map(myBookmarks.map(b => [b.problem_id, b.id]));
-    setBookmarkedProblemIds(bSet);
-    setBookmarkIdMap(bMap);
-    setLoading(false);
+    try {
+      const [allDomains, allTools, allProblems, allSolutions, myBookmarks] = await Promise.all([
+        base44.entities.Domain.list('grade_range', 50),
+        base44.entities.MathTool.list('name', 200),
+        base44.entities.Problem.list('-created_date', 1000),
+        base44.entities.Solution.list('-created_date', 2000),
+        base44.entities.BookmarkedProblem.filter({ user_id: user.id }, '-created_date', 500),
+      ]);
+
+      // Domain: grade_range 기준 정렬 (숫자 먼저, 그 다음 나머지)
+      const sortedDomains = [...allDomains].sort((a, b) => {
+        const ga = a.grade_range || '';
+        const gb = b.grade_range || '';
+        const na = parseFloat(ga) || 999;
+        const nb = parseFloat(gb) || 999;
+        if (na !== nb) return na - nb;
+        return ga.localeCompare(gb, 'ko');
+      });
+
+      // Solution count per problem_id
+      const countMap = new Map();
+      allSolutions.forEach(s => {
+        countMap.set(s.problem_id, (countMap.get(s.problem_id) || 0) + 1);
+      });
+
+      setDomains(sortedDomains);
+      setTools(allTools);
+      setProblems(allProblems);
+      setSolutionCountMap(countMap);
+      setBookmarkedProblemIds(new Set(myBookmarks.map(b => b.problem_id)));
+      setBookmarkIdMap(new Map(myBookmarks.map(b => [b.problem_id, b.id])));
+    } catch {
+      toast.error('데이터를 불러오지 못했어요');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Compute tools per domain
   const toolsForDomain = (domain) => {
     return tools.filter(t => {
       try {
@@ -57,7 +78,6 @@ export default function TeacherProblems() {
     });
   };
 
-  // Problems for a tool
   const problemsForTool = (tool) => {
     return problems.filter(p => {
       try {
@@ -67,16 +87,6 @@ export default function TeacherProblems() {
     });
   };
 
-  const handleSelectDomain = (domain) => {
-    setSelectedDomain(domain);
-    setStep('tool');
-  };
-
-  const handleSelectTool = (tool) => {
-    setSelectedTool(tool);
-    setStep('problem');
-  };
-
   const handleBack = () => {
     if (step === 'tool') { setStep('domain'); setSelectedDomain(null); }
     else if (step === 'problem') { setStep('tool'); setSelectedTool(null); }
@@ -84,30 +94,33 @@ export default function TeacherProblems() {
 
   const toggleBookmark = async (problem) => {
     const pid = problem.problem_id;
-    if (bookmarkedProblemIds.has(pid)) {
-      const bId = bookmarkIdMap.get(pid);
-      if (!bId) return;
-      await base44.entities.BookmarkedProblem.delete(bId);
-      setBookmarkedProblemIds(prev => { const s = new Set(prev); s.delete(pid); return s; });
-      setBookmarkIdMap(prev => { const m = new Map(prev); m.delete(pid); return m; });
-      toast.success('즐겨찾기 해제했어요');
-    } else {
-      // get preview text from content
-      let preview = '';
-      try {
-        const blocks = JSON.parse(problem.content || '[]');
-        preview = blocks.map(b => b.text || '').join(' ').slice(0, 100);
-      } catch { preview = (problem.content || '').slice(0, 100); }
+    try {
+      if (bookmarkedProblemIds.has(pid)) {
+        const bId = bookmarkIdMap.get(pid);
+        if (!bId) return;
+        await base44.entities.BookmarkedProblem.delete(bId);
+        setBookmarkedProblemIds(prev => { const s = new Set(prev); s.delete(pid); return s; });
+        setBookmarkIdMap(prev => { const m = new Map(prev); m.delete(pid); return m; });
+        toast.success('즐겨찾기 해제했어요');
+      } else {
+        let preview = '';
+        try {
+          const blocks = JSON.parse(problem.content || '[]');
+          preview = blocks.map(b => b.text || '').join(' ').slice(0, 100);
+        } catch { preview = (problem.content || '').slice(0, 100); }
 
-      const created = await base44.entities.BookmarkedProblem.create({
-        user_id: user.id,
-        problem_id: pid,
-        problem_content_preview: preview,
-        problem_domain: problem.domain_name || '',
-      });
-      setBookmarkedProblemIds(prev => new Set([...prev, pid]));
-      setBookmarkIdMap(prev => new Map(prev).set(pid, created.id));
-      toast.success('즐겨찾기에 추가했어요');
+        const created = await base44.entities.BookmarkedProblem.create({
+          user_id: user.id,
+          problem_id: pid,
+          problem_content_preview: preview,
+          problem_domain: problem.domain_name || '',
+        });
+        setBookmarkedProblemIds(prev => new Set([...prev, pid]));
+        setBookmarkIdMap(prev => new Map(prev).set(pid, created.id));
+        toast.success('즐겨찾기에 추가했어요');
+      }
+    } catch {
+      toast.error('즐겨찾기 처리 중 오류가 발생했어요');
     }
   };
 
@@ -117,14 +130,12 @@ export default function TeacherProblems() {
   if (step === 'domain') {
     return (
       <div className="space-y-5 pb-8">
-        <div className="flex items-center gap-3">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <BookOpen className="w-6 h-6 text-primary" />
-              문제 열람
-            </h1>
-            <p className="text-sm text-muted-foreground mt-0.5">단원을 선택하세요</p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <BookOpen className="w-6 h-6 text-primary" />
+            문제 열람
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">단원을 선택하세요</p>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {domains.map(domain => {
@@ -133,9 +144,12 @@ export default function TeacherProblems() {
               <Card
                 key={domain.id}
                 className="p-4 cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all"
-                onClick={() => handleSelectDomain(domain)}
+                onClick={() => { setSelectedDomain(domain); setStep('tool'); }}
               >
-                <p className="font-semibold text-foreground text-sm leading-snug">{domain.name}</p>
+                {domain.grade_range && (
+                  <span className="text-xs text-muted-foreground font-mono">{domain.grade_range}학년</span>
+                )}
+                <p className="font-semibold text-foreground text-sm leading-snug mt-0.5">{domain.name}</p>
                 {domain.name_en && <p className="text-xs text-muted-foreground mt-0.5">{domain.name_en}</p>}
                 <div className="flex items-center gap-1 mt-3 text-xs text-primary">
                   <Wrench className="w-3 h-3" />
@@ -174,7 +188,7 @@ export default function TeacherProblems() {
                 <Card
                   key={tool.id}
                   className="p-4 cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all"
-                  onClick={() => handleSelectTool(tool)}
+                  onClick={() => { setSelectedTool(tool); setStep('problem'); }}
                 >
                   <div className="flex items-start gap-3">
                     <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -226,6 +240,7 @@ export default function TeacherProblems() {
               preview = blocks.map(b => b.text || '').join(' ');
             } catch { preview = problem.content || ''; }
             const isBookmarked = bookmarkedProblemIds.has(problem.problem_id);
+            const solCount = solutionCountMap.get(problem.problem_id) || 0;
 
             return (
               <Card
@@ -235,7 +250,14 @@ export default function TeacherProblems() {
               >
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs text-muted-foreground font-mono mb-1">{problem.problem_id}</p>
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="text-xs text-muted-foreground font-mono">{problem.problem_id}</p>
+                      {solCount > 0 && (
+                        <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">
+                          풀이 {solCount}개
+                        </span>
+                      )}
+                    </div>
                     {problem.domain_name && (
                       <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full mb-1 inline-block">
                         {problem.domain_name}

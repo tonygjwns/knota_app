@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { useTeacher } from '@/lib/TeacherContext';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
-import { ArrowLeft, ChevronDown, User } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronUp, User, Star, Wrench } from 'lucide-react';
 import { toast } from 'sonner';
 import MathRenderer from '@/components/MathRenderer';
 
@@ -18,60 +19,174 @@ const parseProblemText = (content) => {
   }
 };
 
+const parseContents = (c) => {
+  try {
+    const arr = JSON.parse(c || '[]');
+    return arr.map(b => b.text || '').join('\n\n');
+  } catch { return c || ''; }
+};
+
+// ── 별해 카드 (accordion) ──
+function SolutionCard({ solution, steps, toolMap, defaultOpen }) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  const sortedSteps = [...steps].sort((a, b) => a.sequence_order - b.sequence_order);
+  const bodyText = parseContents(solution.contents);
+
+  return (
+    <div className="rounded-xl border overflow-hidden">
+      {/* 헤더 */}
+      <button
+        className="w-full p-4 flex items-center justify-between bg-muted/30 hover:bg-muted/50 transition-colors text-left"
+        onClick={() => setOpen(o => !o)}
+      >
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-sm">풀이 #{solution.priority}</span>
+          {solution.priority === 1 && (
+            <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">대표</span>
+          )}
+          <span className="text-xs text-muted-foreground">({sortedSteps.length}단계)</span>
+        </div>
+        {open ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+      </button>
+
+      {open && (
+        <div className="p-4 space-y-4 border-t">
+          {/* 풀이 본문 */}
+          {bodyText && (
+            <div className="prose prose-sm max-w-none">
+              <MathRenderer content={bodyText} />
+            </div>
+          )}
+
+          {/* 단계별 도구 흐름 */}
+          {sortedSteps.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">단계별 도구 흐름</p>
+              <div className="space-y-2">
+                {sortedSteps.map(step => {
+                  const tool = toolMap.get(step.tool_id);
+                  return (
+                    <div key={step.id} className="rounded-lg border bg-background p-3 space-y-2">
+                      {/* step 헤더 */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground font-mono flex-shrink-0">Step {step.sequence_order}</span>
+                        {tool && (
+                          <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                            <Wrench className="w-3 h-3" />
+                            {tool.name}
+                          </span>
+                        )}
+                        {!tool && step.tool_id && (
+                          <span className="text-xs text-muted-foreground font-mono">{step.tool_id}</span>
+                        )}
+                      </div>
+                      {/* 선택 사유 */}
+                      {step.reason && (
+                        <p className="text-xs text-muted-foreground leading-relaxed">{step.reason}</p>
+                      )}
+                      {/* 적용 */}
+                      {step.application && (
+                        <div className="bg-muted/40 rounded-lg p-2">
+                          <MathRenderer content={step.application} />
+                        </div>
+                      )}
+                      {/* 결과 요약 */}
+                      {step.appended_info && (
+                        <p className="text-xs text-muted-foreground italic">{step.appended_info}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ProblemDetail({ mode = 'admin' }) {
   const { problemId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { data: teacherData } = useTeacher();
 
   const [problem, setProblems] = useState(null);
   const [attempts, setAttempts] = useState([]);
   const [tools, setTools] = useState([]);
   const [users, setUsers] = useState([]);
+  const [solutions, setSolutions] = useState([]);
+  const [solutionSteps, setSolutionSteps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sortKey, setSortKey] = useState('submitted_at');
   const [pageIdx, setPageIdx] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
+
+  // 즐겨찾기 상태 (teacher mode)
+  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [bookmarkRecordId, setBookmarkRecordId] = useState(null);
+
   const PAGE_SIZE = 20;
 
   useEffect(() => {
     const load = async () => {
       try {
-        // 문제 fetch (entity id 또는 snapshot UUID 모두 지원)
+        // 문제 fetch
         let problemsData = await base44.entities.Problem.filter({ id: problemId });
         if (problemsData.length === 0) {
-          // Fallback: snapshot UUID 양식 시도
           problemsData = await base44.entities.Problem.filter({ problem_id: problemId });
         }
         if (problemsData.length === 0) throw new Error('문제를 찾을 수 없어요');
-        setProblems(problemsData[0]);
+        const prob = problemsData[0];
+        setProblems(prob);
 
-        // 모든 시도 fetch
-        const allAttempts = await base44.entities.StudentAttempt.filter(
-          { problem_id: problemId },
-          '-submitted_at',
-          1000
-        );
+        // 병렬 fetch: 시도 + 도구 + 별해 + (강사 즐겨찾기)
+        const fetchPromises = [
+          base44.entities.StudentAttempt.filter({ problem_id: problemId }, '-submitted_at', 1000),
+          base44.entities.MathTool.list(),
+          base44.entities.Solution.filter({ problem_id: prob.problem_id }, 'priority', 100),
+        ];
+        if (mode === 'teacher' && user) {
+          fetchPromises.push(
+            base44.entities.BookmarkedProblem.filter({ user_id: user.id, problem_id: prob.problem_id }, '-created_date', 1)
+          );
+        }
 
-        // teacher mode: 내 학생들의 시도만
+        const results = await Promise.all(fetchPromises);
+        const [allAttempts, toolsData, sols, bmData] = results;
+
+        // 강사 즐겨찾기 초기화
+        if (mode === 'teacher' && bmData && bmData.length > 0) {
+          setIsBookmarked(true);
+          setBookmarkRecordId(bmData[0].id);
+        }
+
+        // 별해 steps fetch
+        if (sols.length > 0) {
+          const allSteps = await Promise.all(
+            sols.map(s => base44.entities.SolutionStep.filter({ solution_id: s.solution_id }, 'sequence_order', 50))
+          );
+          setSolutionSteps(allSteps.flat());
+        }
+        setSolutions(sols);
+
+        // teacher mode: 내 학생 필터
         let filteredAttempts = allAttempts;
         if (mode === 'teacher' && teacherData?.my_students) {
           const myStudentIds = new Set(teacherData.my_students.map(s => s.id));
           filteredAttempts = allAttempts.filter(a => myStudentIds.has(a.student_id));
         }
         setAttempts(filteredAttempts);
-
-        // 도구 fetch
-        const toolsData = await base44.entities.MathTool.list();
         setTools(toolsData);
 
-        // 학생 정보 fetch (mode 별 분기)
+        // 학생 정보 fetch
         if (filteredAttempts.length > 0) {
           if (mode === 'teacher') {
-            // 캐시된 my_students 사용 (User.filter 호출 안 함)
             setUsers(teacherData?.my_students || []);
           } else {
-            // admin mode 는 User entity 접근 가능
             const studentIds = [...new Set(filteredAttempts.map(a => a.student_id))];
             const usersData = await Promise.all(
               studentIds.map(id => base44.entities.User.filter({ id }))
@@ -88,11 +203,39 @@ export default function ProblemDetail({ mode = 'admin' }) {
     load();
   }, [problemId, mode, teacherData]);
 
+  const toggleBookmark = async () => {
+    if (!user || !problem) return;
+    try {
+      if (isBookmarked) {
+        await base44.entities.BookmarkedProblem.delete(bookmarkRecordId);
+        setIsBookmarked(false);
+        setBookmarkRecordId(null);
+        toast.success('즐겨찾기 해제했어요');
+      } else {
+        let preview = '';
+        try {
+          const blocks = JSON.parse(problem.content || '[]');
+          preview = blocks.map(b => b.text || '').join(' ').slice(0, 100);
+        } catch { preview = (problem.content || '').slice(0, 100); }
+        const created = await base44.entities.BookmarkedProblem.create({
+          user_id: user.id,
+          problem_id: problem.problem_id,
+          problem_content_preview: preview,
+          problem_domain: problem.domain_name || '',
+        });
+        setIsBookmarked(true);
+        setBookmarkRecordId(created.id);
+        toast.success('즐겨찾기에 추가했어요');
+      }
+    } catch {
+      toast.error('즐겨찾기 처리 중 오류가 발생했어요');
+    }
+  };
+
   if (loading) return <InlineLoader message="문제 정보 불러오는 중..." />;
   if (error) return <div className="text-center py-12 text-red-500">{error}</div>;
   if (!problem) return null;
 
-  // 정렬
   const sorted = [...attempts].sort((a, b) => {
     if (sortKey === 'submitted_at') return new Date(b.submitted_at) - new Date(a.submitted_at);
     if (sortKey === 'score_high') return b.score - a.score;
@@ -102,7 +245,6 @@ export default function ProblemDetail({ mode = 'admin' }) {
   const paged = sorted.slice(pageIdx * PAGE_SIZE, (pageIdx + 1) * PAGE_SIZE);
   const maxPage = Math.ceil(sorted.length / PAGE_SIZE);
 
-  // 통계
   const stats = {
     total: attempts.length,
     correct: attempts.filter(a => a.correctness === 'correct').length,
@@ -110,11 +252,9 @@ export default function ProblemDetail({ mode = 'admin' }) {
     avg_score: attempts.length > 0 ? Math.round(attempts.reduce((s, a) => s + (a.score || 0), 0) / attempts.length) : 0
   };
 
-  // 도구 매핑
   const toolIds = problem.tool_ids ? JSON.parse(problem.tool_ids) : [];
-  const toolNames = toolIds
-    .map(id => tools.find(t => t.tool_id === id)?.name || id)
-    .filter(Boolean);
+  const toolNames = toolIds.map(id => tools.find(t => t.tool_id === id)?.name || id).filter(Boolean);
+  const toolMap = new Map(tools.map(t => [t.tool_id, t]));
 
   return (
     <div className="space-y-6 pb-10">
@@ -123,7 +263,7 @@ export default function ProblemDetail({ mode = 'admin' }) {
         <button onClick={() => navigate(-1)} className="p-1.5 rounded-lg hover:bg-muted">
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <div>
+        <div className="flex-1 min-w-0">
           <p className="text-xs text-muted-foreground">문제 ID: {problem.problem_id}</p>
           <h1 className="text-xl font-bold">{problem.domain_name || '(도메인 없음)'}</h1>
           {toolNames.length > 0 && (
@@ -136,6 +276,16 @@ export default function ProblemDetail({ mode = 'admin' }) {
             </div>
           )}
         </div>
+        {/* 즐겨찾기 (teacher mode only) */}
+        {mode === 'teacher' && (
+          <button
+            onClick={toggleBookmark}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border hover:bg-muted transition-colors text-sm flex-shrink-0"
+          >
+            <Star className={`w-4 h-4 ${isBookmarked ? 'fill-amber-500 text-amber-500' : 'text-muted-foreground'}`} />
+            <span className="text-xs text-muted-foreground">{isBookmarked ? '저장됨' : '저장'}</span>
+          </button>
+        )}
       </div>
 
       {/* 문제 본문 */}
@@ -166,6 +316,32 @@ export default function ProblemDetail({ mode = 'admin' }) {
           )}
         </Card>
       )}
+
+      {/* 별해 섹션 */}
+      <Card className="p-4">
+        <h2 className="font-semibold mb-3 flex items-center gap-2">
+          풀이
+          <span className="text-xs bg-muted px-2 py-0.5 rounded text-muted-foreground">{solutions.length}개</span>
+        </h2>
+        {solutions.length === 0 ? (
+          <p className="text-sm text-muted-foreground">별해 데이터 없음</p>
+        ) : (
+          <div className="space-y-3">
+            {solutions.map((sol, idx) => {
+              const steps = solutionSteps.filter(s => s.solution_id === sol.solution_id);
+              return (
+                <SolutionCard
+                  key={sol.id}
+                  solution={sol}
+                  steps={steps}
+                  toolMap={toolMap}
+                  defaultOpen={idx === 0}
+                />
+              );
+            })}
+          </div>
+        )}
+      </Card>
 
       {/* 통계 */}
       <div className="grid grid-cols-3 gap-3">
