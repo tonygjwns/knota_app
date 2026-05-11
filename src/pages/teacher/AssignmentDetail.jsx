@@ -6,7 +6,8 @@ import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, MoreVertical } from 'lucide-react';
+import { ArrowLeft, MoreVertical, ChevronDown, ChevronUp } from 'lucide-react';
+import AssignmentProblemStats from '@/components/AssignmentProblemStats';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,6 +47,10 @@ export default function AssignmentDetail() {
   const [error, setError] = useState(null);
   const [showEditForm, setShowEditForm] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
+  const [solByProblem, setSolByProblem] = useState(new Map());
+  const [stepsBySol, setStepsBySol] = useState(new Map());
+  const [toolMap, setToolMap] = useState(new Map());
+  const [expandedProblemId, setExpandedProblemId] = useState(null);
 
   useEffect(() => {
     const load = async () => {
@@ -58,10 +63,41 @@ export default function AssignmentDetail() {
 
         // 문제 fetch
         const problemIds = JSON.parse(assignmentData.problem_ids || '[]');
+        let filteredProblems = [];
         if (problemIds.length > 0) {
           const problemsData = await base44.entities.Problem.filter({}, '-created_date', 1000);
-          const filteredProblems = problemsData.filter(p => problemIds.includes(p.id));
+          filteredProblems = problemsData.filter(p => problemIds.includes(p.id));
           setProblems(filteredProblems);
+
+          // Solution + SolutionStep fetch
+          const problemVarchars = filteredProblems.map(p => p.problem_id).filter(Boolean);
+          if (problemVarchars.length > 0) {
+            const [allTools, solArrays] = await Promise.all([
+              base44.entities.MathTool.list('name', 100),
+              Promise.all(problemVarchars.map(pv =>
+                base44.entities.Solution.filter({ problem_id: pv }, 'priority', 20)
+              )),
+            ]);
+
+            const newToolMap = new Map(allTools.map(t => [t.tool_id, t]));
+            setToolMap(newToolMap);
+
+            const newSolByProblem = new Map();
+            problemVarchars.forEach((pv, i) => newSolByProblem.set(pv, solArrays[i]));
+            setSolByProblem(newSolByProblem);
+
+            const allSolIds = solArrays.flat().map(s => s.solution_id);
+            if (allSolIds.length > 0) {
+              const stepArrays = await Promise.all(
+                allSolIds.map(sid =>
+                  base44.entities.SolutionStep.filter({ solution_id: sid }, 'sequence_order', 50)
+                )
+              );
+              const newStepsBySol = new Map();
+              allSolIds.forEach((sid, i) => newStepsBySol.set(sid, stepArrays[i]));
+              setStepsBySol(newStepsBySol);
+            }
+          }
         }
 
         // 학급의 학생들 찾기
@@ -209,27 +245,51 @@ export default function AssignmentDetail() {
         </Card>
       )}
 
-      {/* 출제된 문제 리스트 */}
+      {/* 출제된 문제 리스트 — accordion */}
       <div>
         <h2 className="text-lg font-semibold mb-3">출제된 문제 ({problems.length}개)</h2>
         <div className="grid gap-3">
-          {problems.map(p => (
-            <Card
-              key={p.id}
-              className="p-3 cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => navigate(`/teacher/problems/${p.id}`)}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-mono text-muted-foreground mb-1">{p.id.slice(0, 8)}...</p>
-                  <p className="text-sm font-medium mb-1">{p.domain_name || '(도메인 없음)'}</p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {parseProblemText(p.content).substring(0, 80)}...
-                  </p>
-                </div>
-              </div>
-            </Card>
-          ))}
+          {problems.map(p => {
+            const isOpen = expandedProblemId === p.id;
+            // 이 문제에 대한 이번 숙제의 attempts
+            const problemAttempts = studentSubmissions
+              .flatMap(s => s.attempts)
+              .filter(a => a.problem_id === p.id);
+            const solutions = solByProblem.get(p.problem_id) || [];
+            return (
+              <Card key={p.id} className="overflow-hidden">
+                <button
+                  className="w-full p-3 text-left hover:bg-muted/30 transition-colors"
+                  onClick={() => setExpandedProblemId(isOpen ? null : p.id)}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-mono text-muted-foreground mb-1">{p.id.slice(0, 8)}...</p>
+                      <p className="text-sm font-medium mb-1">{p.domain_name || '(도메인 없음)'}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {parseProblemText(p.content).substring(0, 80)}...
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs text-muted-foreground">{problemAttempts.length}건</span>
+                      {isOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                    </div>
+                  </div>
+                </button>
+                {isOpen && (
+                  <div className="border-t px-4 pb-4">
+                    <AssignmentProblemStats
+                      problem={p}
+                      attempts={problemAttempts}
+                      solutions={solutions}
+                      stepsBySol={stepsBySol}
+                      toolMap={toolMap}
+                    />
+                  </div>
+                )}
+              </Card>
+            );
+          })}
         </div>
       </div>
 
