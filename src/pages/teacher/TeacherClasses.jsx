@@ -4,8 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { BookOpen, Users, ChevronRight, Plus } from 'lucide-react';
+import { BookOpen, Users, ChevronRight, Plus, Key } from 'lucide-react';
 import AssignmentForm from '@/components/AssignmentForm';
+import InviteCodeManager from '@/components/InviteCodeManager';
 import { base44 } from '@/api/base44Client';
 
 export default function TeacherClasses() {
@@ -13,6 +14,7 @@ export default function TeacherClasses() {
   const navigate = useNavigate();
   const [showForm, setShowForm] = useState(false);
   const [selectedClassId, setSelectedClassId] = useState(null);
+  const [expandedCodeClass, setExpandedCodeClass] = useState(null);
 
   if (loading) return <InlineLoader message="학급 목록 불러오는 중..." />;
   if (!data) return <InlineLoader message="초기화 중..." />;
@@ -60,21 +62,40 @@ export default function TeacherClasses() {
                  </div>
                  <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                </div>
-               <Button
-                 variant="outline"
-                 size="sm"
-                 className="gap-1"
-                 onClick={e => {
-                   e.stopPropagation();
-                   setSelectedClassId(cls.id);
-                   setShowForm(true);
-                 }}
-               >
-                 <Plus className="w-4 h-4" />
-                 숙제 만들기
-               </Button>
-             </div>
-           </Card>
+               <div className="flex gap-2">
+                 <Button
+                   variant="outline"
+                   size="sm"
+                   className="gap-1"
+                   onClick={e => {
+                     e.stopPropagation();
+                     setExpandedCodeClass(expandedCodeClass === cls.id ? null : cls.id);
+                   }}
+                 >
+                   <Key className="w-4 h-4" />
+                   초대코드
+                 </Button>
+                 <Button
+                   variant="outline"
+                   size="sm"
+                   className="gap-1"
+                   onClick={e => {
+                     e.stopPropagation();
+                     setSelectedClassId(cls.id);
+                     setShowForm(true);
+                   }}
+                 >
+                   <Plus className="w-4 h-4" />
+                   숙제 만들기
+                 </Button>
+               </div>
+               </div>
+               {expandedCodeClass === cls.id && (
+               <div className="mt-3 pt-3 border-t border-border">
+                 <InviteCodeManager classId={cls.id} academyId={cls.academy_id} />
+               </div>
+               )}
+               </Card>
          ))}
        </div>
 

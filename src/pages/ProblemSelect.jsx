@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import ScoreBadge from '@/components/ScoreBadge';
-import { Shuffle, BookOpen, Wrench, AlertCircle, ChevronRight, ArrowLeft, Clock, ClipboardList, CheckCircle, Star } from 'lucide-react';
+import { Shuffle, BookOpen, Wrench, AlertCircle, ChevronRight, ArrowLeft, Clock, ClipboardList, Star } from 'lucide-react';
 
 // ──────────────────────────────────────────────
 // Hub placeholder card
@@ -357,7 +357,7 @@ function ProblemHub() {
 
         {/* 오늘의 추천 */}
         <section className="space-y-2">
-          <h2 className="text-base font-semibold text-foreground">오늘의 추천</h2>
+          <h2 className="text-base font-semibold text-foreground">추천 문제</h2>
           {recsLoading ? (
             <div className="text-center py-6"><InlineLoader message="추천 문제 불러오는 중..." /></div>
           ) : recommendedProblems.length === 0 ? (
@@ -367,17 +367,21 @@ function ProblemHub() {
             />
           ) : (
             <div className="space-y-2">
-              {recommendedProblems.slice(0, 5).map(problem => (
+              {recommendedProblems.slice(0, 5).map((problem, idx) => (
                 <Link key={problem.id} to={`/problem/${problem.id}`}>
                   <Card className="p-4 card-hover cursor-pointer">
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <Star className="w-4 h-4 text-primary" />
+                      </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm text-foreground line-clamp-2">
-                          {problem.content ? (problem.content.length > 100 ? problem.content.substring(0, 100) + '...' : problem.content) : `문제 #${problem.id}`}
-                        </p>
-                        {problem.domain_name && (
-                          <p className="text-xs text-muted-foreground mt-1">{problem.domain_name}</p>
-                        )}
+                        <div className="flex items-center gap-2 mb-0.5">
+                          {problem.domain_name && (
+                            <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">{problem.domain_name}</span>
+                          )}
+                        </div>
+                        <p className="text-sm font-medium text-foreground">추천 문제 {idx + 1}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">탭해서 풀기</p>
                       </div>
                       <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                     </div>
@@ -619,8 +623,8 @@ function ProblemModeView({ mode, user, navigate }) {
                 ) : (
                   <div className="space-y-2">
                     {domains.map(domain => (
-                      <Card key={domain.id} className="p-4 card-hover cursor-pointer"
-                            onClick={() => handleDomainSelect(domain)}>
+                     <Card key={domain.id} className="p-4 card-hover cursor-pointer"
+                           onClick={() => handleDomainSelect(domain)}>
                         <div className="flex items-center justify-between">
                           <div>
                             <p className="font-semibold text-foreground">{domain.name}</p>
@@ -628,14 +632,7 @@ function ProblemModeView({ mode, user, navigate }) {
                               <p className="text-xs text-muted-foreground mt-0.5">{domain.grade_range}학년</p>
                             )}
                           </div>
-                          <div className="flex items-center gap-2">
-                            {domain.problem_count && (
-                              <span className="text-xs bg-muted px-2 py-1 rounded-full text-muted-foreground">
-                                {domain.problem_count}문제
-                              </span>
-                            )}
-                            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                          </div>
+                          <ChevronRight className="w-4 h-4 text-muted-foreground" />
                         </div>
                       </Card>
                     ))}

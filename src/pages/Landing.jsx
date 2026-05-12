@@ -23,13 +23,9 @@ export default function Landing() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
+  const [inviteCode, setInviteCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  // OTP state
-  const [otpMode, setOtpMode] = useState(false);
-  const [otpCode, setOtpCode] = useState('');
-  const [otpLoading, setOtpLoading] = useState(false);
 
   useEffect(() => {
     base44.auth.isAuthenticated().then(authed => {
@@ -47,28 +43,48 @@ export default function Landing() {
     setLoading(true);
     setError('');
     try {
+      // Register
       await base44.auth.register({ email, password });
-      // Set name and role after registration
       await base44.auth.loginViaEmailPassword(email, password);
-      await base44.auth.updateMe({ full_name: fullName, role, approval_status: 'pending' });
-      setOtpMode(true);
+
+      // Build user data
+      const userData = { full_name: fullName, role, approval_status: 'pending' };
+
+      // Process invite code if provided
+      if (inviteCode.trim()) {
+        const code = inviteCode.trim().toUpperCase();
+        const matches = await base44.asServiceRole
+          ? null // frontend can't use asServiceRole, will handle via filter
+          : null;
+
+        // Try to find matching invite code
+        try {
+          const codes = await base44.entities.InviteCode.filter(
+            { code, is_active: true }, '-created_date', 1
+          );
+          if (codes.length > 0) {
+            const c = codes[0];
+            userData.academy_id = c.academy_id;
+            if (c.class_id) userData.class_id = c.class_id;
+            if (c.role) userData.role = c.role;
+            // Increment use count
+            await base44.entities.InviteCode.update(c.id, { use_count: (c.use_count || 0) + 1 });
+          } else {
+            setError('유효하지 않은 코드예요. 코드를 확인해 주세요.');
+            setLoading(false);
+            return;
+          }
+        } catch (codeErr) {
+          // Code lookup failed, continue without code
+        }
+      }
+
+      await base44.auth.updateMe(userData);
+      navigate('/home', { replace: true });
     } catch (err) {
       setError(err?.response?.data?.detail || err?.message || '회원가입에 실패했어요. 다시 시도해 주세요.');
     }
     setLoading(false);
-  };
-
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault();
-    setOtpLoading(true);
-    setError('');
-    try {
-      await base44.auth.verifyOtp({ email, otpCode });
-      navigate('/home', { replace: true });
-    } catch (err) {
-      setError('인증 코드가 올바르지 않아요. 다시 확인해 주세요.');
-    }
-    setOtpLoading(false);
   };
 
   if (mode === 'signup') {
@@ -83,18 +99,98 @@ export default function Landing() {
             <span className="font-bold text-foreground text-lg">KNOTA</span>
           </div>
 
-          {!otpMode ? (
-            <form onSubmit={handleSignup} className="space-y-4">
-              <div>
-                <h2 className="text-2xl font-bold">회원가입</h2>
-                <p className="text-muted-foreground text-sm mt-1">아래 정보를 입력해 주세요</p>
+          <form onSubmit={handleSignup} className="space-y-4">
+            <div>
+              <h2 className="text-2xl font-bold">회원가입</h2>
+              <p className="text-muted-foreground text-sm mt-1">아래 정보를 입력해 주세요</p>
+            </div>
+
+            {/* Name */}
+            <div>
+              <label className="text-sm font-medium block mb-1">이름</label>
+              <Input
+                placeholder="홍길동"
+                value={fullName}
+                onChange={e => setFullName(e.target.value)}
+                required
+              />
+            </div>
+
+            {/* Email */}
+            <div>
+              <label className="text-sm font-medium block mb-1">이메일</label>
+              <Input
+                type="email"
+                placeholder="example@email.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+              />
+            </div>
+
+            {/* Password */}
+            <div>
+              <label className="text-sm font-medium block mb-1">비밀번호</label>
+              <div className="relative">
+                <Input
+                  type={showPw ? 'text' : 'password'}
+                  placeholder="6자 이상"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPw(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
+            </div>
+
+            {/* Confirm password */}
+            <div>
+              <label className="text-sm font-medium block mb-1">비밀번호 확인</label>
+              <div className="relative">
+                <Input
+                  type={showConfirmPw ? 'text' : 'password'}
+                  placeholder="비밀번호를 다시 입력해 주세요"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  required
+                  className={`pr-10 ${passwordMismatch ? 'border-red-400 focus-visible:ring-red-400' : passwordMatch ? 'border-emerald-400 focus-visible:ring-emerald-400' : ''}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPw(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showConfirmPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              {passwordMatch && (
+                <p className="flex items-center gap-1 text-xs text-emerald-600 mt-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> 비밀번호가 일치해요
+                </p>
+              )}
+              {passwordMismatch && (
+                <p className="flex items-center gap-1 text-xs text-red-500 mt-1">
+                  <XCircle className="w-3.5 h-3.5" /> 비밀번호가 일치하지 않아요
+                </p>
+              )}
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-border pt-2">
+              <p className="text-xs text-muted-foreground mb-3">학원/강사 초대코드가 있으신가요? (선택)</p>
 
               {/* Role selection */}
-              <div>
+              <div className="mb-3">
                 <label className="text-sm font-medium block mb-2">가입 유형</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {[{ value: 'student', label: '학생' }, { value: 'teacher', label: '강사' }].map(r => (
+                  {[{ value: 'student', label: '🎒 학생' }, { value: 'teacher', label: '👩‍🏫 강사' }].map(r => (
                     <button
                       key={r.value}
                       type="button"
@@ -109,133 +205,39 @@ export default function Landing() {
                     </button>
                   ))}
                 </div>
+                <p className="text-xs text-muted-foreground mt-1">코드 입력 시 코드에 설정된 역할이 자동 적용돼요</p>
               </div>
 
-              {/* Name */}
+              {/* Invite code */}
               <div>
-                <label className="text-sm font-medium block mb-1">이름</label>
+                <label className="text-sm font-medium block mb-1">초대코드</label>
                 <Input
-                  placeholder="홍길동"
-                  value={fullName}
-                  onChange={e => setFullName(e.target.value)}
-                  required
+                  placeholder="학원코드 또는 학급코드 입력 (선택)"
+                  value={inviteCode}
+                  onChange={e => setInviteCode(e.target.value.toUpperCase())}
+                  className="tracking-widest font-mono"
+                  maxLength={8}
                 />
+                <p className="text-xs text-muted-foreground mt-1">코드 입력 시 해당 학급/학원에 자동으로 소속돼요</p>
               </div>
+            </div>
 
-              {/* Email */}
-              <div>
-                <label className="text-sm font-medium block mb-1">이메일</label>
-                <Input
-                  type="email"
-                  placeholder="example@email.com"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  required
-                />
-              </div>
+            {error && <p className="text-sm text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
 
-              {/* Password */}
-              <div>
-                <label className="text-sm font-medium block mb-1">비밀번호</label>
-                <div className="relative">
-                  <Input
-                    type={showPw ? 'text' : 'password'}
-                    placeholder="6자 이상"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    required
-                    className="pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPw(v => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? '가입 중...' : '회원가입'}
+            </Button>
 
-              {/* Confirm password */}
-              <div>
-                <label className="text-sm font-medium block mb-1">비밀번호 확인</label>
-                <div className="relative">
-                  <Input
-                    type={showConfirmPw ? 'text' : 'password'}
-                    placeholder="비밀번호를 다시 입력해 주세요"
-                    value={confirmPassword}
-                    onChange={e => setConfirmPassword(e.target.value)}
-                    required
-                    className={`pr-10 ${passwordMismatch ? 'border-red-400 focus-visible:ring-red-400' : passwordMatch ? 'border-emerald-400 focus-visible:ring-emerald-400' : ''}`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPw(v => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {showConfirmPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-                {passwordMatch && (
-                  <p className="flex items-center gap-1 text-xs text-emerald-600 mt-1">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> 비밀번호가 일치해요
-                  </p>
-                )}
-                {passwordMismatch && (
-                  <p className="flex items-center gap-1 text-xs text-red-500 mt-1">
-                    <XCircle className="w-3.5 h-3.5" /> 비밀번호가 일치하지 않아요
-                  </p>
-                )}
-              </div>
-
-              {error && <p className="text-sm text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
-
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? '가입 중...' : '회원가입'}
-              </Button>
-
-              <p className="text-center text-sm text-muted-foreground">
-                이미 계정이 있으신가요?{' '}
-                <button type="button" onClick={() => base44.auth.redirectToLogin('/home')} className="text-primary hover:underline font-medium">
-                  로그인
-                </button>
-              </p>
-              <button type="button" onClick={() => setMode('home')} className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors">
-                ← 처음으로
+            <p className="text-center text-sm text-muted-foreground">
+              이미 계정이 있으신가요?{' '}
+              <button type="button" onClick={() => base44.auth.redirectToLogin('/home')} className="text-primary hover:underline font-medium">
+                로그인
               </button>
-            </form>
-          ) : (
-            <form onSubmit={handleVerifyOtp} className="space-y-4">
-              <div>
-                <h2 className="text-2xl font-bold">이메일 인증</h2>
-                <p className="text-muted-foreground text-sm mt-1">
-                  <span className="font-medium text-foreground">{email}</span>로 발송된 인증 코드를 입력해 주세요
-                </p>
-              </div>
-              <div>
-                <label className="text-sm font-medium block mb-1">인증 코드</label>
-                <Input
-                  placeholder="123456"
-                  value={otpCode}
-                  onChange={e => setOtpCode(e.target.value)}
-                  required
-                  className="text-center text-xl tracking-widest"
-                  maxLength={6}
-                />
-              </div>
-              {error && <p className="text-sm text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
-              <Button type="submit" className="w-full" disabled={otpLoading}>
-                {otpLoading ? '확인 중...' : '인증 완료'}
-              </Button>
-              <button
-                type="button"
-                onClick={async () => { await base44.auth.resendOtp(email); alert('인증 코드를 다시 발송했어요.'); }}
-                className="w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                코드 재발송
-              </button>
-            </form>
-          )}
+            </p>
+            <button type="button" onClick={() => setMode('home')} className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors">
+              ← 처음으로
+            </button>
+          </form>
         </div>
       </div>
     );

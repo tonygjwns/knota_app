@@ -7,45 +7,24 @@ import { InlineLoader } from '@/components/LoadingOverlay';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import MathRenderer from '@/components/MathRenderer';
-import { Shuffle, BookOpen, Wrench, AlertCircle, ChevronRight, Star } from 'lucide-react';
-
-const MODES = [
-  { id: 'random', icon: Shuffle, label: '랜덤', desc: '랜덤 문제', color: 'text-blue-500 bg-blue-50' },
-  { id: 'domain', icon: BookOpen, label: '단원별', desc: '단원 선택', color: 'text-purple-500 bg-purple-50' },
-  { id: 'tool', icon: Wrench, label: '도구별', desc: '도구 선택', color: 'text-amber-500 bg-amber-50' },
-  { id: 'wrong', icon: AlertCircle, label: '틀렸던 문제', desc: '복습', color: 'text-red-500 bg-red-50' },
-];
+import { Star, ChevronRight, TrendingUp, Target, BookOpen } from 'lucide-react';
 
 export default function Home() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [todayProblem, setTodayProblem] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [orgLabel, setOrgLabel] = useState([]);
+  const [domainStats, setDomainStats] = useState([]);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [recentStats, setRecentStats] = useState({ total: 0, avgScore: 0, correct: 0 });
 
   useEffect(() => {
     if (!user) return;
-    // E-1: redirect non-students
     if (user.role === 'admin') { navigate('/admin', { replace: true }); return; }
     if (user.role === 'teacher') { navigate('/teacher', { replace: true }); return; }
     loadData();
-    loadOrgInfo();
+    loadStats();
   }, [user]);
-
-  const loadOrgInfo = async () => {
-    if (!user?.academy_id && !user?.class_id) return;
-    try {
-      const [academies, classesAll] = await Promise.all([
-        user.academy_id ? base44.entities.Academy.list('name', 200) : Promise.resolve([]),
-        user.class_id ? base44.entities.Class.list('name', 500) : Promise.resolve([]),
-      ]);
-      const academy = academies.find(a => a.id === user.academy_id);
-      const cls = classesAll.find(c => c.id === user.class_id);
-      // Store separately for two-line display
-      const parts = [academy?.name, cls?.name].filter(Boolean);
-      if (parts.length > 0) setOrgLabel(parts);
-    } catch { /* silent */ }
-  };
 
   const loadData = async () => {
     setLoading(true);
@@ -62,6 +41,51 @@ export default function Home() {
     }
   };
 
+  const loadStats = async () => {
+    if (!user) return;
+    setStatsLoading(true);
+    try {
+      const [attempts, domains] = await Promise.all([
+        base44.entities.StudentAttempt.filter({ student_id: user.id }, '-submitted_at', 200),
+        base44.entities.Domain.list('name', 50),
+      ]);
+
+      // Recent stats (last 30 days)
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const recent = attempts.filter(a => a.submitted_at && new Date(a.submitted_at) > thirtyDaysAgo);
+      if (recent.length > 0) {
+        const avgScore = Math.round(recent.reduce((s, a) => s + (a.score || 0), 0) / recent.length);
+        const correct = recent.filter(a => a.correctness === 'correct').length;
+        setRecentStats({ total: recent.length, avgScore, correct });
+      }
+
+      // Domain mastery: group attempts by domain
+      const domainMap = new Map(domains.map(d => [d.domain_id, d.name]));
+      const domainScores = {};
+      attempts.forEach(a => {
+        if (!a.problem_domain) return;
+        if (!domainScores[a.problem_domain]) domainScores[a.problem_domain] = [];
+        domainScores[a.problem_domain].push(a.score || 0);
+      });
+
+      const stats = Object.entries(domainScores)
+        .map(([name, scores]) => ({
+          name,
+          avg: Math.round(scores.reduce((s, x) => s + x, 0) / scores.length),
+          count: scores.length,
+        }))
+        .filter(d => d.count >= 1)
+        .sort((a, b) => a.avg - b.avg)
+        .slice(0, 6);
+
+      setDomainStats(stats);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
   const parseProblemText = (content) => {
     try {
       const arr = typeof content === 'string' ? JSON.parse(content) : content;
@@ -74,6 +98,12 @@ export default function Home() {
 
   const greeting = user?.full_name ? `안녕하세요, ${user.full_name}님!` : '안녕하세요!';
 
+  const getMasteryColor = (avg) => {
+    if (avg >= 80) return { bar: 'bg-emerald-500', text: 'text-emerald-600', label: '우수' };
+    if (avg >= 60) return { bar: 'bg-amber-500', text: 'text-amber-600', label: '보통' };
+    return { bar: 'bg-red-400', text: 'text-red-500', label: '부족' };
+  };
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -81,8 +111,24 @@ export default function Home() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">{greeting}</h1>
           <p className="text-muted-foreground mt-1">오늘도 열심히 해볼까요? 💪</p>
-
         </div>
+
+        {/* 최근 30일 통계 */}
+        {recentStats.total > 0 && (
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { IconComp: Target, label: '푼 문제', value: `${recentStats.total}개`, color: 'text-blue-500' },
+              { IconComp: TrendingUp, label: '평균 점수', value: `${recentStats.avgScore}점`, color: 'text-emerald-500' },
+              { IconComp: Star, label: '정답', value: `${recentStats.correct}개`, color: 'text-amber-500' },
+            ].map(({ IconComp, label, value, color }) => (
+              <Card key={label} className="p-3 text-center">
+                <IconComp className={`w-4 h-4 mx-auto mb-1 ${color}`} />
+                <p className="text-xs text-muted-foreground">{label}</p>
+                <p className="font-bold text-sm mt-0.5">{value}</p>
+              </Card>
+            ))}
+          </div>
+        )}
 
         {/* Today's problem */}
         <div>
@@ -115,22 +161,44 @@ export default function Home() {
           )}
         </div>
 
-        {/* Problem selection modes */}
+        {/* 단원별 숙련도 */}
         <div>
-          <h2 className="text-lg font-semibold mb-3">문제 선택</h2>
-          <div className="grid grid-cols-2 gap-3">
-            {MODES.map(mode => (
-              <Link key={mode.id} to={`/problems?mode=${mode.id}`}>
-                <Card className="p-4 card-hover cursor-pointer h-full">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${mode.color}`}>
-                    <mode.icon className="w-5 h-5" />
-                  </div>
-                  <p className="font-semibold text-sm text-foreground">{mode.label}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{mode.desc}</p>
-                </Card>
-              </Link>
-            ))}
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-primary" />
+              단원별 숙련도
+            </h2>
+            <Link to="/history" className="text-xs text-primary hover:underline">전체 보기</Link>
           </div>
+          {statsLoading ? (
+            <InlineLoader message="통계 불러오는 중..." />
+          ) : domainStats.length === 0 ? (
+            <Card className="p-5 text-center text-muted-foreground text-sm">
+              <p>아직 풀이 기록이 없어요.</p>
+              <p className="text-xs mt-1">문제를 풀면 단원별 숙련도가 표시돼요.</p>
+            </Card>
+          ) : (
+            <Card className="p-4 space-y-3">
+              {domainStats.map(d => {
+                const { bar, text, label } = getMasteryColor(d.avg);
+                return (
+                  <div key={d.name}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium text-foreground truncate max-w-[60%]">{d.name}</span>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-semibold ${text}`}>{label}</span>
+                        <span className="text-xs text-muted-foreground">{d.avg}점</span>
+                      </div>
+                    </div>
+                    <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full transition-all ${bar}`} style={{ width: `${d.avg}%` }} />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">{d.count}문제 풀이</p>
+                  </div>
+                );
+              })}
+            </Card>
+          )}
         </div>
       </div>
     </AppLayout>
