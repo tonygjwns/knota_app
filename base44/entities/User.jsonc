@@ -6,11 +6,12 @@
       "type": "string",
       "enum": [
         "admin",
+        "owner",
         "teacher",
         "student"
       ],
       "default": "student",
-      "description": "\uc0ac\uc6a9\uc790 \uc5ed\ud560"
+      "description": "\uc0ac\uc6a9\uc790 \uc5ed\ud560: admin=\uc2dc\uc2a4\ud15c\uad00\ub9ac\uc790, owner=\ud559\uc6d0\uc7a5, teacher=\uac15\uc0ac/\ubcf4\uc870\uac15\uc0ac, student=\ud559\uc0dd"
     },
     "approval_status": {
       "type": "string",
@@ -24,15 +25,23 @@
     },
     "academy_id": {
       "type": "string",
-      "description": "Academy.id"
+      "description": "\uc18c\uc18d Academy.id"
     },
     "class_id": {
       "type": "string",
-      "description": "Class.id"
+      "description": "\uc8fc \uc18c\uc18d Class.id"
+    },
+    "class_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "\ub2f4\ub2f9 \ud559\uae09 ID \ubc30\uc5f4 (\uac15\uc0ac\uc6a9: \ubcf5\uc218 \ud559\uae09 \ub2f4\ub2f9 \uac00\ub2a5)"
     },
     "grade": {
       "type": "string",
       "description": "\ud559\ub144 (1~6: \ucd081~6, 7~9: \uc9111~3, 10~12: \uace01~3)"
     }
-  }
+  },
+  "required": []
 }

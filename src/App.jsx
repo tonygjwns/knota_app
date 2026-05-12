@@ -23,6 +23,7 @@ import AdminTeachers from './pages/admin/AdminTeachers';
 import AdminStudents from './pages/admin/AdminStudents';
 import AdminProblems from './pages/admin/AdminProblems';
 import AdminAcademies from './pages/admin/AdminAcademies';
+import AdminInviteCodes from './pages/admin/AdminInviteCodes';
 import TeacherLayout from './pages/teacher/TeacherLayout';
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
 import TeacherStudents from './pages/teacher/TeacherStudents';
@@ -62,16 +63,18 @@ const AuthenticatedApp = () => {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
     } else if (authError.type === 'auth_required') {
+      // '/' 는 항상 Landing 렌더 (비로그인 상태여도)
       if (window.location.pathname !== '/') {
-        navigateToLogin();
+        // 다른 페이지면 랜딩으로 먼저 보내기
+        window.location.replace('/');
         return null;
       }
-      // '/' 는 fall through → Landing 렌더
+      // fall through → Landing 렌더
     }
   }
 
-  // Block non-approved users (admins bypass the check)
-  if (user && user.role !== 'admin') {
+  // Block non-approved users (admins and owners bypass the check)
+  if (user && user.role !== 'admin' && user.role !== 'owner') {
     if (user.approval_status !== 'approved') {
       return <PendingApprovalScreen user={user} />;
     }
@@ -103,6 +106,7 @@ const AuthenticatedApp = () => {
         <Route path="problems" element={<AdminProblems />} />
         <Route path="problems/:problemId" element={<ProblemDetail mode="admin" />} />
         <Route path="academies" element={<AdminAcademies />} />
+        <Route path="invite-codes" element={<AdminInviteCodes />} />
       </Route>
 
       {/* Teacher routes */}

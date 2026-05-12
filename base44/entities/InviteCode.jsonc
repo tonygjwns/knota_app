@@ -12,7 +12,7 @@
         "academy",
         "class"
       ],
-      "description": "academy: \ud559\uc6d0\uc7a5\uc774 \ubc1c\ud589 \u2192 \ud559\uc6d0 \uac00\uc785, class: \uac15\uc0ac\uac00 \ubc1c\ud589 \u2192 \ud559\uae09 \uac00\uc785"
+      "description": "academy: \ud559\uc6d0 \uac00\uc785, class: \ud559\uae09 \uac00\uc785"
     },
     "academy_id": {
       "type": "string",
@@ -25,8 +25,9 @@
     "role": {
       "type": "string",
       "enum": [
-        "student",
-        "teacher"
+        "owner",
+        "teacher",
+        "student"
       ],
       "description": "\uc774 \ucf54\ub4dc\ub85c \uac00\uc785\ud558\uba74 \ubd80\uc5ec\ub420 \uc5ed\ud560"
     },
@@ -39,10 +40,19 @@
       "default": true,
       "description": "\ud65c\uc131 \uc5ec\ubd80"
     },
+    "one_time": {
+      "type": "boolean",
+      "default": false,
+      "description": "true\uc774\uba74 1\ud68c \uc0ac\uc6a9 \ud6c4 \uc790\ub3d9 \ube44\ud65c\uc131\ud654 (\ud559\uc6d0\uc7a5 \ucf54\ub4dc \ub4f1)"
+    },
     "use_count": {
       "type": "number",
       "default": 0,
       "description": "\uc0ac\uc6a9\ub41c \ud69f\uc218"
+    },
+    "max_uses": {
+      "type": "number",
+      "description": "\ucd5c\ub300 \uc0ac\uc6a9 \ud69f\uc218 (null=\ubb34\uc81c\ud55c)"
     }
   },
   "required": [

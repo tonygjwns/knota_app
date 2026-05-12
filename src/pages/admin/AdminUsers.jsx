@@ -18,6 +18,7 @@ const STATUS_CONFIG = {
 
 const ROLE_CONFIG = {
   admin:   { label: 'admin',   color: 'bg-purple-100 text-purple-700 border-purple-200' },
+  owner:   { label: '학원장',  color: 'bg-amber-100 text-amber-700 border-amber-200' },
   teacher: { label: 'teacher', color: 'bg-blue-100 text-blue-700 border-blue-200' },
   student: { label: 'student', color: 'bg-gray-100 text-gray-600 border-gray-200' },
   user:    { label: 'user',    color: 'bg-gray-100 text-gray-500 border-gray-200' },
@@ -67,6 +68,7 @@ function UserManageModal({ target, allAcademies, allClasses, onSave, onClose }) 
           >
             <option value="student">student (학생)</option>
             <option value="teacher">teacher (강사)</option>
+            <option value="owner">owner (학원장)</option>
             <option value="admin">admin (관리자)</option>
           </select>
         </div>

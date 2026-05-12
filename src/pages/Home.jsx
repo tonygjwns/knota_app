@@ -21,7 +21,7 @@ export default function Home() {
   useEffect(() => {
     if (!user) return;
     if (user.role === 'admin') { navigate('/admin', { replace: true }); return; }
-    if (user.role === 'teacher') { navigate('/teacher', { replace: true }); return; }
+    if (user.role === 'teacher' || user.role === 'owner') { navigate('/teacher', { replace: true }); return; }
     loadData();
     loadStats();
   }, [user]);

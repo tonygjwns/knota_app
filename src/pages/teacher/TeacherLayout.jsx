@@ -39,16 +39,15 @@ export default function TeacherLayout() {
   useEffect(() => {
     if (isLoadingAuth || !user) return;
     if (user.role === 'admin') {
-      toast.error('강사만 접근 가능해요');
       navigate('/admin', { replace: true });
-    } else if (user.role !== 'teacher') {
-      toast.error('강사 권한이 필요해요');
+    } else if (user.role !== 'teacher' && user.role !== 'owner') {
+      toast.error('강사 또는 학원장 권한이 필요해요');
       navigate('/home', { replace: true });
     }
   }, [user, isLoadingAuth, navigate]);
 
   if (isLoadingAuth || !user) return null;
-  if (user.role !== 'teacher') return null;
+  if (user.role !== 'teacher' && user.role !== 'owner') return null;
 
   return (
     <TeacherProvider>

@@ -289,8 +289,7 @@ function ProblemHub() {
     <AppLayout>
       <div className="space-y-7">
         <div>
-          <h1 className="text-2xl font-bold">학습 경로</h1>
-          <p className="text-muted-foreground text-sm mt-1">어떻게 공부할까요?</p>
+          <h1 className="text-2xl font-bold">어떻게 공부할까요?</h1>
         </div>
 
         {/* 받은 숙제 */}
@@ -355,32 +354,38 @@ function ProblemHub() {
           </section>
         )}
 
-        {/* 오늘의 추천 */}
+        {/* 진단 평가 */}
+        <section className="space-y-2">
+          <h2 className="text-base font-semibold text-foreground">진단 평가</h2>
+          <ComingSoonCard
+            title="진단 평가 준비 중"
+            desc="곧 진단 평가가 추가돼요"
+          />
+        </section>
+
+        {/* 추천 문제 */}
         <section className="space-y-2">
           <h2 className="text-base font-semibold text-foreground">추천 문제</h2>
           {recsLoading ? (
-            <div className="text-center py-6"><InlineLoader message="추천 문제 불러오는 중..." /></div>
+            <div className="text-center py-4"><InlineLoader message="추천 문제 불러오는 중..." /></div>
           ) : recommendedProblems.length === 0 ? (
             <ComingSoonCard
               title="추천 문제 준비 중"
               desc="더 많은 문제를 풀면 추천이 생겨요"
             />
           ) : (
-            <div className="space-y-2">
-              {recommendedProblems.slice(0, 5).map((problem, idx) => (
+            <div className="grid grid-cols-1 gap-2">
+              {recommendedProblems.slice(0, 5).map((problem) => (
                 <Link key={problem.id} to={`/problem/${problem.id}`}>
                   <Card className="p-4 card-hover cursor-pointer">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <Star className="w-4 h-4 text-primary" />
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-primary bg-primary/10">
+                        <Star className="w-5 h-5" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          {problem.domain_name && (
-                            <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">{problem.domain_name}</span>
-                          )}
-                        </div>
-                        <p className="text-sm font-medium text-foreground">추천 문제 {idx + 1}</p>
+                        <p className="font-semibold text-sm text-foreground">
+                          {problem.domain_name || '추천 문제'}
+                        </p>
                         <p className="text-xs text-muted-foreground mt-0.5">탭해서 풀기</p>
                       </div>
                       <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
@@ -390,15 +395,6 @@ function ProblemHub() {
               ))}
             </div>
           )}
-        </section>
-
-        {/* 진단 평가 */}
-        <section className="space-y-2">
-          <h2 className="text-base font-semibold text-foreground">진단 평가</h2>
-          <ComingSoonCard
-            title="진단 평가 준비 중"
-            desc="곧 진단 평가가 추가돼요"
-          />
         </section>
 
         {/* 자유 연습 */}
@@ -463,7 +459,7 @@ export default function ProblemSelect() {
   useEffect(() => {
     if (!user) return;
     if (user.role === 'admin') { navigate('/admin', { replace: true }); return; }
-    if (user.role === 'teacher') { navigate('/teacher', { replace: true }); }
+    if (user.role === 'teacher' || user.role === 'owner') { navigate('/teacher', { replace: true }); return; }
   }, [user]);
 
   // No mode → hub

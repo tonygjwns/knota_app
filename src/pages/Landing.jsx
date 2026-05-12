@@ -52,31 +52,37 @@ export default function Landing() {
 
       // Process invite code if provided
       if (inviteCode.trim()) {
-        const code = inviteCode.trim().toUpperCase();
-        const matches = await base44.asServiceRole
-          ? null // frontend can't use asServiceRole, will handle via filter
-          : null;
-
-        // Try to find matching invite code
-        try {
-          const codes = await base44.entities.InviteCode.filter(
-            { code, is_active: true }, '-created_date', 1
-          );
-          if (codes.length > 0) {
-            const c = codes[0];
-            userData.academy_id = c.academy_id;
-            if (c.class_id) userData.class_id = c.class_id;
-            if (c.role) userData.role = c.role;
-            // Increment use count
-            await base44.entities.InviteCode.update(c.id, { use_count: (c.use_count || 0) + 1 });
-          } else {
-            setError('유효하지 않은 코드예요. 코드를 확인해 주세요.');
-            setLoading(false);
-            return;
-          }
-        } catch (codeErr) {
-          // Code lookup failed, continue without code
+      const code = inviteCode.trim().toUpperCase();
+      try {
+      const codes = await base44.entities.InviteCode.filter(
+        { code, is_active: true }, '-created_date', 1
+      );
+      if (codes.length > 0) {
+        const c = codes[0];
+        userData.academy_id = c.academy_id;
+        if (c.class_id) userData.class_id = c.class_id;
+        if (c.role) userData.role = c.role;
+        // 강사는 class_ids에도 추가
+        if ((c.role === 'teacher') && c.class_id) {
+          userData.class_ids = [c.class_id];
         }
+        // 일회용 코드는 사용 즉시 비활성화
+        const newUseCount = (c.use_count || 0) + 1;
+        const updateData = { use_count: newUseCount };
+        if (c.one_time) updateData.is_active = false;
+        await base44.entities.InviteCode.update(c.id, updateData);
+        // owner/teacher는 바로 approved
+        if (c.role === 'owner' || c.role === 'teacher') {
+          userData.approval_status = 'approved';
+        }
+      } else {
+        setError('유효하지 않은 코드예요. 코드를 확인해 주세요.');
+        setLoading(false);
+        return;
+      }
+      } catch (codeErr) {
+      // Code lookup failed silently
+      }
       }
 
       await base44.auth.updateMe(userData);

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTeacher } from '@/lib/TeacherContext';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/lib/AuthContext';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,9 @@ import { base44 } from '@/api/base44Client';
 
 export default function TeacherClasses() {
   const { data, loading } = useTeacher();
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const isOwner = user?.role === 'owner';
   const [showForm, setShowForm] = useState(false);
   const [selectedClassId, setSelectedClassId] = useState(null);
   const [expandedCodeClass, setExpandedCodeClass] = useState(null);
@@ -92,7 +95,11 @@ export default function TeacherClasses() {
                </div>
                {expandedCodeClass === cls.id && (
                <div className="mt-3 pt-3 border-t border-border">
-                 <InviteCodeManager classId={cls.id} academyId={cls.academy_id} />
+                 <InviteCodeManager
+                   classId={cls.id}
+                   academyId={cls.academy_id}
+                   allowedRoles={isOwner ? ['teacher', 'student'] : ['student']}
+                 />
                </div>
                )}
                </Card>
