@@ -197,7 +197,7 @@ export default function TeacherReview() {
             {/* 오류 위치 (도구 단위) */}
             {grading.error_locations?.length > 0 && (
               <div className="bg-red-50 rounded-xl p-3 border border-red-200">
-                <p className="text-xs font-semibold text-red-700 mb-2">🔧 오류 발생 매듭</p>
+                <p className="text-xs font-semibold text-red-700 mb-2">🔧 오류 발생 도구</p>
                 <div className="space-y-1.5">
                   {grading.error_locations.map((err, i) => (
                     <div key={i} className="text-xs">

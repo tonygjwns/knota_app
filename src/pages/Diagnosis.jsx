@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, TrendingUp, TrendingDown, Minus, ChevronRight, BarChart3 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Card } from '@/components/ui/card';
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import AppLayout from '@/components/AppLayout';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { summarizeMastery, getMasteryColor } from '@/lib/mastery.js';
+import { toast } from 'sonner';
 
 export default function Diagnosis() {
   const navigate = useNavigate();
@@ -29,6 +30,24 @@ export default function Diagnosis() {
       setLoading(false);
     })();
   }, []);
+
+  const handlePracticeWithTool = async (toolId) => {
+    try {
+      const allProblems = await base44.entities.Problem.list('-created_date', 1000);
+      const matching = allProblems.filter(p => {
+        try { return JSON.parse(p.tool_ids || '[]').includes(toolId); }
+        catch { return false; }
+      });
+      if (matching.length === 0) {
+        toast.error('이 도구의 문제가 아직 없어요');
+        return;
+      }
+      const pick = matching[Math.floor(Math.random() * matching.length)];
+      navigate(`/problem/${pick.id}`);
+    } catch {
+      toast.error('문제를 불러오지 못했어요');
+    }
+  };
 
   if (loading) {
     return (
@@ -59,7 +78,6 @@ export default function Diagnosis() {
 
   const overallColorClass = overallAvg != null ? getMasteryColor(overallAvg, false) : 'text-muted-foreground';
 
-  // Map domain_id -> domain name
   const domainNameMap = {};
   for (const d of domains) domainNameMap[d.domain_id] = d.name;
 
@@ -95,7 +113,7 @@ export default function Diagnosis() {
         {/* Weak tools */}
         {weakTools.length > 0 && (
           <section className="space-y-2">
-            <h2 className="text-base font-semibold">집중 보완 필요 매듭 (TOP {weakTools.length})</h2>
+            <h2 className="text-base font-semibold">집중 보완 필요 도구 (TOP {weakTools.length})</h2>
             <div className="space-y-2">
               {weakTools.map(({ tool, avg }) => {
                 const barColor = avg >= 90 ? 'bg-emerald-500' : avg >= 70 ? 'bg-amber-400' : 'bg-red-400';
@@ -112,11 +130,10 @@ export default function Diagnosis() {
                         <div className={`h-1.5 rounded-full ${barColor}`} style={{ width: `${avg}%` }} />
                       </div>
                     </div>
-                    <Link to={`/problems?tool=${tool.tool_id}`}>
-                      <Button size="sm" variant="outline" className="text-xs flex-shrink-0">
-                        더 풀기 <ChevronRight className="w-3 h-3" />
-                      </Button>
-                    </Link>
+                    <Button size="sm" variant="outline" className="text-xs flex-shrink-0"
+                      onClick={() => handlePracticeWithTool(tool.tool_id)}>
+                      더 풀기 <ChevronRight className="w-3 h-3" />
+                    </Button>
                   </Card>
                 );
               })}

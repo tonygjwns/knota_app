@@ -200,11 +200,14 @@ export default function TeacherAssignments() {
     return <InlineLoader message="숙제 로딩 중..." />;
   }
 
-  // 추천 매듭 계산
+  // 추천 도구 계산
   const recClassId = classFilter !== 'all' ? classFilter : (my_classes[0]?.id || null);
   const recClass = my_classes.find(c => c.id === recClassId);
   const recTools = (data?.weak_or_unattempted_tools_by_class?.[recClassId]) || [];
-  const weakTools = recTools.filter(t => t.attempted_student_count > 0 && t.avg_score < 70);
+  const weakTools = recTools
+    .filter(t => t.attempted_student_count > 0)
+    .sort((a, b) => b.priority_score - a.priority_score)
+    .slice(0, 20);
   const unattemptedTools = recTools.filter(t => t.attempted_student_count === 0);
 
   const recDomainIds = new Set();
@@ -220,30 +223,113 @@ export default function TeacherAssignments() {
 
   return (
     <div className="flex-1 p-6 space-y-6">
-      {/* 헤더 */}
-      <div className="flex items-center justify-between">
+      {/* 헤더 + 상태 탭 */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <h1 className="text-3xl font-bold">출제한 숙제</h1>
-        <Button
-          onClick={() => {
-            setSelectedClassForForm(null);
-            setShowForm(true);
-          }}
-          className="gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          새 숙제
+        <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+          <TabsList>
+            <TabsTrigger value="all">전체</TabsTrigger>
+            <TabsTrigger value="active">진행중</TabsTrigger>
+            <TabsTrigger value="closed">마감</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
+      {/* 숙제 카드 리스트 */}
+      {filtered.length === 0 ? (
+        <Card className="p-12 text-center">
+          <p className="text-muted-foreground">출제한 숙제가 없습니다.</p>
+        </Card>
+      ) : (
+        <div className="grid gap-4">
+          {filtered.map(assignment => {
+            const problemIds = JSON.parse(assignment.problem_ids || '[]');
+            const studentCount = my_classes.find(c => c.id === assignment.class_id)
+              ?.student_count || 0;
+            return (
+              <Card
+                key={assignment.id}
+                className="hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => navigate(`/teacher/assignments/${assignment.id}`)}
+              >
+                <CardHeader className="flex flex-row items-start justify-between pb-3">
+                  <div className="flex-1">
+                    <CardTitle className="text-lg">{assignment.title}</CardTitle>
+                    <CardDescription>
+                      {classNames[assignment.class_id] || assignment.class_id}
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={assignment.status === 'active' ? 'default' : 'secondary'}>
+                      {assignment.status === 'active' ? '진행중' : '마감'}
+                    </Badge>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="icon">
+                          <MoreVertical className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                        {assignment.status === 'active' && (
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleClose(assignment.id); }}>
+                            마감
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDuplicate(assignment); }}>
+                          복사하여 새 숙제
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive"
+                          onClick={(e) => { e.stopPropagation(); setDeleteId(assignment.id); }}>
+                          삭제
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {assignment.description && (
+                      <p className="text-sm text-muted-foreground">{assignment.description}</p>
+                    )}
+                    <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                      <span>출제일: {format(new Date(assignment.created_date), 'MMM d, HH:mm')}</span>
+                      {assignment.deadline && (
+                        <span>마감: {format(new Date(assignment.deadline), 'MMM d, HH:mm')}</span>
+                      )}
+                    </div>
+                    <div className="flex gap-6 text-sm">
+                      <span className="font-medium">총 {problemIds.length}문제</span>
+                      <span className="text-muted-foreground">학생 {studentCount}명</span>
+                      <span className="text-muted-foreground">제출 0건</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 학급 필터 + 새 숙제 */}
+      <div className="flex items-center justify-between gap-3 pt-4 border-t border-border">
+        <Select value={classFilter} onValueChange={setClassFilter}>
+          <SelectTrigger className="w-48"><SelectValue placeholder="학급 선택" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">전체 학급</SelectItem>
+            {my_classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Button onClick={() => { setSelectedClassForForm(null); setShowForm(true); }} className="gap-2">
+          <Plus className="w-4 h-4" />새 숙제
         </Button>
       </div>
 
-      {/* 추천 매듭 섹션 */}
+      {/* 추천 도구 섹션 */}
       {recClassId && (
         <Card className="p-4">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h2 className="font-semibold">📌 이 학급에서 약한 매듭 / 미경험 매듭</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {recClass?.name} · 클릭해서 숙제 출제
-              </p>
+              <h2 className="font-semibold">📌 이 학급에서 약한 도구 / 미경험 도구</h2>
             </div>
           </div>
 
@@ -273,13 +359,13 @@ export default function TeacherAssignments() {
 
           <Tabs value={recTab} onValueChange={setRecTab}>
             <TabsList className="grid grid-cols-2 w-full">
-              <TabsTrigger value="weak">⚠️ 약점 ({displayWeak.length})</TabsTrigger>
-              <TabsTrigger value="unattempted">🆕 미경험 ({displayUnattempted.length})</TabsTrigger>
+              <TabsTrigger value="weak">⚠️ 약점 도구 ({displayWeak.length})</TabsTrigger>
+              <TabsTrigger value="unattempted">🆕 미경험 도구 ({displayUnattempted.length})</TabsTrigger>
             </TabsList>
             <TabsContent value="weak" className="mt-3">
               {displayWeak.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-6 text-center">
-                  {selectedDomainId ? '이 단원에 해당하는 약점 매듭이 없어요' : '약점 매듭이 없어요'}
+                  {selectedDomainId ? '이 단원에 해당하는 약점 도구가 없어요' : '약점 도구가 없어요'}
                 </p>
               ) : (
                 <div className="space-y-2">
@@ -292,7 +378,7 @@ export default function TeacherAssignments() {
             <TabsContent value="unattempted" className="mt-3">
               {displayUnattempted.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-6 text-center">
-                  {selectedDomainId ? '이 단원에 해당하는 미경험 매듭이 없어요' : '학급 전원이 모든 매듭을 한 번씩 풀어봤어요'}
+                  {selectedDomainId ? '이 단원에 해당하는 미경험 도구가 없어요' : '학급 전원이 모든 도구를 한 번씩 풀어봤어요'}
                 </p>
               ) : (
                 <div className="space-y-2">
@@ -310,130 +396,6 @@ export default function TeacherAssignments() {
             </p>
           )}
         </Card>
-      )}
-
-      {/* 필터 */}
-      <div className="flex gap-4 items-center">
-        <Tabs
-          value={statusFilter}
-          onValueChange={setStatusFilter}
-          className="flex-1"
-        >
-          <TabsList>
-            <TabsTrigger value="all">전체</TabsTrigger>
-            <TabsTrigger value="active">진행중</TabsTrigger>
-            <TabsTrigger value="closed">마감</TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        <Select value={classFilter} onValueChange={setClassFilter}>
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="학급 선택" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">전체 학급</SelectItem>
-            {my_classes.map(c => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* 숙제 리스트 */}
-      {filtered.length === 0 ? (
-        <Card className="p-12 text-center">
-          <p className="text-muted-foreground">출제한 숙제가 없습니다.</p>
-        </Card>
-      ) : (
-        <div className="grid gap-4">
-          {filtered.map(assignment => {
-            const problemIds = JSON.parse(assignment.problem_ids || '[]');
-            const studentCount = my_classes.find(c => c.id === assignment.class_id)
-              ?.student_count || 0;
-
-            return (
-              <Card
-                key={assignment.id}
-                className="hover:shadow-md transition-shadow cursor-pointer"
-                onClick={() => navigate(`/teacher/assignments/${assignment.id}`)}
-              >
-                <CardHeader className="flex flex-row items-start justify-between pb-3">
-                  <div className="flex-1">
-                    <CardTitle className="text-lg">{assignment.title}</CardTitle>
-                    <CardDescription>
-                      {classNames[assignment.class_id] || assignment.class_id}
-                    </CardDescription>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      variant={assignment.status === 'active' ? 'default' : 'secondary'}
-                    >
-                      {assignment.status === 'active' ? '진행중' : '마감'}
-                    </Badge>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" size="icon">
-                          <MoreVertical className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                        {assignment.status === 'active' && (
-                          <DropdownMenuItem
-                            onClick={(e) => { e.stopPropagation(); handleClose(assignment.id); }}
-                          >
-                            마감
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDuplicate(assignment); }}>
-                          복사하여 새 숙제
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive"
-                          onClick={(e) => { e.stopPropagation(); setDeleteId(assignment.id); }}
-                        >
-                          삭제
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </CardHeader>
-
-                <CardContent>
-                  <div className="space-y-3">
-                    {assignment.description && (
-                      <p className="text-sm text-muted-foreground">
-                        {assignment.description}
-                      </p>
-                    )}
-
-                    <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                      <span>출제일: {format(new Date(assignment.created_date), 'MMM d, HH:mm')}</span>
-                      {assignment.deadline && (
-                        <span>
-                          마감: {format(new Date(assignment.deadline), 'MMM d, HH:mm')}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex gap-6 text-sm">
-                      <span className="font-medium">
-                        총 {problemIds.length}문제
-                      </span>
-                      <span className="text-muted-foreground">
-                        학생 {studentCount}명
-                      </span>
-                      <span className="text-muted-foreground">
-                        제출 0건
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
       )}
 
       {/* 새 숙제 버튼 클릭 시 학급 선택 모달 */}

@@ -53,7 +53,7 @@ export default function Withdraw() {
               <p className="font-semibold text-destructive mb-1">탈퇴하시면 다음 데이터가 삭제됩니다</p>
               <ul className="text-sm text-foreground space-y-1 list-disc ml-4">
                 <li>즐겨찾기한 문제</li>
-                <li>즐겨찾기한 매듭 (도구)</li>
+                <li>즐겨찾기한 도구</li>
                 <li>추천 피드백 기록</li>
               </ul>
               <p className="text-sm text-muted-foreground mt-3">

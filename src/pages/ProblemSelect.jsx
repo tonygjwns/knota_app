@@ -11,7 +11,7 @@ import ScoreBadge from '@/components/ScoreBadge';
 import { gradeLabel, gradeLabelShort, extractGradeOptions } from '@/lib/grade-labels.js';
 import {
   Shuffle, BookOpen, Wrench, AlertCircle, ChevronRight, ArrowLeft,
-  Clock, ClipboardList, Star, Sparkles, BarChart3
+  Clock, ClipboardList, Star, Sparkles
 } from 'lucide-react';
 import { buildMasteryMap, computeWeakness, getMasteryColor } from '@/lib/mastery';
 
@@ -182,7 +182,7 @@ function ProblemHub() {
     { id: 'recommended', icon: Sparkles, label: '추천', desc: '내가 틀릴 확률이 높은 문제', color: 'text-primary bg-primary/10', action: 'navigate-mode' },
     { id: 'random', icon: Shuffle, label: '랜덤', desc: '무작위 문제', color: 'text-blue-500 bg-blue-50', action: 'go-random' },
     { id: 'domain', icon: BookOpen, label: '단원별', desc: '영역/단원을 골라서 연습', color: 'text-purple-500 bg-purple-50', action: 'navigate-mode' },
-    { id: 'tool', icon: Wrench, label: '도구별', desc: '약점 매듭부터 연습', color: 'text-amber-500 bg-amber-50', action: 'navigate-mode' },
+    { id: 'tool', icon: Wrench, label: '도구별', desc: '약점 도구부터 연습', color: 'text-amber-500 bg-amber-50', action: 'navigate-mode' },
     { id: 'wrong', icon: AlertCircle, label: '틀렸던 문제', desc: '틀렸던 문제만 골라서 연습', color: 'text-red-500 bg-red-50', action: 'navigate-mode' },
   ];
 
@@ -238,25 +238,6 @@ function ProblemHub() {
               )}
             </div>
           )}
-        </section>
-
-        {/* 내 진단 */}
-        <section className="space-y-2">
-          <h2 className="text-base font-semibold text-foreground">내 진단</h2>
-          <Link to="/diagnosis">
-            <Card className="p-4 card-hover cursor-pointer">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-emerald-500 bg-emerald-50">
-                  <BarChart3 className="w-5 h-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm text-foreground">내 진단 보기</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">약점 매듭과 영역별 숙련도</p>
-                </div>
-                <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-              </div>
-            </Card>
-          </Link>
         </section>
 
         {/* 자유 연습 */}
@@ -588,7 +569,7 @@ function ProblemModeView({ mode, user, navigate }) {
                   <Card className="p-4 bg-muted/40">
                     <p className="text-sm font-semibold mb-1">아직 추천이 준비되지 않았어요</p>
                     <p className="text-xs text-muted-foreground">
-                      5문제 이상 풀면 약점 매듭을 분석해 맞춤 추천을 시작해요. 먼저 다양한 매듭을 경험해 봐요.
+                      5문제 이상 풀면 약점 도구를 분석해 맞춤 추천을 시작해요. 먼저 다양한 도구를 경험해 봐요.
                     </p>
                     <Button size="sm" variant="outline" className="mt-3"
                             onClick={() => navigate('/problems?mode=tool')}>

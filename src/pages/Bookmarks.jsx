@@ -58,7 +58,7 @@ export default function Bookmarks() {
         } catch { return false; }
       });
       if (matching.length === 0) {
-        toast.error('이 매듭의 문제가 아직 없어요');
+        toast.error('이 도구의 문제가 아직 없어요');
         return;
       }
       const pick = matching[Math.floor(Math.random() * matching.length)];
@@ -103,7 +103,7 @@ export default function Bookmarks() {
           <TabsList className="grid grid-cols-2 w-full">
             <TabsTrigger value="tools">
               <Wrench className="w-4 h-4 mr-1.5" />
-              매듭 ({toolBookmarks.length})
+              도구 ({toolBookmarks.length})
             </TabsTrigger>
             <TabsTrigger value="problems">
               <BookOpen className="w-4 h-4 mr-1.5" />
@@ -111,7 +111,7 @@ export default function Bookmarks() {
             </TabsTrigger>
           </TabsList>
 
-          {/* ── 매듭 탭 ── */}
+          {/* ── 도구 탭 ── */}
           <TabsContent value="tools" className="mt-4">
             {toolBookmarks.length === 0 ? (
               <div className="flex flex-col items-center gap-4 py-16 text-center">
@@ -119,7 +119,7 @@ export default function Bookmarks() {
                   <Star className="w-8 h-8 text-amber-300" />
                 </div>
                 <div>
-                  <p className="font-semibold text-lg text-foreground">아직 즐겨찾기한 매듭이 없어요</p>
+                  <p className="font-semibold text-lg text-foreground">아직 즐겨찾기한 도구가 없어요</p>
                   <p className="text-sm text-muted-foreground mt-1">문제 풀기·결과 화면에서 ⭐ 버튼으로 추가할 수 있어요</p>
                 </div>
                 <Button onClick={() => navigate(isTeacherRoute ? '/teacher/problems' : '/problems')}>
@@ -160,7 +160,7 @@ export default function Bookmarks() {
                         >
                           {practicingId === bookmark.id
                             ? '문제 찾는 중...'
-                            : (isTeacherRoute ? '이 매듭의 문제 보기' : '이 매듭의 문제 풀기')}
+                            : (isTeacherRoute ? '이 도구의 문제 보기' : '이 도구의 문제 풀기')}
                           {practicingId !== bookmark.id && <ChevronRight className="w-4 h-4" />}
                         </Button>
                         <Button size="sm" variant="outline" onClick={() => handleToolUnbookmark(bookmark)} className="text-muted-foreground">

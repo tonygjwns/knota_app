@@ -126,7 +126,7 @@ export default function RemediationLesson() {
       {/* Content */}
       <div className="max-w-2xl mx-auto p-4 space-y-6">
         <div className="text-center py-4">
-          <h1 className="text-xl font-bold mb-2">매듭 학습</h1>
+          <h1 className="text-xl font-bold mb-2">도구 학습</h1>
           <p className="text-muted-foreground">이 도구를 함께 살펴봐요</p>
         </div>
 

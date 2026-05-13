@@ -16,7 +16,7 @@ export default function RemediationComplete() {
         </div>
         
         <div>
-          <h1 className="text-2xl font-bold mb-2">🎉 매듭 보강 완료!</h1>
+          <h1 className="text-2xl font-bold mb-2">🎉 도구 보강 완료!</h1>
           <p className="text-muted-foreground">3 단계를 모두 완료했어요. 대단해요!</p>
         </div>
 

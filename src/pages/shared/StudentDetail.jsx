@@ -164,7 +164,7 @@ export default function StudentDetail({ mode }) {
           {weakTools.length > 0 && (
             <Card className="p-4 border-red-200">
               <h2 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-red-500" />약점 매듭
+                <span className="w-2 h-2 rounded-full bg-red-500" />약점 도구
               </h2>
               <div className="space-y-2">
                 {weakTools.map(tool => (
@@ -183,7 +183,7 @@ export default function StudentDetail({ mode }) {
           {strongTools.length > 0 && (
             <Card className="p-4 border-emerald-200">
               <h2 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />강점 매듭 (Top 5)
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />강점 도구 (Top 5)
               </h2>
               <div className="space-y-2">
                 {strongTools.map(tool => (
@@ -202,7 +202,7 @@ export default function StudentDetail({ mode }) {
           {remediationHistory.length > 0 && (
             <Card className="p-4 border-primary/30">
               <h2 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-primary" />🎯 매듭 보강 이력
+                <span className="w-2 h-2 rounded-full bg-primary" />🎯 도구 보강 이력
               </h2>
               <div className="space-y-2">
                 {remediationHistory.map(rec => (

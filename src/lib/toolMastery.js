@@ -1,5 +1,5 @@
 /**
- * 매듭(도구) 단위 성취도 집계 유틸리티
+ * 도구 단위 성취도 집계 유틸리티
  */
 
 /**
@@ -64,7 +64,7 @@ export function aggregateToolMastery(attempts, problemMap) {
 }
 
 /**
- * 약점 매듭 Top N (avg_score 낮은 순, minSamples 이상)
+ * 약점 도구 Top N (avg_score 낮은 순, minSamples 이상)
  * @param {Map} masteryMap
  * @param {Map} toolNameMap - Map<tool_id, tool entity>
  * @param {number} n
@@ -89,7 +89,7 @@ export function topWeakTools(masteryMap, toolNameMap, n = 5, minSamples = 3) {
 }
 
 /**
- * 강점 매듭 Top N (avg_score 높은 순, minScore 이상, minSamples 이상)
+ * 강점 도구 Top N (avg_score 높은 순, minScore 이상, minSamples 이상)
  * @param {Map} masteryMap
  * @param {Map} toolNameMap - Map<tool_id, tool entity>
  * @param {number} n

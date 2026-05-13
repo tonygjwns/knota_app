@@ -105,7 +105,7 @@ export default function RemediationRetry() {
             다시 풀기
           </Button>
           <Button size="lg" variant="outline" className="flex-1" onClick={() => navigate(`/remediation/${attemptId}/lesson`)}>
-            건너뛰기 — 매듭 학습으로
+            건너뛰기 — 도구 학습으로
           </Button>
         </div>
       </div>

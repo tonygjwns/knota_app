@@ -48,6 +48,7 @@ export default function ProblemSolve() {
   const [searchParams] = useSearchParams();
   const assignmentId = searchParams.get('assignment_id');
   const remediationFor = searchParams.get('remediation_for');
+  const targetToolId = searchParams.get('target_tool');
   const fromRecommend = searchParams.get('from') === 'recommend';
   const recommendReason = searchParams.get('reason');
 
@@ -287,6 +288,9 @@ ${OCR_SYSTEM_PROMPT}`;
         submitted_at: submittedAt,
         duration_sec: durationSec,
         assignment_id: assignmentId || null,
+        attempt_type: remediationFor ? 'remediation_retry' : (assignmentId ? 'homework' : 'practice'),
+        parent_attempt_id: remediationFor || null,
+        target_tool_id: targetToolId || null,
       });
 
       setStage(null);

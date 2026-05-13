@@ -803,16 +803,16 @@ export default function ResultView() {
                 <Wrench className="w-4 h-4 text-primary" />
               </div>
               <div className="flex-1">
-                <h3 className="text-sm font-semibold text-foreground mb-1">🎯 매듭 보강하기</h3>
+                <h3 className="text-sm font-semibold text-foreground mb-1">🎯 도구 보강하기</h3>
                 <p className="text-xs text-muted-foreground">
                   {weakToolNames.length > 0
                     ? `[${weakToolNames.join(', ')}] 부분이 어려웠어요`
-                    : '일부 매듭이 부족했어요'}
+                    : '일부 도구가 부족했어요'}
                 </p>
               </div>
             </div>
             <p className="text-xs text-muted-foreground mb-3">
-              매듭 학습 + 유사 문제 3 개로 보강해 봐요
+              도구 학습 + 유사 문제 3 개로 보강해 봐요
             </p>
             <div className="flex gap-2">
               <Button
@@ -838,11 +838,11 @@ export default function ResultView() {
           <div className="pt-2">
             {attempt.correctness === 'correct' ? (
               <Button size="lg" className="w-full" onClick={() => navigate(`/remediation/${attempt.parent_attempt_id}/practice/0`)}>
-                매듭 보강 계속하기 (단계 3)
+                도구 보강 계속하기 (단계 3)
               </Button>
             ) : (
               <Button size="lg" className="w-full" onClick={() => navigate(`/remediation/${attempt.parent_attempt_id}/lesson`)}>
-                매듭 학습하기 (단계 2)
+                도구 학습하기 (단계 2)
               </Button>
             )}
           </div>

@@ -217,7 +217,7 @@ export default function History() {
               <Card className="p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <TrendingDown className="w-4 h-4 text-red-500" />
-                  <h3 className="text-sm font-semibold text-foreground">약점 매듭 Top {weakTools.length}</h3>
+                  <h3 className="text-sm font-semibold text-foreground">약점 도구 Top {weakTools.length}</h3>
                 </div>
                 <div className="divide-y divide-border">
                   {weakTools.map(tool => (
@@ -230,7 +230,7 @@ export default function History() {
               <Card className="p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <TrendingUp className="w-4 h-4 text-emerald-500" />
-                  <h3 className="text-sm font-semibold text-foreground">강점 매듭 Top {strongTools.length}</h3>
+                  <h3 className="text-sm font-semibold text-foreground">강점 도구 Top {strongTools.length}</h3>
                 </div>
                 <div className="divide-y divide-border">
                   {strongTools.map(tool => (
