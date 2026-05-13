@@ -548,6 +548,60 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ── types_only mode ─────────────────────────────────────────────────────
+    if (mode === 'types_only') {
+      // Type — 기존 있는 type_id 는 skip
+      const existingTypes = await db.entities.Type.list('-created_date', 9999);
+      const existingTypeIds = new Set(existingTypes.map(t => t.type_id));
+      const newTypes = types
+        .filter(t => !existingTypeIds.has(t.id))
+        .map(t => ({
+          type_id: t.id,
+          name: t.name,
+          description: t.description || null,
+          unit: t.unit || null,
+          version: t.version || null,
+        }));
+      if (newTypes.length > 0) await bulkCreateChunked(db, 'Type', newTypes);
+
+      // ProblemType — 동일 (problem_id, type_id) 쌍 skip
+      const existingPTs = await db.entities.ProblemType.list('-created_date', 9999);
+      const existingPTKeys = new Set(existingPTs.map(pt => `${pt.problem_id}|${pt.type_id}`));
+      const newPTs = problemTypes
+        .filter(pt => !existingPTKeys.has(`${pt.problem_id}|${pt.type_id}`))
+        .map(pt => ({ problem_id: pt.problem_id, type_id: pt.type_id }));
+      if (newPTs.length > 0) await bulkCreateChunked(db, 'ProblemType', newPTs);
+
+      // 매칭 진단
+      const sampleProblems = await db.entities.Problem.list('-created_date', 5);
+      const sampleProblemIds = sampleProblems.map(p => p.problem_id);
+      const samplePTProblemIds = problemTypes.slice(0, 5).map(pt => pt.problem_id);
+
+      const allDbProblems = await db.entities.Problem.list('-created_date', 9999);
+      const allProbIds = new Set(allDbProblems.map(p => p.problem_id));
+      const allPTProbIds = new Set(problemTypes.map(pt => pt.problem_id));
+      let overlap = 0;
+      for (const id of allPTProbIds) {
+        if (allProbIds.has(id)) overlap++;
+      }
+
+      return Response.json({
+        success: true,
+        mode: 'types_only',
+        types_created: newTypes.length,
+        types_skipped: existingTypeIds.size,
+        problem_types_created: newPTs.length,
+        problem_types_skipped: existingPTs.length,
+        diagnostic: {
+          sample_problem_ids: sampleProblemIds,
+          sample_problem_type_problem_ids: samplePTProblemIds,
+          problem_total: allProbIds.size,
+          problem_type_problem_total_unique: allPTProbIds.size,
+          problem_id_overlap: overlap,
+        },
+      });
+    }
+
     return Response.json({ error: `Unknown mode: ${mode}` }, { status: 400 });
 
   } catch (error) {
