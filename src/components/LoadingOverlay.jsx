@@ -1,6 +1,7 @@
 import React from 'react';
 
 const STAGES = [
+  { key: 'checking', label: '답 확인 중...', sub: '학생 답안을 확인하고 있어요' },
   { key: 'ocr', label: '필기 인식 중...', sub: 'Gemini가 손글씨를 읽고 있어요' },
   { key: 'grading', label: '채점 중...', sub: 'AI가 풀이를 꼼꼼히 확인하고 있어요' },
   { key: 'loading', label: '불러오는 중...', sub: '' },

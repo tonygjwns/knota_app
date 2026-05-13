@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
 import { ArrowLeft, Upload, Image, Send, AlertCircle, Star } from 'lucide-react';
 import { toast } from 'sonner';
-import { GRADING_SCHEMA, buildToolsBlock, buildSolutionsBlock, buildGradingPrompt, sanitizeGradingResult } from '@/lib/grading';
+import { GRADING_SCHEMA, buildToolsBlock, buildSolutionsBlock, buildGradingPrompt, sanitizeGradingResult, checkAnswerFast, checkSolutionReachesAnswer } from '@/lib/grading';
 
 const OCR_SYSTEM_PROMPT = `당신은 한국 K-12 수학 손글씨 풀이 OCR 전문가입니다.
 
@@ -62,6 +62,7 @@ export default function ProblemSolve() {
   const [activeTab, setActiveTab] = useState('canvas');
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [bookmarkId, setBookmarkId] = useState(null);
+  const [studentAnswer, setStudentAnswer] = useState('');
   const startedAt = useRef(new Date().toISOString());
   const fileInputRef = useRef(null);
 
@@ -170,29 +171,137 @@ export default function ProblemSolve() {
     });
   };
 
+  const doDeepGrading = async (problemText, verifiedAnswer, ocrText) => {
+    const toolIds = (() => { try { return JSON.parse(problem.tool_ids || '[]'); } catch { return []; } })();
+    const [allTools, allSolutions] = await Promise.all([
+      toolIds.length > 0 ? base44.entities.MathTool.list('name', 100) : Promise.resolve([]),
+      base44.entities.Solution.filter({ problem_id: problem.problem_id }, 'priority', 20),
+    ]);
+    const relevantTools = toolIds.length > 0 ? allTools.filter(t => toolIds.includes(t.tool_id)) : [];
+    const toolsBlock = buildToolsBlock(relevantTools);
+    const solutions = allSolutions.slice(0, 5);
+    const solutionIds = solutions.map(s => s.solution_id);
+    const stepsBySol = new Map();
+    if (solutionIds.length > 0) {
+      const stepArrays = await Promise.all(
+        solutionIds.map(sid => base44.entities.SolutionStep.filter({ solution_id: sid }, 'sequence_order', 50))
+      );
+      solutionIds.forEach((sid, i) => stepsBySol.set(sid, stepArrays[i]));
+    }
+    const solutionsBlock = buildSolutionsBlock(solutions, stepsBySol, relevantTools);
+    const gradingPrompt = buildGradingPrompt({
+      problemText, verifiedAnswer, solutionsBlock, toolsBlock,
+      studentOcrSolution: ocrText, studentAnswer: studentAnswer.trim()
+    });
+    const gradeRaw = await base44.integrations.Core.InvokeLLM({
+      prompt: gradingPrompt,
+      model: 'claude_sonnet_4_6',
+      response_json_schema: GRADING_SCHEMA,
+    });
+    const gradeResult = gradeRaw?.response ?? gradeRaw;
+    return sanitizeGradingResult(gradeResult, {
+      validToolIds: new Set(relevantTools.map(t => t.tool_id)),
+      validSolutionIds: new Set(solutionIds),
+      stepsBySolutionId: stepsBySol,
+    });
+  };
+
   const handleSubmit = async () => {
     const imageSource = activeTab === 'canvas' ? canvasBlob : photoFile;
-    if (!imageSource) {
-      toast.error('풀이를 작성해 주세요');
+    if (!imageSource && !studentAnswer.trim()) {
+      toast.error('풀이 또는 답을 작성해 주세요');
       return;
     }
     if (!problem || !user) return;
 
     setError(null);
     const submittedAt = new Date().toISOString();
-    const durationSec = Math.round(
-      (new Date(submittedAt) - new Date(startedAt.current)) / 1000
-    );
+    const durationSec = Math.round((new Date(submittedAt) - new Date(startedAt.current)) / 1000);
+    const problemText = parseProblemText(problem.content);
+    const verifiedAnswer = problem.verified_answer || '';
 
     try {
-      // Compress image
+      // ───── Stage 1: Fast Check (답안 input 있을 때만) ─────
+      let stage1Result = null;
+      if (studentAnswer.trim() && verifiedAnswer) {
+        setStage('checking');
+        stage1Result = await checkAnswerFast(studentAnswer.trim(), verifiedAnswer, base44.integrations.Core.InvokeLLM);
+      }
+
+      // ───── Stage 1 정답 → 즉시 처리 ─────
+      if (stage1Result?.result === 'match') {
+        let imageUrl = null;
+        if (imageSource) {
+          setStage('ocr');
+          const compressed = await compressImage(imageSource);
+          const upload = await base44.integrations.Core.UploadFile({ file: compressed });
+          imageUrl = upload.file_url;
+        }
+        
+        const attempt = await base44.entities.StudentAttempt.create({
+          student_id: user.id,
+          student_email: user.email,
+          problem_id: problem.id,
+          problem_content: problemText.slice(0, 500),
+          problem_domain: problem.domain_name || '',
+          [imageSource && activeTab === 'canvas' ? 'canvas_image_url' : imageSource ? 'photo_url' : null]: imageUrl,
+          student_answer: studentAnswer.trim(),
+          answer_check_result: 'correct',
+          score: 100,
+          correctness: 'correct',
+          tool_mapping_status: imageSource ? 'pending' : null,
+          started_at: startedAt.current,
+          submitted_at: submittedAt,
+          duration_sec: durationSec,
+          assignment_id: assignmentId || null,
+          attempt_type: remediationFor ? 'remediation_retry' : (assignmentId ? 'homework' : 'practice'),
+          parent_attempt_id: remediationFor || null,
+          target_tool_id: targetToolId || null,
+        });
+        
+        // 백그라운드 Stage 3 (이미지 있을 때만)
+        if (imageSource && imageUrl) {
+          runBackgroundGrading(attempt.id, imageUrl, problemText, verifiedAnswer, studentAnswer.trim());
+        }
+        
+        setStage(null);
+        const resultUrl = fromRecommend
+          ? `/result/${attempt.id}?from=recommend&reason=${recommendReason || ''}`
+          : `/result/${attempt.id}`;
+        navigate(resultUrl);
+        return;
+      }
+
+      // ───── 풀이 이미지 없이 답안만 적었는데 답이 틀린 경우 ─────
+      if (!imageSource) {
+        const attempt = await base44.entities.StudentAttempt.create({
+          student_id: user.id,
+          student_email: user.email,
+          problem_id: problem.id,
+          problem_content: problemText.slice(0, 500),
+          problem_domain: problem.domain_name || '',
+          student_answer: studentAnswer.trim(),
+          answer_check_result: 'wrong',
+          score: 0,
+          correctness: 'wrong',
+          started_at: startedAt.current,
+          submitted_at: submittedAt,
+          duration_sec: durationSec,
+          assignment_id: assignmentId || null,
+          attempt_type: remediationFor ? 'remediation_retry' : (assignmentId ? 'homework' : 'practice'),
+          parent_attempt_id: remediationFor || null,
+          target_tool_id: targetToolId || null,
+        });
+        setStage(null);
+        navigate(`/result/${attempt.id}`);
+        return;
+      }
+
+      // ───── 풀이 OCR ─────
       setStage('ocr');
       const compressed = await compressImage(imageSource);
-      
-      // Upload image
       const { file_url: imageUrl } = await base44.integrations.Core.UploadFile({ file: compressed });
-
-      // OCR via Gemini using InvokeLLM with vision
+      
       const ocrPrompt = `다음 이미지는 학생의 손글씨 수학 풀이입니다. OCR해서 JSON으로 응답해 주세요.
       
 형식: {"markdown_text": "풀이 텍스트 (LaTeX 포함)", "confidence": 85, "notes": null}
@@ -212,66 +321,53 @@ ${OCR_SYSTEM_PROMPT}`;
           }
         }
       });
-
       const ocrResult = ocrRaw?.response ?? ocrRaw;
       const ocrText = ocrResult?.markdown_text || '';
       if (!ocrText) throw new Error('OCR 결과가 없어요');
 
-      // Build grading prompt
-      setStage('grading');
-      const problemText = parseProblemText(problem.content);
-
-      // Fetch tools + solutions in parallel
-      const toolIds = (() => { try { return JSON.parse(problem.tool_ids || '[]'); } catch { return []; } })();
-      const [allTools, allSolutions] = await Promise.all([
-        toolIds.length > 0 ? base44.entities.MathTool.list('name', 100) : Promise.resolve([]),
-        base44.entities.Solution.filter({ problem_id: problem.problem_id }, 'priority', 20),
-      ]);
-
-      let relevantTools = [];
-      if (toolIds.length > 0) {
-        relevantTools = allTools.filter(t => toolIds.includes(t.tool_id));
-      }
-      window.__relevantToolIds = new Set(relevantTools.map(t => t.tool_id));
-
-      // Fetch solution steps (up to 5 solutions)
-      const solutions = allSolutions.slice(0, 5);
-      const solutionIds = solutions.map(s => s.solution_id);
-      const stepsBySol = new Map();
-      if (solutionIds.length > 0) {
-        const stepArrays = await Promise.all(
-          solutionIds.map(sid =>
-            base44.entities.SolutionStep.filter({ solution_id: sid }, 'sequence_order', 50)
-          )
+      // ───── Stage 2: 인식 오류 체크 (Stage 1 = no_match 인 경우만) ─────
+      let stage2Result = null;
+      if (stage1Result?.result === 'no_match' && verifiedAnswer) {
+        setStage('checking');
+        stage2Result = await checkSolutionReachesAnswer(
+          { problemText, ocrText, verifiedAnswer, studentAnswer: studentAnswer.trim() },
+          base44.integrations.Core.InvokeLLM
         );
-        solutionIds.forEach((sid, i) => stepsBySol.set(sid, stepArrays[i]));
       }
 
-      const toolsBlock = buildToolsBlock(relevantTools);
-      const solutionsBlock = buildSolutionsBlock(solutions, stepsBySol, relevantTools);
-      const gradingPrompt = buildGradingPrompt({
-        problemText,
-        verifiedAnswer: problem.verified_answer,
-        solutionsBlock,
-        toolsBlock,
-        studentOcrSolution: ocrText,
-      });
+      // ───── Stage 2 정답 → 즉시 처리 ─────
+      if (stage2Result?.result === 'reached') {
+        const attempt = await base44.entities.StudentAttempt.create({
+          student_id: user.id,
+          student_email: user.email,
+          problem_id: problem.id,
+          problem_content: problemText.slice(0, 500),
+          problem_domain: problem.domain_name || '',
+          [activeTab === 'canvas' ? 'canvas_image_url' : 'photo_url']: imageUrl,
+          ocr_text: ocrText,
+          student_answer: studentAnswer.trim(),
+          answer_check_result: 'correct_via_solution',
+          score: 95,
+          correctness: 'correct',
+          tool_mapping_status: 'pending',
+          started_at: startedAt.current,
+          submitted_at: submittedAt,
+          duration_sec: durationSec,
+          assignment_id: assignmentId || null,
+          attempt_type: remediationFor ? 'remediation_retry' : (assignmentId ? 'homework' : 'practice'),
+          parent_attempt_id: remediationFor || null,
+          target_tool_id: targetToolId || null,
+        });
+        runBackgroundGrading(attempt.id, imageUrl, problemText, verifiedAnswer, studentAnswer.trim(), ocrText);
+        setStage(null);
+        navigate(`/result/${attempt.id}`);
+        return;
+      }
 
-      const gradeRaw = await base44.integrations.Core.InvokeLLM({
-        prompt: gradingPrompt,
-        model: 'claude_sonnet_4_6',
-        response_json_schema: GRADING_SCHEMA,
-      });
-
-      const gradeResultRaw = gradeRaw?.response ?? gradeRaw;
-      const sanitized = sanitizeGradingResult(gradeResultRaw, {
-        validToolIds: window.__relevantToolIds,
-        validSolutionIds: new Set(solutionIds),
-        stepsBySolutionId: stepsBySol,
-      });
-      const gradeResult = sanitized;
-
-      // Save attempt — ocr_corrected_text는 학생이 직접 수정할 때만 저장 (기본 흐름은 null)
+      // ───── Stage 3: 깊이 채점 (동기) ─────
+      setStage('grading');
+      const gradeResult = await doDeepGrading(problemText, verifiedAnswer, ocrText);
+      
       const attempt = await base44.entities.StudentAttempt.create({
         student_id: user.id,
         student_email: user.email,
@@ -280,10 +376,12 @@ ${OCR_SYSTEM_PROMPT}`;
         problem_domain: problem.domain_name || '',
         [activeTab === 'canvas' ? 'canvas_image_url' : 'photo_url']: imageUrl,
         ocr_text: ocrText,
-        ocr_corrected_text: null,
+        student_answer: studentAnswer.trim() || null,
+        answer_check_result: 'wrong',
         claude_grade_json: JSON.stringify(gradeResult),
         score: gradeResult?.score || 0,
         correctness: gradeResult?.correctness || 'wrong',
+        tool_mapping_status: 'done',
         started_at: startedAt.current,
         submitted_at: submittedAt,
         duration_sec: durationSec,
@@ -292,7 +390,7 @@ ${OCR_SYSTEM_PROMPT}`;
         parent_attempt_id: remediationFor || null,
         target_tool_id: targetToolId || null,
       });
-
+      
       setStage(null);
       const resultUrl = fromRecommend
         ? `/result/${attempt.id}?from=recommend&reason=${recommendReason || ''}`
@@ -302,6 +400,51 @@ ${OCR_SYSTEM_PROMPT}`;
       setStage(null);
       console.error(err);
       setError('잠시 문제가 생겼어요. 다시 시도해 주세요');
+    }
+  };
+
+  const runBackgroundGrading = async (attemptId, imageUrl, problemText, verifiedAnswer, studentAnswerText, prefetchedOcrText = null) => {
+    try {
+      let ocrText = prefetchedOcrText;
+      if (!ocrText) {
+        const ocrPrompt = `다음 이미지는 학생의 손글씨 수학 풀이입니다. OCR해서 JSON으로 응답해 주세요.
+      
+형식: {"markdown_text": "풀이 텍스트 (LaTeX 포함)", "confidence": 85, "notes": null}
+
+${OCR_SYSTEM_PROMPT}`;
+        const ocrRaw = await base44.integrations.Core.InvokeLLM({
+          prompt: ocrPrompt,
+          file_urls: [imageUrl],
+          model: 'gemini_3_flash',
+          response_json_schema: {
+            type: 'object',
+            properties: {
+              markdown_text: { type: 'string' },
+              confidence: { type: 'number' },
+              notes: { type: 'string' }
+            }
+          }
+        });
+        ocrText = (ocrRaw?.response ?? ocrRaw)?.markdown_text || '';
+      }
+      if (!ocrText) throw new Error('OCR 실패');
+      
+      // 일시적으로 studentAnswer를 변경해서 채점
+      const originalAnswer = studentAnswer;
+      setStudentAnswer(studentAnswerText);
+      const gradeResult = await doDeepGrading(problemText, verifiedAnswer, ocrText);
+      setStudentAnswer(originalAnswer);
+      
+      await base44.entities.StudentAttempt.update(attemptId, {
+        ocr_text: ocrText,
+        claude_grade_json: JSON.stringify(gradeResult),
+        tool_mapping_status: 'done',
+      });
+    } catch (err) {
+      console.error('Background grading failed:', err);
+      try {
+        await base44.entities.StudentAttempt.update(attemptId, { tool_mapping_status: 'failed' });
+      } catch {}
     }
   };
 
@@ -402,6 +545,27 @@ ${OCR_SYSTEM_PROMPT}`;
                 />
               </div>
             )}
+          </div>
+
+          {/* 답안 input */}
+          <div className="p-4 border-t border-border space-y-2">
+            <label className="text-sm font-semibold text-foreground">답 (선택)</label>
+            <input
+              type="text"
+              value={studentAnswer}
+              onChange={e => setStudentAnswer(e.target.value)}
+              placeholder="예: 2, x=3, 1/2, \frac{1}{2}"
+              className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+            {studentAnswer && (
+              <div className="px-3 py-2 bg-muted/40 rounded-lg">
+                <p className="text-xs text-muted-foreground mb-1">미리보기</p>
+                <MathRenderer content={studentAnswer} className="text-sm" />
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              답을 입력하면 채점이 빨라져요 (LaTeX 표기 가능: \frac{}{}, ^{}, \sqrt{})
+            </p>
           </div>
 
           {/* 제출 버튼 — 풀이 영역 하단 고정 */}

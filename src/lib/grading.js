@@ -113,9 +113,88 @@ ${pathText}
 }
 
 /**
+ * Stage 1: Fast Check — 학생 답안 vs verified_answer 매칭
+ */
+export async function checkAnswerFast(studentAnswer, verifiedAnswer, llmInvoke) {
+  if (!studentAnswer?.trim() || !verifiedAnswer?.trim()) return { result: 'unclear' };
+  
+  const prompt = `다음 두 수학 표현이 수학적으로 동등한지 판정해 주세요.
+
+학생 답: ${studentAnswer.trim()}
+정답: ${verifiedAnswer.trim()}
+
+규칙:
+- 동등한 표현 (0.5 = 1/2, x=2 = 2 = "x=2", 등) → "match"
+- 다른 값 → "no_match"
+- 정규화해도 판단 어려움 → "unclear"
+
+JSON 으로만 응답하세요.`;
+
+  const raw = await llmInvoke({
+    prompt,
+    model: 'gemini_3_flash',
+    response_json_schema: {
+      type: 'object',
+      properties: {
+        result: { type: 'string', enum: ['match', 'no_match', 'unclear'] },
+        reason: { type: 'string' },
+      },
+      required: ['result'],
+    },
+  });
+  return raw?.response ?? raw;
+}
+
+/**
+ * Stage 2: 인식 오류 체크 — OCR 후 풀이가 정답에 도달했는가?
+ */
+export async function checkSolutionReachesAnswer({ problemText, ocrText, verifiedAnswer, studentAnswer }, llmInvoke) {
+  const prompt = `학생의 풀이가 정답에 실제로 도달했는지 빠르게 판정해 주세요.
+
+<problem>
+${problemText}
+</problem>
+
+<verified_answer>
+${verifiedAnswer || '(없음)'}
+</verified_answer>
+
+<student_answer_input>
+${studentAnswer?.trim() || '(비어 있음)'}
+</student_answer_input>
+
+<student_solution_ocr>
+${ocrText}
+</student_solution_ocr>
+
+규칙:
+- 풀이상 최종 결과가 verified_answer 와 수학적으로 동등 → "reached"
+- 풀이가 답에 도달 못 함 → "not_reached"
+- 판단 불확실 → "unclear"
+
+학생이 답안 input 에 오타를 적었더라도 풀이 자체가 정답에 도달했다면 reached.
+
+JSON 만 응답.`;
+
+  const raw = await llmInvoke({
+    prompt,
+    model: 'claude_sonnet_4_6',
+    response_json_schema: {
+      type: 'object',
+      properties: {
+        result: { type: 'string', enum: ['reached', 'not_reached', 'unclear'] },
+        reason: { type: 'string' },
+      },
+      required: ['result'],
+    },
+  });
+  return raw?.response ?? raw;
+}
+
+/**
  * 채점 prompt 문자열 생성
  */
-export function buildGradingPrompt({ problemText, verifiedAnswer, solutionsBlock, toolsBlock, studentOcrSolution }) {
+export function buildGradingPrompt({ problemText, verifiedAnswer, solutionsBlock, toolsBlock, studentOcrSolution, studentAnswer }) {
   const answerText = verifiedAnswer || '(검증된 정답 없음)';
   return `당신은 한국 K-12 수학 풀이 채점 전문가입니다.
 
@@ -153,6 +232,7 @@ export function buildGradingPrompt({ problemText, verifiedAnswer, solutionsBlock
     학생이 쓴 순서로 출력하세요. matched_solution_step_number 만 정해 순서를 가리킵니다.
 12. 학생이 도구의 이름을 명시적으로 쓰지 않더라도, 그 도구의 결과
     (공식·정리의 산물) 를 사용했다면 그 정해 step 에 매핑하세요.
+13. 학생이 답안 input 칸에 적은 답이 있다면 참고하되, 풀이 자체를 우선 분석하세요.
 
 ## 점수 기준
 - 100 = 정답 + 풀이 완전
@@ -185,6 +265,10 @@ ${toolsBlock}
 
 학생 풀이가 어느 별해 path와 가장 가까운지 판정해 matched_solution_id에 채우고,
 step_feedback[].tool_id 는 그 별해의 도구로 매핑하세요.
+
+<student_answer_input>
+${studentAnswer || '(비어 있음)'}
+</student_answer_input>
 
 <student_ocr_solution>
 ${studentOcrSolution}

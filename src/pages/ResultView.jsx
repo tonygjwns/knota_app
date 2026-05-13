@@ -446,10 +446,37 @@ export default function ResultView() {
           <div className="text-xl font-semibold mt-2">
             <ScoreSummaryText score={score} />
           </div>
+          {attempt?.answer_check_result === 'correct' && (
+            <p className="text-sm text-emerald-700 font-medium mt-2">정답을 맞췄어요!</p>
+          )}
+          {attempt?.answer_check_result === 'correct_via_solution' && (
+            <p className="text-sm text-amber-700 font-medium mt-2">풀이가 정답에 도달했어요! (답안 입력에 오타가 있었나봐요)</p>
+          )}
           {grading?.summary && (
             <p className="text-muted-foreground text-sm mt-3 leading-relaxed">{grading.summary}</p>
           )}
         </Card>
+
+        {/* tool_mapping_status 표시 */}
+        {attempt?.tool_mapping_status === 'pending' && (
+          <div className="text-center">
+            <span className="inline-flex items-center gap-2 text-xs text-muted-foreground bg-muted/40 px-3 py-1.5 rounded-full">
+              <div className="w-3 h-3 rounded-full border-2 border-transparent border-t-primary animate-spin" />
+              풀이 분석 중... (잠시 후 새로고침)
+            </span>
+          </div>
+        )}
+        {attempt?.tool_mapping_status === 'failed' && (
+          <p className="text-xs text-muted-foreground text-center">풀이 분석을 완료하지 못했어요</p>
+        )}
+
+        {/* 학생 답안 표시 */}
+        {attempt?.student_answer && (
+          <div className="bg-muted/40 rounded-lg p-3">
+            <p className="text-xs text-muted-foreground mb-1">학생이 적은 답</p>
+            <MathRenderer content={attempt.student_answer} className="text-sm" />
+          </div>
+        )}
 
         {/* Tools used chips */}
         {tools.length > 0 && (
