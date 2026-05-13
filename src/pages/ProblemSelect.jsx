@@ -319,6 +319,8 @@ function ProblemModeView({ mode, user, navigate }) {
   // tool filters
   const [toolFilterGrade, setToolFilterGrade] = useState('');
   const [toolFilterDomain, setToolFilterDomain] = useState('');
+  const [toolFilterType, setToolFilterType] = useState(null);
+  const [typeToolMap, setTypeToolMap] = useState(new Map());
 
   // wrong filters
   const [wrongFilterGrade, setWrongFilterGrade] = useState('');
@@ -415,12 +417,16 @@ function ProblemModeView({ mode, user, navigate }) {
         setProblemTypes(allPTs);
 
       } else if (mode === 'tool') {
-        const [t, allP, allD, allAttempts] = await Promise.all([
+        const [t, allP, allD, allTypes, allTypeToolMap, allPTs, allAttempts] = await Promise.all([
           base44.entities.MathTool.list('name', 200),
           base44.entities.Problem.list('tool_ids', 5000),
           base44.entities.Domain.list('grade_range', 100),
+          base44.entities.Type.list('name', 500),
+          base44.entities.TypeToolMap.list('-updated_at', 1000),
+          base44.entities.ProblemType.list('-created_date', 10000),
           user ? base44.entities.StudentAttempt.filter({ student_id: user.id }, '-submitted_at', 500) : Promise.resolve([]),
         ]);
+        setProblemTypes(allPTs);
         const problemMap = new Map(allP.map(p => [p.id, p]));
         const masteryMap = buildMasteryMap(allAttempts, problemMap);
         const toolCountMap = {};
@@ -433,13 +439,24 @@ function ProblemModeView({ mode, user, navigate }) {
           const avg = isNew ? null : Math.round(m.weightedScore / m.weight);
           return { ...tool, problem_count: toolCountMap[tool.tool_id] || 0, isNew, avg, weight: m?.weight || 0 };
         });
-        // sort: 미경험 먼저, 그 다음 avg 오름차순
         toolsWithMastery.sort((a, b) => {
           if (a.isNew && !b.isNew) return -1;
           if (!a.isNew && b.isNew) return 1;
           if (a.isNew && b.isNew) return 0;
           return (a.avg ?? 100) - (b.avg ?? 100);
         });
+        // TypeToolMap
+        const ttmMap = new Map();
+        allTypeToolMap.forEach(ttm => {
+          try {
+            ttmMap.set(ttm.type_id, {
+              tool_ids: JSON.parse(ttm.tool_ids || '[]'),
+              tool_problem_counts: JSON.parse(ttm.tool_problem_counts || '{}'),
+            });
+          } catch {}
+        });
+        setTypeToolMap(ttmMap);
+        setTypes(allTypes);
         setTools(toolsWithMastery);
         setProblems(allP);
         setDomains(allD);
@@ -520,6 +537,10 @@ function ProblemModeView({ mode, user, navigate }) {
         const dids = JSON.parse(tool.domain_ids || '[]');
         if (!dids.includes(toolFilterDomain)) return false;
       } catch { return false; }
+    }
+    if (toolFilterType) {
+      const ttm = typeToolMap.get(toolFilterType);
+      if (!ttm || !ttm.tool_ids.includes(tool.tool_id)) return false;
     }
     return true;
   });
@@ -706,25 +727,54 @@ function ProblemModeView({ mode, user, navigate }) {
             {mode === 'tool' && (
               <div>
                 {/* 필터 */}
-                <div className="flex gap-2 mb-4 flex-wrap">
-                  <select
-                    value={toolFilterGrade}
-                    onChange={e => { setToolFilterGrade(e.target.value); setToolFilterDomain(''); }}
-                    className="text-sm border border-border rounded-lg px-3 py-1.5 bg-card focus:outline-none focus:ring-1 focus:ring-ring"
-                  >
-                    <option value="">전체 학년</option>
-                    {gradeOptions.map(g => <option key={g} value={g}>{gradeLabel(g)}</option>)}
-                  </select>
-                  <select
-                    value={toolFilterDomain}
-                    onChange={e => setToolFilterDomain(e.target.value)}
-                    disabled={!toolFilterGrade}
-                    className="text-sm border border-border rounded-lg px-3 py-1.5 bg-card focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-40"
-                  >
-                    <option value="">전체 단원</option>
-                    {domainsForGrade(toolFilterGrade).map(d => <option key={d.id} value={d.domain_id}>{d.name}</option>)}
-                  </select>
+                <div className="flex gap-2 mb-3 flex-wrap">
+                 <select
+                   value={toolFilterGrade}
+                   onChange={e => { setToolFilterGrade(e.target.value); setToolFilterDomain(''); setToolFilterType(null); }}
+                   className="text-sm border border-border rounded-lg px-3 py-1.5 bg-card focus:outline-none focus:ring-1 focus:ring-ring"
+                 >
+                   <option value="">전체 학년</option>
+                   {gradeOptions.map(g => <option key={g} value={g}>{gradeLabel(g)}</option>)}
+                 </select>
+                 <select
+                   value={toolFilterDomain}
+                   onChange={e => { setToolFilterDomain(e.target.value); setToolFilterType(null); }}
+                   disabled={!toolFilterGrade}
+                   className="text-sm border border-border rounded-lg px-3 py-1.5 bg-card focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-40"
+                 >
+                   <option value="">전체 영역</option>
+                   {domainsForGrade(toolFilterGrade).map(d => <option key={d.id} value={d.domain_id}>{d.name}</option>)}
+                 </select>
                 </div>
+
+                {/* 단원(Type) chip */}
+                {toolFilterDomain && (() => {
+                 const domainProblems = problems.filter(p => p.domain_id === toolFilterDomain);
+                 const domainProblemIds = new Set(domainProblems.map(p => p.problem_id));
+                 const typeIdsInDomain = new Set(
+                   problemTypes.filter(pt => domainProblemIds.has(pt.problem_id)).map(pt => pt.type_id)
+                 );
+                 const typesInDomain = types.filter(t => typeIdsInDomain.has(t.type_id));
+                 return typesInDomain.length > 0 && (
+                   <div className="flex gap-2 flex-wrap mb-4">
+                     <button
+                       onClick={() => setToolFilterType(null)}
+                       className={`rounded-full text-xs px-3 py-1.5 border transition-colors ${
+                         !toolFilterType ? 'bg-primary text-primary-foreground border-primary' : 'bg-card border-border hover:bg-muted'
+                       }`}
+                     >전체</button>
+                     {typesInDomain.map(t => (
+                       <button
+                         key={t.type_id}
+                         onClick={() => setToolFilterType(toolFilterType === t.type_id ? null : t.type_id)}
+                         className={`rounded-full text-xs px-3 py-1.5 border transition-colors ${
+                           toolFilterType === t.type_id ? 'bg-primary text-primary-foreground border-primary' : 'bg-card border-border hover:bg-muted'
+                         }`}
+                       >{t.name}</button>
+                     ))}
+                   </div>
+                 );
+                })()}
 
                 {filteredTools.length === 0 ? (
                   <p className="text-center text-muted-foreground py-8">도구 정보가 없어요.</p>

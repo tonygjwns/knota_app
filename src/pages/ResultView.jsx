@@ -113,7 +113,6 @@ export default function ResultView() {
   const [regrading, setRegrading] = useState(false);
   const [showAlt, setShowAlt] = useState(false);
   const [tooltipTool, setTooltipTool] = useState(null); // tool entity for tooltip modal
-  const [dismissedRemediation, setDismissedRemediation] = useState(false);
   const [bookmarkedToolIds, setBookmarkedToolIds] = useState(new Set());
   const [bookmarkIdMap, setBookmarkIdMap] = useState(new Map());
   const [problemBookmarked, setProblemBookmarked] = useState(false);
@@ -122,6 +121,9 @@ export default function ResultView() {
   const [solutionSteps, setSolutionSteps] = useState([]);
   const [showMatchedSolution, setShowMatchedSolution] = useState(false);
   const [feedbackSent, setFeedbackSent] = useState(false);
+  const [showReviewRequestModal, setShowReviewRequestModal] = useState(false);
+  const [reviewNote, setReviewNote] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   useEffect(() => {
     loadAttempt();
@@ -384,12 +386,32 @@ export default function ResultView() {
     : null;
   const otherSolutions = solutions.filter(s => s.solution_id !== grading?.matched_solution_id);
 
-  // Unique tool_ids from errors/gaps for "이 매듭 더 연습하기"
-  const weakToolIds = [...new Set([
-    ...errors.map(e => e.tool_id).filter(Boolean),
-    ...gaps.map(g => g.tool_id).filter(Boolean),
-  ])];
-  const weakToolNames = weakToolIds.map(id => getToolName(id)).filter(Boolean);
+  // UX-3: 도구 추출 (partial/wrong step_feedback + error_locations + gap_locations)
+  const weakStepToolIds = (grading?.step_feedback || [])
+    .filter(s => s.status === 'partial' || s.status === 'wrong')
+    .map(s => s.tool_id).filter(Boolean);
+  const errorToolIds = (grading?.error_locations || []).map(e => e.tool_id).filter(Boolean);
+  const gapToolIds = (grading?.gap_locations || []).map(g => g.tool_id).filter(Boolean);
+  const remediationToolIds = [...new Set([...weakStepToolIds, ...errorToolIds, ...gapToolIds])];
+
+  const handleRemediation = async (toolId) => {
+    try {
+      const allProblems = await base44.entities.Problem.list('-created_date', 1000);
+      const matching = allProblems.filter(p => {
+        try { return JSON.parse(p.tool_ids || '[]').includes(toolId); } 
+        catch { return false; }
+      });
+      const pool = matching.filter(p => p.id !== attempt.problem_id);
+      if (pool.length === 0) {
+        toast.error('이 도구의 다른 문제가 없어요');
+        return;
+      }
+      const pick = pool[Math.floor(Math.random() * pool.length)];
+      navigate(`/problem/${pick.id}?remediation_for=${attempt.id}&target_tool=${toolId}`);
+    } catch {
+      toast.error('문제를 불러오지 못했어요');
+    }
+  };
 
   return (
     <AppLayout>
@@ -780,6 +802,46 @@ export default function ResultView() {
           )}
         </div>
 
+        {/* 검토 요청 - 학생만 */}
+        {viewerIsOwner && !attempt.review_requested && (
+          <Card className="p-3 border-dashed">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium">채점이 이상한가요?</p>
+                <p className="text-xs text-muted-foreground mt-0.5">선생님께 다시 봐달라고 요청할 수 있어요</p>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => setShowReviewRequestModal(true)}>
+                다시 봐달라기
+              </Button>
+            </div>
+          </Card>
+        )}
+        {viewerIsOwner && attempt.review_requested && !attempt.review_resolved_at && (
+          <Card className="p-3 bg-emerald-50 border-emerald-200">
+            <p className="text-sm text-emerald-700">✓ 선생님께 다시 봐달라고 요청했어요</p>
+          </Card>
+        )}
+        {viewerIsOwner && attempt.teacher_review_json && (
+          <Card className="p-4 bg-primary/5 border-primary/30">
+            <p className="text-sm font-medium mb-2">📝 선생님이 다시 채점했어요</p>
+            {(() => {
+              try {
+                const tr = JSON.parse(attempt.teacher_review_json);
+                return (
+                  <>
+                    {tr.score_adjustment !== undefined && (
+                      <p className="text-sm">점수 보정: {tr.score_adjustment > 0 ? '+' : ''}{tr.score_adjustment}점</p>
+                    )}
+                    {tr.comment && (
+                      <p className="text-sm text-foreground mt-2">{tr.comment}</p>
+                    )}
+                  </>
+                );
+              } catch { return null; }
+            })()}
+          </Card>
+        )}
+
         {/* 추천 피드백 카드 */}
         {viewerIsOwner && fromRecommend && !feedbackSent && (
           <Card className="p-4 bg-primary/5 border-primary/30">
@@ -822,68 +884,51 @@ export default function ResultView() {
           <p className="text-xs text-muted-foreground">피드백을 보내주셔서 감사해요</p>
         )}
 
-        {/* 매듭 보강 권유 카드 — remediation 중이 아니면 표시 (소유자만) */}
-        {viewerIsOwner && (attempt.correctness === 'partial' || attempt.correctness === 'wrong') && weakToolIds.length > 0 && attempt.attempt_type !== 'remediation_retry' && attempt.attempt_type !== 'remediation_practice' && !dismissedRemediation && (
-          <Card className="p-4 border-primary/30 bg-primary/5">
-            <div className="flex items-start gap-3 mb-3">
-              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                <Wrench className="w-4 h-4 text-primary" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-foreground mb-1">🎯 도구 보강하기</h3>
-                <p className="text-xs text-muted-foreground">
-                  {weakToolNames.length > 0
-                    ? `[${weakToolNames.join(', ')}] 부분이 어려웠어요`
-                    : '일부 도구가 부족했어요'}
-                </p>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground mb-3">
-              도구 학습 + 유사 문제 3 개로 보강해 봐요
+        {/* UX-3: 도구별 보강 카드 */}
+        {viewerIsOwner && (attempt.correctness === 'partial' || attempt.correctness === 'wrong') && 
+         remediationToolIds.length > 0 && 
+         attempt.attempt_type !== 'remediation_retry' && (
+          <div className="space-y-2">
+            <h2 className="text-base font-semibold flex items-center gap-2">
+              <Wrench className="w-4 h-4 text-primary" />
+              도구 보강하기
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              이 문제에서 부족했던 도구를 그 도구의 다른 문제로 연습할 수 있어요
             </p>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                className="flex-1"
-                onClick={() => navigate(`/remediation/${attempt.id}/retry`)}
-              >
-                보강 시작하기
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setDismissedRemediation(true)}
-              >
-                그냥 넘어가기
-              </Button>
-            </div>
-          </Card>
-        )}
-
-        {/* Remediation flow buttons — 소유자만 */}
-        {viewerIsOwner && attempt.attempt_type === 'remediation_retry' && (
-          <div className="pt-2">
-            {attempt.correctness === 'correct' ? (
-              <Button size="lg" className="w-full" onClick={() => navigate(`/remediation/${attempt.parent_attempt_id}/practice/0`)}>
-                도구 보강 계속하기 (단계 3)
-              </Button>
-            ) : (
-              <Button size="lg" className="w-full" onClick={() => navigate(`/remediation/${attempt.parent_attempt_id}/lesson`)}>
-                도구 학습하기 (단계 2)
-              </Button>
-            )}
+            {remediationToolIds.map(toolId => {
+              const toolName = getToolName(toolId) || toolId;
+              return (
+                <Card key={toolId} className="p-3 flex items-center justify-between border-primary/30 bg-primary/5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Wrench className="w-4 h-4 text-primary flex-shrink-0" />
+                    <p className="text-sm font-medium truncate">{toolName}</p>
+                  </div>
+                  <Button size="sm" onClick={() => handleRemediation(toolId)}>
+                    연습하기 <ChevronRight className="w-3 h-3 ml-1" />
+                  </Button>
+                </Card>
+              );
+            })}
           </div>
         )}
 
-        {viewerIsOwner && attempt.attempt_type === 'remediation_practice' && (
-          <div className="pt-2">
-            <Button size="lg" className="w-full" onClick={() => {
-              const parentAttemptId = attempt.parent_attempt_id;
-              navigate(`/remediation/${parentAttemptId}/complete`);
+        {/* 보강 풀이 결과 - 원래 문제로 돌아가기 */}
+        {viewerIsOwner && attempt.attempt_type === 'remediation_retry' && attempt.parent_attempt_id && (
+          <Card className="p-4 bg-primary/5 border-primary/30">
+            <p className="text-sm font-medium mb-2">📚 보강 풀이 완료!</p>
+            <p className="text-xs text-muted-foreground mb-3">원래 문제로 돌아가 다시 풀어볼까요?</p>
+            <Button size="sm" className="w-full" onClick={async () => {
+              const parents = await base44.entities.StudentAttempt.filter({ id: attempt.parent_attempt_id }, '-created_date', 1);
+              if (parents.length > 0) {
+                navigate(`/problem/${parents[0].problem_id}`);
+              } else {
+                toast.error('원래 문제를 찾지 못했어요');
+              }
             }}>
-              🎉 보강 완료!
+              원래 문제 다시 풀기 <ChevronRight className="w-4 h-4 ml-1" />
             </Button>
-          </div>
+          </Card>
         )}
 
         {/* Regular action buttons */}
@@ -916,8 +961,49 @@ export default function ResultView() {
               {attempt.assignment_id ? '다음 문제 (숙제)' : '다음 문제'} <ChevronRight className="w-4 h-4 ml-1" />
             </Button>
           </>
-        )}
-      </div>
-    </AppLayout>
-  );
-}
+          )}
+
+          {/* 검토 요청 모달 */}
+          {showReviewRequestModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => !submittingReview && setShowReviewRequestModal(false)}>
+           <div className="absolute inset-0 bg-black/40" />
+           <Card className="relative z-10 p-5 max-w-md w-full" onClick={e => e.stopPropagation()}>
+             <h2 className="font-semibold mb-1">채점 다시 요청</h2>
+             <p className="text-xs text-muted-foreground mb-3">어떤 점이 이상한가요? (선택)</p>
+             <Textarea
+               value={reviewNote}
+               onChange={e => setReviewNote(e.target.value)}
+               placeholder="예: 제 풀이가 맞다고 생각해요"
+               className="min-h-24"
+               disabled={submittingReview}
+             />
+             <div className="flex gap-2 mt-4 justify-end">
+               <Button variant="outline" disabled={submittingReview} onClick={() => setShowReviewRequestModal(false)}>
+                 취소
+               </Button>
+               <Button disabled={submittingReview} onClick={async () => {
+                 setSubmittingReview(true);
+                 try {
+                   await base44.entities.StudentAttempt.update(attempt.id, {
+                     review_requested: true,
+                     review_request_note: reviewNote.trim() || null,
+                   });
+                   setAttempt(prev => ({ ...prev, review_requested: true, review_request_note: reviewNote.trim() || null }));
+                   setShowReviewRequestModal(false);
+                   toast.success('선생님께 전달했어요');
+                 } catch {
+                   toast.error('전송 실패. 다시 시도해 주세요');
+                 } finally {
+                   setSubmittingReview(false);
+                 }
+               }}>
+                 요청 보내기
+               </Button>
+             </div>
+           </Card>
+          </div>
+          )}
+          </div>
+          </AppLayout>
+          );
+          }

@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Building2, GraduationCap, Users, BookOpen } from 'lucide-react';
 import DataImportPanel from '@/components/admin/DataImportPanel';
+import { toast } from 'sonner';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
@@ -127,6 +129,22 @@ export default function AdminDashboard() {
       )}
 
       <DataImportPanel />
+
+      {/* 도구 매핑 재계산 */}
+      <Card className="p-5">
+        <h2 className="text-base font-semibold mb-1">도구 매핑 재계산</h2>
+        <p className="text-xs text-muted-foreground mb-3">TypeToolMap 을 재계산합니다. 새 문제/도구 데이터가 추가된 후 실행하세요.</p>
+        <Button onClick={async () => {
+          try {
+            const res = await base44.functions.invoke('recomputeTypeToolMap', {});
+            toast.success(`완료: ${res.data?.created || 0}개 생성, ${res.data?.updated || 0}개 갱신`);
+          } catch (e) {
+            toast.error('실패: ' + e.message);
+          }
+        }}>
+          도구 매핑 재계산
+        </Button>
+      </Card>
     </div>
   );
 }

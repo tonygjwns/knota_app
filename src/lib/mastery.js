@@ -21,7 +21,21 @@ export function buildMasteryMap(attempts, problemMap) {
 
     // 도구 추출 우선순위
     let toolIds = [];
-    if (attempt.claude_grade_json) {
+    // Priority 1: teacher_review_json (강사 보정)
+    if (attempt.teacher_review_json) {
+      try {
+        const tr = JSON.parse(attempt.teacher_review_json);
+        const edits = tr.step_edits || {};
+        Object.values(edits).forEach(edit => {
+          if ((edit.status === 'wrong' || edit.status === 'partial') && edit.tool_id) {
+            toolIds.push(edit.tool_id);
+          }
+        });
+        if (toolIds.length > 0) toolIds = [...new Set(toolIds)];
+      } catch {}
+    }
+    // Priority 2: claude_grade_json error_locations
+    if (toolIds.length === 0 && attempt.claude_grade_json) {
       try {
         const raw = JSON.parse(attempt.claude_grade_json);
         const g = raw?.response ?? raw;
@@ -29,6 +43,7 @@ export function buildMasteryMap(attempts, problemMap) {
         if (errIds.length > 0) toolIds = [...new Set(errIds)];
       } catch {}
     }
+    // Priority 3: problem.tool_ids (fallback)
     if (toolIds.length === 0 && problem.tool_ids) {
       try {
         const parsed = JSON.parse(problem.tool_ids);

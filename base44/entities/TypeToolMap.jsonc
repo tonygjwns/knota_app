@@ -1,0 +1,30 @@
+{
+  "name": "TypeToolMap",
+  "type": "object",
+  "properties": {
+    "type_id": {
+      "type": "string",
+      "description": "Type ID (\uc774 \ub9e4\ud551\uc758 \ud0a4)"
+    },
+    "tool_ids": {
+      "type": "string",
+      "description": "\uc774 Type \uc758 \ubb38\uc81c\ub4e4\uc5d0\uc11c \uc0ac\uc6a9\ub41c \ub3c4\uad6c ID \uc758 \ud569\uc9d1\ud569 (JSON \ubc30\uc5f4 \ubb38\uc790\uc5f4)"
+    },
+    "problem_count": {
+      "type": "number",
+      "description": "\uc774 Type \uc5d0 \uc18d\ud55c \ubb38\uc81c \uc218"
+    },
+    "tool_problem_counts": {
+      "type": "string",
+      "description": "{tool_id: \uadf8 Type \uc548\uc5d0\uc11c \uadf8 \ub3c4\uad6c\ub97c \uc4f0\ub294 \ubb38\uc81c \uc218} JSON object \ubb38\uc790\uc5f4"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "\ub9c8\uc9c0\ub9c9 \uc7ac\uacc4\uc0b0 \uc2dc\uac01"
+    }
+  },
+  "required": [
+    "type_id"
+  ]
+}
