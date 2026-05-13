@@ -400,6 +400,13 @@ function ProblemModeView({ mode, user, navigate }) {
   const [wrongFilterDomain, setWrongFilterDomain] = useState('');
   const [wrongSort, setWrongSort] = useState('recent');
 
+  // tool section collapse
+  const [expandedToolSections, setExpandedToolSections] = useState({ new: true, practiced: true });
+  // wrong date group collapse
+  const [expandedWrongDates, setExpandedWrongDates] = useState({
+    today: true, yesterday: true, thisWeek: true, thisMonth: false, older: false,
+  });
+
   useEffect(() => {
     setLoading(true);
     setSelectedDomain(null);
@@ -594,25 +601,23 @@ function ProblemModeView({ mode, user, navigate }) {
 
   // filtered tools
   const filteredTools = tools.filter(tool => {
-    if (!toolFilterDomain) return true;
-    const dom = domains.find(d => d.domain_id === toolFilterDomain);
-    if (!dom) return true;
-    try { return JSON.parse(dom.achvmt_prefix_patterns || '[]').length >= 0; } catch { return true; }
-    // domain_ids field on MathTool
-    try {
-      const dids = JSON.parse(tool.domain_ids || '[]');
-      return dids.includes(toolFilterDomain);
-    } catch { return true; }
-  }).filter(tool => {
-    if (!toolFilterGrade) return true;
-    // domain_ids → check if any of those domains has matching grade_range
-    try {
-      const dids = JSON.parse(tool.domain_ids || '[]');
-      return dids.some(did => {
-        const dom = domains.find(d => d.domain_id === did);
-        return dom?.grade_range === toolFilterGrade;
-      });
-    } catch { return true; }
+    if (toolFilterGrade) {
+      try {
+        const dids = JSON.parse(tool.domain_ids || '[]');
+        const matchesGrade = dids.some(did => {
+          const dom = domains.find(d => d.domain_id === did);
+          return dom?.grade_range === toolFilterGrade;
+        });
+        if (!matchesGrade) return false;
+      } catch { return false; }
+    }
+    if (toolFilterDomain) {
+      try {
+        const dids = JSON.parse(tool.domain_ids || '[]');
+        if (!dids.includes(toolFilterDomain)) return false;
+      } catch { return false; }
+    }
+    return true;
   });
 
   const domainsForGrade = (grade) => domains.filter(d => !grade || d.grade_range === grade);
@@ -833,23 +838,39 @@ function ProblemModeView({ mode, user, navigate }) {
                     {/* 미경험 섹션 */}
                     {filteredTools.some(t => t.isNew) && (
                       <div className="mb-4">
-                        <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">미경험 도구</p>
-                        <div className="space-y-2">
-                          {filteredTools.filter(t => t.isNew).map(tool => (
-                            <ToolCard key={tool.id} tool={tool} onClick={() => handleToolSelect(tool)} />
-                          ))}
-                        </div>
+                        <button
+                          onClick={() => setExpandedToolSections(p => ({ ...p, new: !p.new }))}
+                          className="flex items-center justify-between w-full mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide"
+                        >
+                          <span>미경험 도구 ({filteredTools.filter(t => t.isNew).length})</span>
+                          <ChevronRight className={`w-4 h-4 transition-transform ${expandedToolSections.new ? 'rotate-90' : ''}`} />
+                        </button>
+                        {expandedToolSections.new && (
+                          <div className="space-y-2">
+                            {filteredTools.filter(t => t.isNew).map(tool => (
+                              <ToolCard key={tool.id} tool={tool} onClick={() => handleToolSelect(tool)} />
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                     {/* 숙련도별 */}
                     {filteredTools.some(t => !t.isNew) && (
                       <div>
-                        <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">숙련도 낮은 순</p>
-                        <div className="space-y-2">
-                          {filteredTools.filter(t => !t.isNew).map(tool => (
-                            <ToolCard key={tool.id} tool={tool} onClick={() => handleToolSelect(tool)} />
-                          ))}
-                        </div>
+                        <button
+                          onClick={() => setExpandedToolSections(p => ({ ...p, practiced: !p.practiced }))}
+                          className="flex items-center justify-between w-full mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide"
+                        >
+                          <span>숙련도 낮은 순 ({filteredTools.filter(t => !t.isNew).length})</span>
+                          <ChevronRight className={`w-4 h-4 transition-transform ${expandedToolSections.practiced ? 'rotate-90' : ''}`} />
+                        </button>
+                        {expandedToolSections.practiced && (
+                          <div className="space-y-2">
+                            {filteredTools.filter(t => !t.isNew).map(tool => (
+                              <ToolCard key={tool.id} tool={tool} onClick={() => handleToolSelect(tool)} />
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </>
@@ -902,31 +923,66 @@ function ProblemModeView({ mode, user, navigate }) {
                       단원별로 풀기
                     </Button>
                   </div>
-                ) : (
-                  <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground mb-2">{filteredWrong.length}개의 문제</p>
-                    {filteredWrong.map(attempt => (
-                      <Card key={attempt.id}
-                            className="p-4 card-hover cursor-pointer border-l-4 border-l-red-300"
-                            onClick={() => navigate(`/problem/${attempt.problem_id}`)}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-foreground truncate">
-                              {attempt.problem_content
-                                ? attempt.problem_content.slice(0, 60) + '...'
-                                : `문제 #${attempt.problem_id}`}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {attempt.problem_domain && <span className="mr-2">{attempt.problem_domain}</span>}
-                              {attempt.submitted_at ? new Date(attempt.submitted_at).toLocaleDateString('ko-KR') : ''}
-                            </p>
+                ) : (() => {
+                  const now2 = new Date();
+                  const today2 = new Date(now2.getFullYear(), now2.getMonth(), now2.getDate());
+                  const yesterday2 = new Date(today2.getTime() - 24 * 60 * 60 * 1000);
+                  const weekAgo2 = new Date(today2.getTime() - 7 * 24 * 60 * 60 * 1000);
+                  const monthAgo2 = new Date(today2.getTime() - 30 * 24 * 60 * 60 * 1000);
+                  const wrongGrouped = { today: [], yesterday: [], thisWeek: [], thisMonth: [], older: [] };
+                  filteredWrong.forEach(a => {
+                    const d = new Date(a.submitted_at);
+                    if (d >= today2) wrongGrouped.today.push(a);
+                    else if (d >= yesterday2) wrongGrouped.yesterday.push(a);
+                    else if (d >= weekAgo2) wrongGrouped.thisWeek.push(a);
+                    else if (d >= monthAgo2) wrongGrouped.thisMonth.push(a);
+                    else wrongGrouped.older.push(a);
+                  });
+                  const dateLabels = { today: '오늘', yesterday: '어제', thisWeek: '이번 주', thisMonth: '이번 달', older: '그 이전' };
+                  return (
+                    <div className="space-y-4">
+                      {Object.entries(wrongGrouped).map(([groupKey, items]) => {
+                        if (items.length === 0) return null;
+                        const isExpanded = expandedWrongDates[groupKey];
+                        return (
+                          <div key={groupKey}>
+                            <button
+                              onClick={() => setExpandedWrongDates(p => ({ ...p, [groupKey]: !p[groupKey] }))}
+                              className="flex items-center justify-between w-full mb-2 text-sm font-semibold text-foreground"
+                            >
+                              <span>{dateLabels[groupKey]} ({items.length})</span>
+                              <ChevronRight className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                            </button>
+                            {isExpanded && (
+                              <div className="space-y-2">
+                                {items.map(attempt => (
+                                  <Card key={attempt.id}
+                                        className="p-4 card-hover cursor-pointer border-l-4 border-l-red-300"
+                                        onClick={() => navigate(`/problem/${attempt.problem_id}`)}>
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium text-foreground truncate">
+                                          {attempt.problem_content
+                                            ? attempt.problem_content.slice(0, 60) + '...'
+                                            : `문제 #${attempt.problem_id}`}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground mt-0.5">
+                                          {attempt.problem_domain && <span className="mr-2">{attempt.problem_domain}</span>}
+                                          {attempt.submitted_at ? new Date(attempt.submitted_at).toLocaleDateString('ko-KR') : ''}
+                                        </p>
+                                      </div>
+                                      <ScoreBadge score={attempt.score || 0} size="sm" />
+                                    </div>
+                                  </Card>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                          <ScoreBadge score={attempt.score || 0} size="sm" />
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
-                )}
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </>

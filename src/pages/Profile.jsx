@@ -139,6 +139,14 @@ export default function Profile() {
         <LogOut className="w-4 h-4 mr-2" />
         로그아웃
       </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="w-full mt-2 text-xs text-muted-foreground hover:text-destructive"
+        onClick={() => navigate('/withdraw')}
+      >
+        회원 탈퇴
+      </Button>
     </div>
   );
 

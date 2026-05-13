@@ -295,24 +295,14 @@ export default function History() {
               <span>{filters.scoreRange[0]} - {filters.scoreRange[1]}</span>
             </div>
             <div className="px-2">
-              <div className="flex items-center gap-2">
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={filters.scoreRange[0]}
-                  onChange={e => setFilters(f => ({ ...f, scoreRange: [+e.target.value, f.scoreRange[1]] }))}
-                  className="flex-1"
-                />
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={filters.scoreRange[1]}
-                  onChange={e => setFilters(f => ({ ...f, scoreRange: [f.scoreRange[0], +e.target.value] }))}
-                  className="flex-1"
-                />
-              </div>
+              <Slider
+                value={filters.scoreRange}
+                onValueChange={(val) => setFilters(f => ({ ...f, scoreRange: val }))}
+                min={0}
+                max={100}
+                step={1}
+                className="w-full"
+              />
             </div>
           </div>
         </div>

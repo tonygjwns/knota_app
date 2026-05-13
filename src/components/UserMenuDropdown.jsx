@@ -39,10 +39,7 @@ export default function UserMenuDropdown({ orgLabel }) {
       {open && (
         <div className="absolute right-0 top-full mt-1.5 w-64 bg-card rounded-xl shadow-lg border border-border z-50 overflow-hidden">
           {/* 사용자 정보 헤더 */}
-          <button
-            className="w-full flex items-center gap-3 p-4 hover:bg-muted transition-colors text-left"
-            onClick={() => { navigate('/profile'); close(); }}
-          >
+          <div className="w-full flex items-center gap-3 p-4 text-left">
             <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold flex-shrink-0">
               {initials}
             </div>
@@ -53,7 +50,7 @@ export default function UserMenuDropdown({ orgLabel }) {
                 {ROLE_LABELS[user?.role] || user?.role}
               </span>
             </div>
-          </button>
+          </div>
 
           {/* 학원/학급 */}
           {orgLabel && (

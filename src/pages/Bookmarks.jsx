@@ -7,7 +7,7 @@ import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Wrench, Star, ChevronRight, BookOpen } from 'lucide-react';
+import { Wrench, Star, ChevronRight, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Bookmarks() {
@@ -80,9 +80,6 @@ export default function Bookmarks() {
     <AppLayout>
       <div className="space-y-5 pb-8">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/problems')} className="btn-touch">
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <Star className="w-6 h-6 text-amber-500" />

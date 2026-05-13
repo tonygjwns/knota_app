@@ -41,6 +41,7 @@ import RemediationLesson from './pages/remediation/RemediationLesson';
 import RemediationPractice from './pages/remediation/RemediationPractice';
 import RemediationComplete from './pages/remediation/RemediationComplete';
 import Bookmarks from './pages/Bookmarks';
+import Withdraw from './pages/Withdraw';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user } = useAuth();
@@ -90,6 +91,7 @@ const AuthenticatedApp = () => {
       <Route path="/remediation/:attemptId/practice/:practiceIdx" element={<RemediationPractice />} />
       <Route path="/remediation/:attemptId/complete" element={<RemediationComplete />} />
       <Route path="/bookmarks" element={<Bookmarks />} />
+      <Route path="/withdraw" element={<Withdraw />} />
 
       {/* Admin routes */}
       <Route path="/admin" element={<AdminLayout />}>
