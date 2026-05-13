@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import AppLayout from '@/components/AppLayout';
@@ -13,12 +13,18 @@ import { toast } from 'sonner';
 export default function Bookmarks() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isTeacherRoute = location.pathname.startsWith('/teacher');
   const [toolBookmarks, setToolBookmarks] = useState([]);
   const [problemBookmarks, setProblemBookmarks] = useState([]);
   const [toolMap, setToolMap] = useState(new Map());
   const [attemptMap, setAttemptMap] = useState(new Map());
   const [loading, setLoading] = useState(true);
   const [practicingId, setPracticingId] = useState(null);
+
+  const Wrapper = isTeacherRoute
+    ? ({ children }) => <div>{children}</div>
+    : AppLayout;
 
   useEffect(() => {
     if (!user) return;
@@ -56,7 +62,7 @@ export default function Bookmarks() {
         return;
       }
       const pick = matching[Math.floor(Math.random() * matching.length)];
-      navigate(`/problem/${pick.id}`);
+      navigate(isTeacherRoute ? `/teacher/problems/${pick.id}` : `/problem/${pick.id}`);
     } finally {
       setPracticingId(null);
     }
@@ -74,10 +80,10 @@ export default function Bookmarks() {
     toast.success('즐겨찾기에서 제거했어요');
   };
 
-  if (loading) return <AppLayout><InlineLoader message="즐겨찾기 불러오는 중..." /></AppLayout>;
+  if (loading) return <Wrapper><InlineLoader message="즐겨찾기 불러오는 중..." /></Wrapper>;
 
   return (
-    <AppLayout>
+    <Wrapper>
       <div className="space-y-5 pb-8">
         <div className="flex items-center gap-3">
           <div>
@@ -85,7 +91,11 @@ export default function Bookmarks() {
               <Star className="w-6 h-6 text-amber-500" />
               내 즐겨찾기
             </h1>
-            <p className="text-sm text-muted-foreground mt-0.5">나중에 다시 공부하려고 표시한 항목들이에요</p>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {isTeacherRoute
+                ? '즐겨찾기된 항목들이에요'
+                : '나중에 다시 공부하려고 표시한 항목들이에요'}
+            </p>
           </div>
         </div>
 
@@ -112,9 +122,9 @@ export default function Bookmarks() {
                   <p className="font-semibold text-lg text-foreground">아직 즐겨찾기한 매듭이 없어요</p>
                   <p className="text-sm text-muted-foreground mt-1">문제 풀기·결과 화면에서 ⭐ 버튼으로 추가할 수 있어요</p>
                 </div>
-                <Button onClick={() => navigate('/problems')}>
+                <Button onClick={() => navigate(isTeacherRoute ? '/teacher/problems' : '/problems')}>
                   <BookOpen className="w-4 h-4 mr-2" />
-                  자유 풀이로 →
+                  {isTeacherRoute ? '문제 열람으로 →' : '자유 풀이로 →'}
                 </Button>
               </div>
             ) : (
@@ -148,7 +158,9 @@ export default function Bookmarks() {
                           onClick={() => handleToolPractice(bookmark)}
                           disabled={practicingId === bookmark.id}
                         >
-                          {practicingId === bookmark.id ? '문제 찾는 중...' : '이 매듭의 문제 풀기'}
+                          {practicingId === bookmark.id
+                            ? '문제 찾는 중...'
+                            : (isTeacherRoute ? '이 매듭의 문제 보기' : '이 매듭의 문제 풀기')}
                           {practicingId !== bookmark.id && <ChevronRight className="w-4 h-4" />}
                         </Button>
                         <Button size="sm" variant="outline" onClick={() => handleToolUnbookmark(bookmark)} className="text-muted-foreground">
@@ -173,9 +185,9 @@ export default function Bookmarks() {
                   <p className="font-semibold text-lg text-foreground">아직 즐겨찾기한 문제가 없어요</p>
                   <p className="text-sm text-muted-foreground mt-1">문제 풀기·결과 화면에서 ⭐ 버튼으로 추가할 수 있어요</p>
                 </div>
-                <Button onClick={() => navigate('/problems')}>
+                <Button onClick={() => navigate(isTeacherRoute ? '/teacher/problems' : '/problems')}>
                   <BookOpen className="w-4 h-4 mr-2" />
-                  문제 풀러 가기 →
+                  {isTeacherRoute ? '문제 열람으로 →' : '문제 풀러 가기 →'}
                 </Button>
               </div>
             ) : (
@@ -203,9 +215,11 @@ export default function Bookmarks() {
                     <div className="flex gap-2">
                       <Button
                         size="sm" className="flex-1 gap-1"
-                        onClick={() => navigate(`/problem/${bookmark.problem_id}`)}
+                        onClick={() => navigate(
+                          isTeacherRoute ? `/teacher/problems/${bookmark.problem_id}` : `/problem/${bookmark.problem_id}`
+                        )}
                       >
-                        다시 풀기 <ChevronRight className="w-4 h-4" />
+                        {isTeacherRoute ? '문제 보기' : '다시 풀기'} <ChevronRight className="w-4 h-4" />
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => handleProblemUnbookmark(bookmark)} className="text-muted-foreground">
                         해제
@@ -218,6 +232,6 @@ export default function Bookmarks() {
           </TabsContent>
         </Tabs>
       </div>
-    </AppLayout>
+    </Wrapper>
   );
 }

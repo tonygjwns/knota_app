@@ -48,10 +48,7 @@ export default function TeacherDashboard() {
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">강사 대시보드</h1>
-          <p className="text-muted-foreground text-sm mt-1">내 학급 학생들의 학습 현황이에요</p>
-        </div>
+        <p className="text-muted-foreground text-sm">내 학급 학생들의 학습 현황이에요</p>
         {timing && (
           <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-lg">
             로드 {timing.total_ms}ms

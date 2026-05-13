@@ -9,7 +9,6 @@ import UserMenuDropdown from '@/components/UserMenuDropdown';
 
 const TEACHER_NAV = [
   { path: '/teacher', icon: BarChart2, label: '대시보드', exact: true },
-  { path: '/teacher/students', icon: Users, label: '내 학생들' },
   { path: '/teacher/classes', icon: BookOpen, label: '내 학급' },
   { path: '/teacher/assignments', icon: ClipboardList, label: '숙제' },
   { path: '/teacher/review', icon: CheckSquare, label: '채점 검토' },
