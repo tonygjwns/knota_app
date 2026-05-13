@@ -11,8 +11,9 @@ import ScoreBadge from '@/components/ScoreBadge';
 import { gradeLabel, gradeLabelShort, extractGradeOptions } from '@/lib/grade-labels.js';
 import {
   Shuffle, BookOpen, Wrench, AlertCircle, ChevronRight, ArrowLeft,
-  Clock, ClipboardList, Star, Sparkles
+  Clock, ClipboardList, Star, Sparkles, BarChart3
 } from 'lucide-react';
+import { HALF_LIFE_MS, STALE_MS, buildMasteryMap, getMasteryColor } from '@/lib/mastery';
 
 // ──────────────────────────────────────────────
 // Hub placeholder card
@@ -268,6 +269,25 @@ function ProblemHub() {
           </section>
         )}
 
+        {/* 내 진단 */}
+        <section className="space-y-2">
+          <h2 className="text-base font-semibold text-foreground">내 진단</h2>
+          <Link to="/diagnosis">
+            <Card className="p-4 card-hover cursor-pointer">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-emerald-500 bg-emerald-50">
+                  <BarChart3 className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm text-foreground">내 진단 보기</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">약점 매듭과 영역별 숙련도</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+              </div>
+            </Card>
+          </Link>
+        </section>
+
         {/* 자유 연습 */}
         <section className="space-y-2">
           <h2 className="text-base font-semibold text-foreground">자유 연습</h2>
@@ -326,53 +346,6 @@ export default function ProblemSelect() {
 
   if (!mode) return <ProblemHub />;
   return <ProblemModeView mode={mode} user={user} navigate={navigate} />;
-}
-
-// ──────────────────────────────────────────────
-// Helpers
-// ──────────────────────────────────────────────
-const HALF_LIFE_MS = 30 * 24 * 60 * 60 * 1000;
-
-function buildMasteryMap(attempts, problemMap) {
-  const now = Date.now();
-  const masteryMap = new Map();
-  for (const a of attempts) {
-    const problem = problemMap.get(a.problem_id);
-    if (!problem) continue;
-    const submittedAt = a.submitted_at ? new Date(a.submitted_at).getTime() : now;
-    const ageMs = now - submittedAt;
-    const w = Math.pow(0.5, ageMs / HALF_LIFE_MS);
-    let toolIds = [];
-    if (a.claude_grade_json) {
-      try {
-        const raw = JSON.parse(a.claude_grade_json);
-        const g = raw?.response ?? raw;
-        const errIds = (g?.error_locations || []).map(e => e.tool_id).filter(Boolean);
-        if (errIds.length > 0) toolIds = [...new Set(errIds)];
-      } catch {}
-    }
-    if (toolIds.length === 0 && problem.tool_ids) {
-      try {
-        const parsed = JSON.parse(problem.tool_ids);
-        if (Array.isArray(parsed)) toolIds = parsed.filter(Boolean);
-      } catch {}
-    }
-    for (const tid of toolIds) {
-      if (!masteryMap.has(tid)) masteryMap.set(tid, { weightedScore: 0, weight: 0, lastAt: 0 });
-      const m = masteryMap.get(tid);
-      m.weightedScore += (a.score || 0) * w;
-      m.weight += w;
-      m.lastAt = Math.max(m.lastAt, submittedAt);
-    }
-  }
-  return masteryMap;
-}
-
-function getMasteryColor(avg, isNew) {
-  if (isNew) return 'text-muted-foreground';
-  if (avg < 70) return 'text-red-500';
-  if (avg < 90) return 'text-amber-500';
-  return 'text-emerald-500';
 }
 
 // ──────────────────────────────────────────────
@@ -440,7 +413,6 @@ function ProblemModeView({ mode, user, navigate }) {
         weakEntries.sort((a, b) => a.avg - b.avg);
 
         // stale tools (14일 이상)
-        const STALE_MS = 14 * 24 * 60 * 60 * 1000;
         const staleEntries = [];
         for (const [tid, m] of masteryMap) {
           const ageMs = now - m.lastAt;

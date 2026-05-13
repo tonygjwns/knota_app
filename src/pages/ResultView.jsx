@@ -11,7 +11,8 @@ import ScoreBadge, { ScoreSummaryText, StepStatusBadge } from '@/components/Scor
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { ChevronDown, ChevronUp, AlertTriangle, ArrowLeft, RotateCcw, ChevronRight, Clock, Wrench, Star, BookOpen } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle, ArrowLeft, RotateCcw, ChevronRight, Clock, Wrench, Star, BookOpen, BarChart3 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import SolutionCard from '@/components/SolutionCard';
 import { toast } from 'sonner';
 import { GRADING_SCHEMA, buildToolsBlock, buildSolutionsBlock, buildGradingPrompt, sanitizeGradingResult } from '@/lib/grading';
@@ -877,9 +878,17 @@ export default function ResultView() {
           </div>
         )}
         {viewerIsOwner && attempt.attempt_type !== 'remediation_retry' && attempt.attempt_type !== 'remediation_practice' && (
-          <Button size="sm" className="btn-touch w-full mt-2" onClick={handleNextProblem}>
-            {attempt.assignment_id ? '다음 문제 (숙제)' : '다음 문제'} <ChevronRight className="w-4 h-4 ml-1" />
-          </Button>
+          <>
+            <div className="text-center mt-3">
+              <Link to="/diagnosis" className="text-xs text-muted-foreground hover:text-primary inline-flex items-center gap-1">
+                <BarChart3 className="w-3 h-3" />
+                내 진단 보기
+              </Link>
+            </div>
+            <Button size="sm" className="btn-touch w-full mt-2" onClick={handleNextProblem}>
+              {attempt.assignment_id ? '다음 문제 (숙제)' : '다음 문제'} <ChevronRight className="w-4 h-4 ml-1" />
+            </Button>
+          </>
         )}
       </div>
     </AppLayout>
