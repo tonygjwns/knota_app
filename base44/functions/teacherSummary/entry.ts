@@ -81,6 +81,7 @@ Deno.serve(async (req) => {
         active_assignments: [],
         weak_or_unattempted_tools_by_class: {},
         domain_summary_by_class: {},
+        type_summary_by_class: {},
         review_request_count: 0,
         timing: { classes_ms, students_ms: 0, attempts_ms: 0, mastery_ms: 0, total_ms: Date.now() - t0 },
       });
@@ -118,6 +119,7 @@ Deno.serve(async (req) => {
         active_assignments: [],
         weak_or_unattempted_tools_by_class: {},
         domain_summary_by_class: {},
+        type_summary_by_class: {},
         review_request_count: 0,
         timing: { classes_ms, students_ms, attempts_ms: 0, mastery_ms: 0, total_ms: Date.now() - t0 },
       });
@@ -145,9 +147,9 @@ Deno.serve(async (req) => {
 
     const t_mastery_start = Date.now();
 
-    // Step 4: Problem fetch + Tools + Assignments 병렬
+    // Step 4: Problem + Tools + Assignments + Domains + Types + ProblemTypes 병렬
     const uniqueProblemIds = [...new Set(allAttempts.map(a => a.problem_id).filter(Boolean))];
-    const [allProblems, allTools, assignmentArrays] = await Promise.all([
+    const [allProblems, allTools, assignmentArrays, allDomains, allTypes, allProblemTypes] = await Promise.all([
       uniqueProblemIds.length > 0
         ? base44.asServiceRole.entities.Problem.list('-created_date', 5000)
         : Promise.resolve([]),
@@ -157,6 +159,9 @@ Deno.serve(async (req) => {
           base44.asServiceRole.entities.Assignment.filter({ class_id: c.id }, '-created_date', 100)
         )
       ),
+      base44.asServiceRole.entities.Domain.list('grade_range', 200),
+      base44.asServiceRole.entities.Type.list('name', 500),
+      base44.asServiceRole.entities.ProblemType.list('-created_date', 10000),
     ]);
 
     const problemSet = new Set(uniqueProblemIds);
@@ -205,14 +210,13 @@ Deno.serve(async (req) => {
       attemptsByStudent.get(a.student_id).push(a);
     }
 
-    // Step 7: active_assignments 계산
+    // Step 7: active_assignments 계산 (deadline 없는 active 포함)
     const now = Date.now();
     const DAY_MS = 86400000;
     const allAssignmentsFlat = assignmentArrays.flat();
     const active = allAssignmentsFlat.filter(a =>
       a.status === 'active' &&
-      a.deadline &&
-      new Date(a.deadline).getTime() > now
+      (!a.deadline || new Date(a.deadline).getTime() > now)
     );
 
     // assignment별 제출 통계
@@ -249,7 +253,9 @@ Deno.serve(async (req) => {
       const avg_score = scores.length > 0
         ? Math.round(scores.reduce((s, x) => s + x, 0) / scores.length)
         : 0;
-      const days_left = Math.ceil((new Date(a.deadline).getTime() - now) / DAY_MS);
+      const days_left = a.deadline
+        ? Math.ceil((new Date(a.deadline).getTime() - now) / DAY_MS)
+        : null;
       const progress_pct = total_students > 0
         ? Math.round(submitted_students / total_students * 100)
         : 0;
@@ -303,10 +309,11 @@ Deno.serve(async (req) => {
       if (last_attempt_at && days_since_last_attempt > 7) risk_flags.push('dormant');
       if (ua.length >= 20 && score_drop_delta < -20) risk_flags.push('score_drop');
 
-      // homework_lag: check active assignments for this student's class
+      // homework_lag: days_left null인 숙제는 제외
       let homework_lag_info = null;
       const classAssignmentsForStudent = active_assignments.filter(a => a.class_id === u.class_id);
       for (const asn of classAssignmentsForStudent) {
+        if (asn.days_left === null) continue;
         if (!asn.submitted_student_ids.includes(u.id) && asn.days_left <= 3) {
           risk_flags.push('homework_lag');
           homework_lag_info = {
@@ -349,27 +356,50 @@ Deno.serve(async (req) => {
       grade_range: c.grade_range || '',
     }));
 
-    // Step 10: domain_summary (전체) + domain_summary_by_class
+    // Step 10: domain_summary + domain_summary_by_class + type_summary_by_class
     const domainMapGlobal = new Map();
-    const domainMapByClass = new Map(); // classId → Map(domainName → {sum, count})
+    const domainMapByClass = new Map();
+
+    // type_summary_by_class 준비
+    const typesByProblemId = new Map();
+    for (const pt of allProblemTypes) {
+      if (!typesByProblemId.has(pt.problem_id)) typesByProblemId.set(pt.problem_id, []);
+      typesByProblemId.get(pt.problem_id).push(pt.type_id);
+    }
+    const typeNameMap = new Map(allTypes.map(t => [t.type_id, t.name]));
+    const typeSumMapByClass = new Map();
 
     for (const a of allAttempts) {
       const d = a.problem_domain || '미분류';
-      // global
+      // global domain
       if (!domainMapGlobal.has(d)) domainMapGlobal.set(d, { sum: 0, count: 0 });
       const ge = domainMapGlobal.get(d);
       ge.sum += a.score || 0;
       ge.count += 1;
 
-      // by class
       const student = allStudents.find(u => u.id === a.student_id);
-      if (student?.class_id) {
-        if (!domainMapByClass.has(student.class_id)) domainMapByClass.set(student.class_id, new Map());
-        const cm = domainMapByClass.get(student.class_id);
-        if (!cm.has(d)) cm.set(d, { sum: 0, count: 0 });
-        const ce = cm.get(d);
-        ce.sum += a.score || 0;
-        ce.count += 1;
+      if (!student?.class_id) continue;
+
+      // domain by class
+      if (!domainMapByClass.has(student.class_id)) domainMapByClass.set(student.class_id, new Map());
+      const cm = domainMapByClass.get(student.class_id);
+      if (!cm.has(d)) cm.set(d, { sum: 0, count: 0 });
+      const ce = cm.get(d);
+      ce.sum += a.score || 0;
+      ce.count += 1;
+
+      // type by class
+      const problem = problemMap.get(a.problem_id);
+      if (!problem) continue;
+      const typeIds = typesByProblemId.get(problem.problem_id) || [];
+      if (typeIds.length === 0) continue;
+      if (!typeSumMapByClass.has(student.class_id)) typeSumMapByClass.set(student.class_id, new Map());
+      const tcm = typeSumMapByClass.get(student.class_id);
+      for (const tid of typeIds) {
+        if (!tcm.has(tid)) tcm.set(tid, { sum: 0, count: 0 });
+        const te = tcm.get(tid);
+        te.sum += a.score || 0;
+        te.count += 1;
       }
     }
 
@@ -389,9 +419,18 @@ Deno.serve(async (req) => {
       domain_summary_by_class[classId] = arr;
     });
 
-    // Step 11: weak_or_unattempted_tools_by_class
-    // 학생별 attempt의 tool_id 집합 추출 (같은 로직)
-    const studentAttemptedTools = new Map(); // studentId → Set<toolId>
+    const type_summary_by_class = {};
+    typeSumMapByClass.forEach((tcm, classId) => {
+      const arr = [];
+      tcm.forEach((entry, tid) => {
+        arr.push({ type_id: tid, name: typeNameMap.get(tid) || tid, avg: Math.round(entry.sum / entry.count), count: entry.count });
+      });
+      arr.sort((a, b) => b.count - a.count);
+      type_summary_by_class[classId] = arr;
+    });
+
+    // Step 11: weak_or_unattempted_tools_by_class (학급 학년 영역 한정)
+    const studentAttemptedTools = new Map();
     for (const attempt of allAttempts) {
       const problem = problemMap.get(attempt.problem_id);
       if (!problem) continue;
@@ -411,7 +450,7 @@ Deno.serve(async (req) => {
         } catch {}
       }
       if (!studentAttemptedTools.has(attempt.student_id)) {
-        studentAttemptedTools.set(attempt.student_id, new Map()); // toolId → scores[]
+        studentAttemptedTools.set(attempt.student_id, new Map());
       }
       const studentToolMap = studentAttemptedTools.get(attempt.student_id);
       for (const toolId of toolIds) {
@@ -429,8 +468,15 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // 이 학급에서 등장한 모든 tool_id 수집
-      const toolScoresByClass = new Map(); // toolId → { scores[], studentSet }
+      // 학급 학년 영역 도구만 후보
+      const classGradeRange = cls.grade_range;
+      const classDomainIds = new Set(
+        classGradeRange
+          ? allDomains.filter(d => d.grade_range === classGradeRange).map(d => d.domain_id)
+          : []
+      );
+
+      const toolScoresByClass = new Map();
       for (const student of classStudentList) {
         const toolMap2 = studentAttemptedTools.get(student.id) || new Map();
         toolMap2.forEach((scores, toolId) => {
@@ -443,9 +489,19 @@ Deno.serve(async (req) => {
         });
       }
 
-      // 전체 tool 목록 (MathTool)
       const toolEntries = [];
       allTools.forEach(tool => {
+        let domain_ids = [];
+        try {
+          if (tool.domain_ids) domain_ids = JSON.parse(tool.domain_ids);
+        } catch {}
+
+        // 학급 학년 영역 한정 (grade_range 없으면 전체 허용)
+        if (classDomainIds.size > 0) {
+          const inGrade = domain_ids.some(d => classDomainIds.has(d));
+          if (!inGrade) return;
+        }
+
         const entry2 = toolScoresByClass.get(tool.tool_id);
         const attempted_student_count = entry2 ? entry2.studentSet.size : 0;
         const unattempted_count = total_student_count - attempted_student_count;
@@ -455,11 +511,6 @@ Deno.serve(async (req) => {
         const priority_score = attempted_student_count > 0
           ? (100 - avg_sc) + (unattempted_count * 10)
           : 100 + unattempted_count * 10;
-
-        let domain_ids = [];
-        try {
-          if (tool.domain_ids) domain_ids = JSON.parse(tool.domain_ids);
-        } catch {}
 
         toolEntries.push({
           tool_id: tool.tool_id,
@@ -473,7 +524,6 @@ Deno.serve(async (req) => {
         });
       });
 
-      // priority 내림차순 정렬 후 top 30
       toolEntries.sort((a, b) => b.priority_score - a.priority_score);
       weak_or_unattempted_tools_by_class[cls.id] = toolEntries.slice(0, 30);
     }
@@ -502,6 +552,7 @@ Deno.serve(async (req) => {
       active_assignments,
       weak_or_unattempted_tools_by_class,
       domain_summary_by_class,
+      type_summary_by_class,
       review_request_count,
       timing: { classes_ms, students_ms, attempts_ms, mastery_ms, total_ms },
     });

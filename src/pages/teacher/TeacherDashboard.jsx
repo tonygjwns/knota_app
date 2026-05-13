@@ -51,7 +51,7 @@ export default function TeacherDashboard() {
   const top3WeakTools = weakTools.slice(0, 3);
   const classAssignments = (data.active_assignments || []).filter(a => a.class_id === selectedClassId);
   const atRiskStudents = classStudents.filter(s => (s.risk_flags || []).length > 0);
-  const domainData = (data.domain_summary_by_class?.[selectedClassId]) || [];
+  const typeData = (data.type_summary_by_class?.[selectedClassId]) || [];
   const reviewCount = data.review_request_count || 0;
 
   const handleAssignTool = (toolId) => {
@@ -146,8 +146,8 @@ export default function TeacherDashboard() {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium truncate">{a.title}</p>
                   <p className="text-xs text-muted-foreground">
-                    D-{a.days_left} · {a.submitted_students}/{a.total_students} 제출 ({a.progress_pct}%)
-                    {a.avg_score > 0 && ` · 평균 ${a.avg_score}점`}
+                   {a.days_left !== null ? `D-${a.days_left}` : '마감 없음'} · {a.submitted_students}/{a.total_students} 제출 ({a.progress_pct}%)
+                   {a.avg_score > 0 && ` · 평균 ${a.avg_score}점`}
                   </p>
                 </div>
                 <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
@@ -171,20 +171,20 @@ export default function TeacherDashboard() {
         </Card>
       )}
 
-      {/* Section 5: 단원별 평균 차트 */}
-      {domainData.length > 0 && (
+      {/* Section 5: 단원별 평균 차트 (type_summary_by_class 기반) */}
+      {typeData.length > 0 && (
         <Card className="p-5">
           <h2 className="font-semibold mb-1">단원별 평균 점수</h2>
           <p className="text-xs text-muted-foreground mb-4">{currentClass?.name} 단원별 성취도</p>
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={domainData} margin={{ top: 5, right: 10, bottom: 60, left: 0 }}>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={typeData} margin={{ top: 5, right: 10, bottom: 80, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="name" angle={-35} textAnchor="end" tick={{ fontSize: 11 }} />
+              <XAxis dataKey="name" angle={-35} textAnchor="end" tick={{ fontSize: 11 }} height={80} />
               <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
               <Tooltip formatter={(v) => [`${v}점`, '평균 점수']}
                 contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
               <Bar dataKey="avg" radius={[4, 4, 0, 0]}>
-                {domainData.map((entry, i) => (
+                {typeData.map((entry, i) => (
                   <Cell key={i} fill={entry.avg < 50 ? '#ef4444' : entry.avg < 70 ? '#f59e0b' : '#10b981'} />
                 ))}
               </Bar>
