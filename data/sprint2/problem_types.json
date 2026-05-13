@@ -1,0 +1,1745 @@
+[
+  {
+    "id": "problem_type_000002",
+    "problem_id": "problem_000008",
+    "type_id": "type_0001",
+    "created_at": "2026-05-03T17:17:44.691347+00:00",
+    "updated_at": "2026-05-03T17:17:44.691353+00:00"
+  },
+  {
+    "id": "problem_type_000003",
+    "problem_id": "problem_000009",
+    "type_id": "type_0005",
+    "created_at": "2026-05-03T17:17:44.740168+00:00",
+    "updated_at": "2026-05-03T17:17:44.740172+00:00"
+  },
+  {
+    "id": "problem_type_000004",
+    "problem_id": "problem_000010",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:44.782903+00:00",
+    "updated_at": "2026-05-03T17:17:44.782909+00:00"
+  },
+  {
+    "id": "problem_type_000005",
+    "problem_id": "problem_000011",
+    "type_id": "type_0013",
+    "created_at": "2026-05-03T17:17:44.830038+00:00",
+    "updated_at": "2026-05-03T17:17:44.830045+00:00"
+  },
+  {
+    "id": "problem_type_000006",
+    "problem_id": "problem_000012",
+    "type_id": "type_0001",
+    "created_at": "2026-05-03T17:17:44.872437+00:00",
+    "updated_at": "2026-05-03T17:17:44.872442+00:00"
+  },
+  {
+    "id": "problem_type_000007",
+    "problem_id": "problem_000013",
+    "type_id": "type_0009",
+    "created_at": "2026-05-03T17:17:44.937727+00:00",
+    "updated_at": "2026-05-03T17:17:44.937733+00:00"
+  },
+  {
+    "id": "problem_type_000008",
+    "problem_id": "problem_000014",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:44.988992+00:00",
+    "updated_at": "2026-05-03T17:17:44.988997+00:00"
+  },
+  {
+    "id": "problem_type_000009",
+    "problem_id": "problem_000015",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:45.039492+00:00",
+    "updated_at": "2026-05-03T17:17:45.039498+00:00"
+  },
+  {
+    "id": "problem_type_000010",
+    "problem_id": "problem_000016",
+    "type_id": "type_0012",
+    "created_at": "2026-05-03T17:17:45.083026+00:00",
+    "updated_at": "2026-05-03T17:17:45.083033+00:00"
+  },
+  {
+    "id": "problem_type_000011",
+    "problem_id": "problem_000017",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:45.126254+00:00",
+    "updated_at": "2026-05-03T17:17:45.126261+00:00"
+  },
+  {
+    "id": "problem_type_000012",
+    "problem_id": "problem_000018",
+    "type_id": "type_0004",
+    "created_at": "2026-05-03T17:17:45.169620+00:00",
+    "updated_at": "2026-05-03T17:17:45.169627+00:00"
+  },
+  {
+    "id": "problem_type_000013",
+    "problem_id": "problem_000019",
+    "type_id": "type_0003",
+    "created_at": "2026-05-03T17:17:45.212985+00:00",
+    "updated_at": "2026-05-03T17:17:45.212995+00:00"
+  },
+  {
+    "id": "problem_type_000014",
+    "problem_id": "problem_000020",
+    "type_id": "type_0005",
+    "created_at": "2026-05-03T17:17:45.255908+00:00",
+    "updated_at": "2026-05-03T17:17:45.255913+00:00"
+  },
+  {
+    "id": "problem_type_000015",
+    "problem_id": "problem_000021",
+    "type_id": "type_0010",
+    "created_at": "2026-05-03T17:17:45.315684+00:00",
+    "updated_at": "2026-05-03T17:17:45.315691+00:00"
+  },
+  {
+    "id": "problem_type_000016",
+    "problem_id": "problem_000022",
+    "type_id": "type_0003",
+    "created_at": "2026-05-03T17:17:45.359416+00:00",
+    "updated_at": "2026-05-03T17:17:45.359421+00:00"
+  },
+  {
+    "id": "problem_type_000017",
+    "problem_id": "problem_000023",
+    "type_id": "type_0005",
+    "created_at": "2026-05-03T17:17:45.403854+00:00",
+    "updated_at": "2026-05-03T17:17:45.403860+00:00"
+  },
+  {
+    "id": "problem_type_000018",
+    "problem_id": "problem_000024",
+    "type_id": "type_0006",
+    "created_at": "2026-05-03T17:17:45.444573+00:00",
+    "updated_at": "2026-05-03T17:17:45.444582+00:00"
+  },
+  {
+    "id": "problem_type_000019",
+    "problem_id": "problem_000025",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:45.486668+00:00",
+    "updated_at": "2026-05-03T17:17:45.486689+00:00"
+  },
+  {
+    "id": "problem_type_000020",
+    "problem_id": "problem_000026",
+    "type_id": "type_0013",
+    "created_at": "2026-05-03T17:17:45.530024+00:00",
+    "updated_at": "2026-05-03T17:17:45.530030+00:00"
+  },
+  {
+    "id": "problem_type_000021",
+    "problem_id": "problem_000027",
+    "type_id": "type_0008",
+    "created_at": "2026-05-03T17:17:45.572498+00:00",
+    "updated_at": "2026-05-03T17:17:45.572504+00:00"
+  },
+  {
+    "id": "problem_type_000022",
+    "problem_id": "problem_000028",
+    "type_id": "type_0010",
+    "created_at": "2026-05-03T17:17:45.614385+00:00",
+    "updated_at": "2026-05-03T17:17:45.614391+00:00"
+  },
+  {
+    "id": "problem_type_000023",
+    "problem_id": "problem_000029",
+    "type_id": "type_0006",
+    "created_at": "2026-05-03T17:17:45.655852+00:00",
+    "updated_at": "2026-05-03T17:17:45.655857+00:00"
+  },
+  {
+    "id": "problem_type_000024",
+    "problem_id": "problem_000030",
+    "type_id": "type_0008",
+    "created_at": "2026-05-03T17:17:45.698592+00:00",
+    "updated_at": "2026-05-03T17:17:45.698597+00:00"
+  },
+  {
+    "id": "problem_type_000025",
+    "problem_id": "problem_000031",
+    "type_id": "type_0005",
+    "created_at": "2026-05-03T17:17:45.741087+00:00",
+    "updated_at": "2026-05-03T17:17:45.741092+00:00"
+  },
+  {
+    "id": "problem_type_000026",
+    "problem_id": "problem_000032",
+    "type_id": "type_0003",
+    "created_at": "2026-05-03T17:17:45.780889+00:00",
+    "updated_at": "2026-05-03T17:17:45.780893+00:00"
+  },
+  {
+    "id": "problem_type_000027",
+    "problem_id": "problem_000033",
+    "type_id": "type_0001",
+    "created_at": "2026-05-03T17:17:45.826731+00:00",
+    "updated_at": "2026-05-03T17:17:45.826737+00:00"
+  },
+  {
+    "id": "problem_type_000028",
+    "problem_id": "problem_000034",
+    "type_id": "type_0005",
+    "created_at": "2026-05-03T17:17:45.866948+00:00",
+    "updated_at": "2026-05-03T17:17:45.866953+00:00"
+  },
+  {
+    "id": "problem_type_000029",
+    "problem_id": "problem_000035",
+    "type_id": "type_0004",
+    "created_at": "2026-05-03T17:17:45.906636+00:00",
+    "updated_at": "2026-05-03T17:17:45.906642+00:00"
+  },
+  {
+    "id": "problem_type_000030",
+    "problem_id": "problem_000036",
+    "type_id": "type_0010",
+    "created_at": "2026-05-03T17:17:45.949517+00:00",
+    "updated_at": "2026-05-03T17:17:45.949522+00:00"
+  },
+  {
+    "id": "problem_type_000031",
+    "problem_id": "problem_000037",
+    "type_id": "type_0004",
+    "created_at": "2026-05-03T17:17:45.993403+00:00",
+    "updated_at": "2026-05-03T17:17:45.993408+00:00"
+  },
+  {
+    "id": "problem_type_000032",
+    "problem_id": "problem_000038",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:46.036602+00:00",
+    "updated_at": "2026-05-03T17:17:46.036608+00:00"
+  },
+  {
+    "id": "problem_type_000033",
+    "problem_id": "problem_000039",
+    "type_id": "type_0003",
+    "created_at": "2026-05-03T17:17:46.077908+00:00",
+    "updated_at": "2026-05-03T17:17:46.077913+00:00"
+  },
+  {
+    "id": "problem_type_000034",
+    "problem_id": "problem_000040",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:46.120102+00:00",
+    "updated_at": "2026-05-03T17:17:46.120156+00:00"
+  },
+  {
+    "id": "problem_type_000035",
+    "problem_id": "problem_000041",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:46.160368+00:00",
+    "updated_at": "2026-05-03T17:17:46.160374+00:00"
+  },
+  {
+    "id": "problem_type_000036",
+    "problem_id": "problem_000042",
+    "type_id": "type_0001",
+    "created_at": "2026-05-03T17:17:46.200037+00:00",
+    "updated_at": "2026-05-03T17:17:46.200044+00:00"
+  },
+  {
+    "id": "problem_type_000037",
+    "problem_id": "problem_000043",
+    "type_id": "type_0010",
+    "created_at": "2026-05-03T17:17:46.243470+00:00",
+    "updated_at": "2026-05-03T17:17:46.243475+00:00"
+  },
+  {
+    "id": "problem_type_000038",
+    "problem_id": "problem_000044",
+    "type_id": "type_0001",
+    "created_at": "2026-05-03T17:17:46.284366+00:00",
+    "updated_at": "2026-05-03T17:17:46.284372+00:00"
+  },
+  {
+    "id": "problem_type_000039",
+    "problem_id": "problem_000045",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:46.324453+00:00",
+    "updated_at": "2026-05-03T17:17:46.324458+00:00"
+  },
+  {
+    "id": "problem_type_000040",
+    "problem_id": "problem_000046",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:46.364134+00:00",
+    "updated_at": "2026-05-03T17:17:46.364139+00:00"
+  },
+  {
+    "id": "problem_type_000041",
+    "problem_id": "problem_000047",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:46.405706+00:00",
+    "updated_at": "2026-05-03T17:17:46.405715+00:00"
+  },
+  {
+    "id": "problem_type_000042",
+    "problem_id": "problem_000048",
+    "type_id": "type_0008",
+    "created_at": "2026-05-03T17:17:46.448448+00:00",
+    "updated_at": "2026-05-03T17:17:46.448453+00:00"
+  },
+  {
+    "id": "problem_type_000043",
+    "problem_id": "problem_000049",
+    "type_id": "type_0001",
+    "created_at": "2026-05-03T17:17:46.489960+00:00",
+    "updated_at": "2026-05-03T17:17:46.489967+00:00"
+  },
+  {
+    "id": "problem_type_000044",
+    "problem_id": "problem_000050",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:46.536566+00:00",
+    "updated_at": "2026-05-03T17:17:46.536573+00:00"
+  },
+  {
+    "id": "problem_type_000045",
+    "problem_id": "problem_000051",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:46.577906+00:00",
+    "updated_at": "2026-05-03T17:17:46.577910+00:00"
+  },
+  {
+    "id": "problem_type_000046",
+    "problem_id": "problem_000052",
+    "type_id": "type_0001",
+    "created_at": "2026-05-03T17:17:46.621263+00:00",
+    "updated_at": "2026-05-03T17:17:46.621267+00:00"
+  },
+  {
+    "id": "problem_type_000047",
+    "problem_id": "problem_000053",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:46.661547+00:00",
+    "updated_at": "2026-05-03T17:17:46.661552+00:00"
+  },
+  {
+    "id": "problem_type_000048",
+    "problem_id": "problem_000054",
+    "type_id": "type_0013",
+    "created_at": "2026-05-03T17:17:46.702465+00:00",
+    "updated_at": "2026-05-03T17:17:46.702470+00:00"
+  },
+  {
+    "id": "problem_type_000049",
+    "problem_id": "problem_000055",
+    "type_id": "type_0008",
+    "created_at": "2026-05-03T17:17:46.749613+00:00",
+    "updated_at": "2026-05-03T17:17:46.749619+00:00"
+  },
+  {
+    "id": "problem_type_000050",
+    "problem_id": "problem_000056",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:46.790542+00:00",
+    "updated_at": "2026-05-03T17:17:46.790547+00:00"
+  },
+  {
+    "id": "problem_type_000051",
+    "problem_id": "problem_000057",
+    "type_id": "type_0013",
+    "created_at": "2026-05-03T17:17:46.833128+00:00",
+    "updated_at": "2026-05-03T17:17:46.833134+00:00"
+  },
+  {
+    "id": "problem_type_000052",
+    "problem_id": "problem_000058",
+    "type_id": "type_0001",
+    "created_at": "2026-05-03T17:17:46.880734+00:00",
+    "updated_at": "2026-05-03T17:17:46.880745+00:00"
+  },
+  {
+    "id": "problem_type_000053",
+    "problem_id": "problem_000059",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:46.925165+00:00",
+    "updated_at": "2026-05-03T17:17:46.925171+00:00"
+  },
+  {
+    "id": "problem_type_000054",
+    "problem_id": "problem_000060",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:47.046053+00:00",
+    "updated_at": "2026-05-03T17:17:47.046065+00:00"
+  },
+  {
+    "id": "problem_type_000055",
+    "problem_id": "problem_000061",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:47.113791+00:00",
+    "updated_at": "2026-05-03T17:17:47.113809+00:00"
+  },
+  {
+    "id": "problem_type_000056",
+    "problem_id": "problem_000062",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:47.195742+00:00",
+    "updated_at": "2026-05-03T17:17:47.195748+00:00"
+  },
+  {
+    "id": "problem_type_000057",
+    "problem_id": "problem_000063",
+    "type_id": "type_0003",
+    "created_at": "2026-05-03T17:17:47.354809+00:00",
+    "updated_at": "2026-05-03T17:17:47.354843+00:00"
+  },
+  {
+    "id": "problem_type_000058",
+    "problem_id": "problem_000064",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:47.507688+00:00",
+    "updated_at": "2026-05-03T17:17:47.507694+00:00"
+  },
+  {
+    "id": "problem_type_000059",
+    "problem_id": "problem_000065",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:47.679803+00:00",
+    "updated_at": "2026-05-03T17:17:47.679810+00:00"
+  },
+  {
+    "id": "problem_type_000060",
+    "problem_id": "problem_000066",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:47.820804+00:00",
+    "updated_at": "2026-05-03T17:17:47.820810+00:00"
+  },
+  {
+    "id": "problem_type_000061",
+    "problem_id": "problem_000067",
+    "type_id": "type_0001",
+    "created_at": "2026-05-03T17:17:47.921952+00:00",
+    "updated_at": "2026-05-03T17:17:47.921959+00:00"
+  },
+  {
+    "id": "problem_type_000062",
+    "problem_id": "problem_000068",
+    "type_id": "type_0005",
+    "created_at": "2026-05-03T17:17:48.205152+00:00",
+    "updated_at": "2026-05-03T17:17:48.205163+00:00"
+  },
+  {
+    "id": "problem_type_000063",
+    "problem_id": "problem_000069",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:48.426086+00:00",
+    "updated_at": "2026-05-03T17:17:48.426090+00:00"
+  },
+  {
+    "id": "problem_type_000064",
+    "problem_id": "problem_000070",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:48.471338+00:00",
+    "updated_at": "2026-05-03T17:17:48.471343+00:00"
+  },
+  {
+    "id": "problem_type_000065",
+    "problem_id": "problem_000071",
+    "type_id": "type_0010",
+    "created_at": "2026-05-03T17:17:48.621482+00:00",
+    "updated_at": "2026-05-03T17:17:48.621488+00:00"
+  },
+  {
+    "id": "problem_type_000066",
+    "problem_id": "problem_000072",
+    "type_id": "type_0001",
+    "created_at": "2026-05-03T17:17:48.682877+00:00",
+    "updated_at": "2026-05-03T17:17:48.682883+00:00"
+  },
+  {
+    "id": "problem_type_000067",
+    "problem_id": "problem_000073",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:48.740587+00:00",
+    "updated_at": "2026-05-03T17:17:48.740593+00:00"
+  },
+  {
+    "id": "problem_type_000068",
+    "problem_id": "problem_000074",
+    "type_id": "type_0010",
+    "created_at": "2026-05-03T17:17:48.806972+00:00",
+    "updated_at": "2026-05-03T17:17:48.806977+00:00"
+  },
+  {
+    "id": "problem_type_000069",
+    "problem_id": "problem_000075",
+    "type_id": "type_0010",
+    "created_at": "2026-05-03T17:17:48.873665+00:00",
+    "updated_at": "2026-05-03T17:17:48.873675+00:00"
+  },
+  {
+    "id": "problem_type_000070",
+    "problem_id": "problem_000076",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:48.939608+00:00",
+    "updated_at": "2026-05-03T17:17:48.939612+00:00"
+  },
+  {
+    "id": "problem_type_000071",
+    "problem_id": "problem_000077",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:49.006202+00:00",
+    "updated_at": "2026-05-03T17:17:49.006213+00:00"
+  },
+  {
+    "id": "problem_type_000072",
+    "problem_id": "problem_000078",
+    "type_id": "type_0003",
+    "created_at": "2026-05-03T17:17:49.055868+00:00",
+    "updated_at": "2026-05-03T17:17:49.055873+00:00"
+  },
+  {
+    "id": "problem_type_000073",
+    "problem_id": "problem_000079",
+    "type_id": "type_0010",
+    "created_at": "2026-05-03T17:17:49.099744+00:00",
+    "updated_at": "2026-05-03T17:17:49.099750+00:00"
+  },
+  {
+    "id": "problem_type_000074",
+    "problem_id": "problem_000080",
+    "type_id": "type_0003",
+    "created_at": "2026-05-03T17:17:49.139848+00:00",
+    "updated_at": "2026-05-03T17:17:49.139854+00:00"
+  },
+  {
+    "id": "problem_type_000075",
+    "problem_id": "problem_000081",
+    "type_id": "type_0003",
+    "created_at": "2026-05-03T17:17:49.181271+00:00",
+    "updated_at": "2026-05-03T17:17:49.181288+00:00"
+  },
+  {
+    "id": "problem_type_000076",
+    "problem_id": "problem_000082",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:49.225578+00:00",
+    "updated_at": "2026-05-03T17:17:49.225584+00:00"
+  },
+  {
+    "id": "problem_type_000077",
+    "problem_id": "problem_000083",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:49.270738+00:00",
+    "updated_at": "2026-05-03T17:17:49.270747+00:00"
+  },
+  {
+    "id": "problem_type_000078",
+    "problem_id": "problem_000084",
+    "type_id": "type_0009",
+    "created_at": "2026-05-03T17:17:49.312719+00:00",
+    "updated_at": "2026-05-03T17:17:49.312731+00:00"
+  },
+  {
+    "id": "problem_type_000079",
+    "problem_id": "problem_000085",
+    "type_id": "type_0012",
+    "created_at": "2026-05-03T17:17:49.357455+00:00",
+    "updated_at": "2026-05-03T17:17:49.357459+00:00"
+  },
+  {
+    "id": "problem_type_000080",
+    "problem_id": "problem_000086",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:49.402620+00:00",
+    "updated_at": "2026-05-03T17:17:49.402632+00:00"
+  },
+  {
+    "id": "problem_type_000081",
+    "problem_id": "problem_000087",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:49.448411+00:00",
+    "updated_at": "2026-05-03T17:17:49.448417+00:00"
+  },
+  {
+    "id": "problem_type_000082",
+    "problem_id": "problem_000088",
+    "type_id": "type_0006",
+    "created_at": "2026-05-03T17:17:49.496086+00:00",
+    "updated_at": "2026-05-03T17:17:49.496092+00:00"
+  },
+  {
+    "id": "problem_type_000083",
+    "problem_id": "problem_000089",
+    "type_id": "type_0005",
+    "created_at": "2026-05-03T17:17:49.536248+00:00",
+    "updated_at": "2026-05-03T17:17:49.536254+00:00"
+  },
+  {
+    "id": "problem_type_000084",
+    "problem_id": "problem_000090",
+    "type_id": "type_0013",
+    "created_at": "2026-05-03T17:17:49.579321+00:00",
+    "updated_at": "2026-05-03T17:17:49.579326+00:00"
+  },
+  {
+    "id": "problem_type_000085",
+    "problem_id": "problem_000091",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:49.619478+00:00",
+    "updated_at": "2026-05-03T17:17:49.619483+00:00"
+  },
+  {
+    "id": "problem_type_000086",
+    "problem_id": "problem_000092",
+    "type_id": "type_0003",
+    "created_at": "2026-05-03T17:17:49.658815+00:00",
+    "updated_at": "2026-05-03T17:17:49.658820+00:00"
+  },
+  {
+    "id": "problem_type_000087",
+    "problem_id": "problem_000093",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:49.699517+00:00",
+    "updated_at": "2026-05-03T17:17:49.699523+00:00"
+  },
+  {
+    "id": "problem_type_000088",
+    "problem_id": "problem_000094",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:49.740860+00:00",
+    "updated_at": "2026-05-03T17:17:49.740866+00:00"
+  },
+  {
+    "id": "problem_type_000089",
+    "problem_id": "problem_000095",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:49.780454+00:00",
+    "updated_at": "2026-05-03T17:17:49.780461+00:00"
+  },
+  {
+    "id": "problem_type_000090",
+    "problem_id": "problem_000096",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:49.823315+00:00",
+    "updated_at": "2026-05-03T17:17:49.823320+00:00"
+  },
+  {
+    "id": "problem_type_000091",
+    "problem_id": "problem_000097",
+    "type_id": "type_0005",
+    "created_at": "2026-05-03T17:17:49.864723+00:00",
+    "updated_at": "2026-05-03T17:17:49.864729+00:00"
+  },
+  {
+    "id": "problem_type_000092",
+    "problem_id": "problem_000098",
+    "type_id": "type_0003",
+    "created_at": "2026-05-03T17:17:49.909241+00:00",
+    "updated_at": "2026-05-03T17:17:49.909245+00:00"
+  },
+  {
+    "id": "problem_type_000093",
+    "problem_id": "problem_000099",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:49.952436+00:00",
+    "updated_at": "2026-05-03T17:17:49.952442+00:00"
+  },
+  {
+    "id": "problem_type_000094",
+    "problem_id": "problem_000100",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:49.994930+00:00",
+    "updated_at": "2026-05-03T17:17:49.994937+00:00"
+  },
+  {
+    "id": "problem_type_000095",
+    "problem_id": "problem_000101",
+    "type_id": "type_0001",
+    "created_at": "2026-05-03T17:17:50.037081+00:00",
+    "updated_at": "2026-05-03T17:17:50.037087+00:00"
+  },
+  {
+    "id": "problem_type_000096",
+    "problem_id": "problem_000102",
+    "type_id": "type_0008",
+    "created_at": "2026-05-03T17:17:50.077618+00:00",
+    "updated_at": "2026-05-03T17:17:50.077623+00:00"
+  },
+  {
+    "id": "problem_type_000097",
+    "problem_id": "problem_000103",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:50.117539+00:00",
+    "updated_at": "2026-05-03T17:17:50.117548+00:00"
+  },
+  {
+    "id": "problem_type_000098",
+    "problem_id": "problem_000104",
+    "type_id": "type_0010",
+    "created_at": "2026-05-03T17:17:50.158216+00:00",
+    "updated_at": "2026-05-03T17:17:50.158227+00:00"
+  },
+  {
+    "id": "problem_type_000099",
+    "problem_id": "problem_000105",
+    "type_id": "type_0005",
+    "created_at": "2026-05-03T17:17:50.200518+00:00",
+    "updated_at": "2026-05-03T17:17:50.200523+00:00"
+  },
+  {
+    "id": "problem_type_000100",
+    "problem_id": "problem_000106",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:50.241460+00:00",
+    "updated_at": "2026-05-03T17:17:50.241465+00:00"
+  },
+  {
+    "id": "problem_type_000101",
+    "problem_id": "problem_000107",
+    "type_id": "type_0001",
+    "created_at": "2026-05-03T17:17:50.286817+00:00",
+    "updated_at": "2026-05-03T17:17:50.286824+00:00"
+  },
+  {
+    "id": "problem_type_000102",
+    "problem_id": "problem_000108",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:50.329477+00:00",
+    "updated_at": "2026-05-03T17:17:50.329481+00:00"
+  },
+  {
+    "id": "problem_type_000103",
+    "problem_id": "problem_000109",
+    "type_id": "type_0004",
+    "created_at": "2026-05-03T17:17:50.367937+00:00",
+    "updated_at": "2026-05-03T17:17:50.367943+00:00"
+  },
+  {
+    "id": "problem_type_000104",
+    "problem_id": "problem_000110",
+    "type_id": "type_0004",
+    "created_at": "2026-05-03T17:17:50.408491+00:00",
+    "updated_at": "2026-05-03T17:17:50.408496+00:00"
+  },
+  {
+    "id": "problem_type_000105",
+    "problem_id": "problem_000111",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:50.448237+00:00",
+    "updated_at": "2026-05-03T17:17:50.448242+00:00"
+  },
+  {
+    "id": "problem_type_000106",
+    "problem_id": "problem_000112",
+    "type_id": "type_0013",
+    "created_at": "2026-05-03T17:17:50.493110+00:00",
+    "updated_at": "2026-05-03T17:17:50.493115+00:00"
+  },
+  {
+    "id": "problem_type_000107",
+    "problem_id": "problem_000113",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:50.535028+00:00",
+    "updated_at": "2026-05-03T17:17:50.535033+00:00"
+  },
+  {
+    "id": "problem_type_000108",
+    "problem_id": "problem_000114",
+    "type_id": "type_0008",
+    "created_at": "2026-05-03T17:17:50.593726+00:00",
+    "updated_at": "2026-05-03T17:17:50.593731+00:00"
+  },
+  {
+    "id": "problem_type_000109",
+    "problem_id": "problem_000115",
+    "type_id": "type_0005",
+    "created_at": "2026-05-03T17:17:50.634591+00:00",
+    "updated_at": "2026-05-03T17:17:50.634595+00:00"
+  },
+  {
+    "id": "problem_type_000110",
+    "problem_id": "problem_000116",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:50.674293+00:00",
+    "updated_at": "2026-05-03T17:17:50.674297+00:00"
+  },
+  {
+    "id": "problem_type_000111",
+    "problem_id": "problem_000117",
+    "type_id": "type_0001",
+    "created_at": "2026-05-03T17:17:50.714904+00:00",
+    "updated_at": "2026-05-03T17:17:50.714909+00:00"
+  },
+  {
+    "id": "problem_type_000112",
+    "problem_id": "problem_000118",
+    "type_id": "type_0006",
+    "created_at": "2026-05-03T17:17:50.756140+00:00",
+    "updated_at": "2026-05-03T17:17:50.756146+00:00"
+  },
+  {
+    "id": "problem_type_000113",
+    "problem_id": "problem_000119",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:50.795662+00:00",
+    "updated_at": "2026-05-03T17:17:50.795667+00:00"
+  },
+  {
+    "id": "problem_type_000114",
+    "problem_id": "problem_000120",
+    "type_id": "type_0010",
+    "created_at": "2026-05-03T17:17:50.840313+00:00",
+    "updated_at": "2026-05-03T17:17:50.840317+00:00"
+  },
+  {
+    "id": "problem_type_000115",
+    "problem_id": "problem_000121",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:50.880114+00:00",
+    "updated_at": "2026-05-03T17:17:50.880119+00:00"
+  },
+  {
+    "id": "problem_type_000116",
+    "problem_id": "problem_000122",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:50.926611+00:00",
+    "updated_at": "2026-05-03T17:17:50.926617+00:00"
+  },
+  {
+    "id": "problem_type_000117",
+    "problem_id": "problem_000123",
+    "type_id": "type_0010",
+    "created_at": "2026-05-03T17:17:50.967447+00:00",
+    "updated_at": "2026-05-03T17:17:50.967451+00:00"
+  },
+  {
+    "id": "problem_type_000118",
+    "problem_id": "problem_000124",
+    "type_id": "type_0005",
+    "created_at": "2026-05-03T17:17:51.025651+00:00",
+    "updated_at": "2026-05-03T17:17:51.025655+00:00"
+  },
+  {
+    "id": "problem_type_000119",
+    "problem_id": "problem_000125",
+    "type_id": "type_0010",
+    "created_at": "2026-05-03T17:17:51.072159+00:00",
+    "updated_at": "2026-05-03T17:17:51.072178+00:00"
+  },
+  {
+    "id": "problem_type_000120",
+    "problem_id": "problem_000126",
+    "type_id": "type_0010",
+    "created_at": "2026-05-03T17:17:51.129524+00:00",
+    "updated_at": "2026-05-03T17:17:51.129525+00:00"
+  },
+  {
+    "id": "problem_type_000121",
+    "problem_id": "problem_000127",
+    "type_id": "type_0001",
+    "created_at": "2026-05-03T17:17:51.170779+00:00",
+    "updated_at": "2026-05-03T17:17:51.170784+00:00"
+  },
+  {
+    "id": "problem_type_000122",
+    "problem_id": "problem_000128",
+    "type_id": "type_0003",
+    "created_at": "2026-05-03T17:17:51.219833+00:00",
+    "updated_at": "2026-05-03T17:17:51.219839+00:00"
+  },
+  {
+    "id": "problem_type_000123",
+    "problem_id": "problem_000129",
+    "type_id": "type_0003",
+    "created_at": "2026-05-03T17:17:51.260964+00:00",
+    "updated_at": "2026-05-03T17:17:51.260970+00:00"
+  },
+  {
+    "id": "problem_type_000124",
+    "problem_id": "problem_000130",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:51.305977+00:00",
+    "updated_at": "2026-05-03T17:17:51.305982+00:00"
+  },
+  {
+    "id": "problem_type_000125",
+    "problem_id": "problem_000131",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:51.347473+00:00",
+    "updated_at": "2026-05-03T17:17:51.347479+00:00"
+  },
+  {
+    "id": "problem_type_000126",
+    "problem_id": "problem_000132",
+    "type_id": "type_0006",
+    "created_at": "2026-05-03T17:17:51.385836+00:00",
+    "updated_at": "2026-05-03T17:17:51.385841+00:00"
+  },
+  {
+    "id": "problem_type_000127",
+    "problem_id": "problem_000133",
+    "type_id": "type_0001",
+    "created_at": "2026-05-03T17:17:51.425797+00:00",
+    "updated_at": "2026-05-03T17:17:51.425800+00:00"
+  },
+  {
+    "id": "problem_type_000128",
+    "problem_id": "problem_000134",
+    "type_id": "type_0003",
+    "created_at": "2026-05-03T17:17:51.465625+00:00",
+    "updated_at": "2026-05-03T17:17:51.465628+00:00"
+  },
+  {
+    "id": "problem_type_000129",
+    "problem_id": "problem_000135",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:51.509467+00:00",
+    "updated_at": "2026-05-03T17:17:51.509473+00:00"
+  },
+  {
+    "id": "problem_type_000130",
+    "problem_id": "problem_000136",
+    "type_id": "type_0008",
+    "created_at": "2026-05-03T17:17:51.551645+00:00",
+    "updated_at": "2026-05-03T17:17:51.551650+00:00"
+  },
+  {
+    "id": "problem_type_000131",
+    "problem_id": "problem_000137",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:51.599950+00:00",
+    "updated_at": "2026-05-03T17:17:51.599955+00:00"
+  },
+  {
+    "id": "problem_type_000132",
+    "problem_id": "problem_000138",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:51.641401+00:00",
+    "updated_at": "2026-05-03T17:17:51.641405+00:00"
+  },
+  {
+    "id": "problem_type_000133",
+    "problem_id": "problem_000139",
+    "type_id": "type_0003",
+    "created_at": "2026-05-03T17:17:51.681793+00:00",
+    "updated_at": "2026-05-03T17:17:51.681797+00:00"
+  },
+  {
+    "id": "problem_type_000134",
+    "problem_id": "problem_000140",
+    "type_id": "type_0005",
+    "created_at": "2026-05-03T17:17:51.725446+00:00",
+    "updated_at": "2026-05-03T17:17:51.725451+00:00"
+  },
+  {
+    "id": "problem_type_000135",
+    "problem_id": "problem_000141",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:51.767187+00:00",
+    "updated_at": "2026-05-03T17:17:51.767194+00:00"
+  },
+  {
+    "id": "problem_type_000136",
+    "problem_id": "problem_000142",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:51.818783+00:00",
+    "updated_at": "2026-05-03T17:17:51.818788+00:00"
+  },
+  {
+    "id": "problem_type_000137",
+    "problem_id": "problem_000143",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:51.856956+00:00",
+    "updated_at": "2026-05-03T17:17:51.856960+00:00"
+  },
+  {
+    "id": "problem_type_000138",
+    "problem_id": "problem_000144",
+    "type_id": "type_0013",
+    "created_at": "2026-05-03T17:17:51.898652+00:00",
+    "updated_at": "2026-05-03T17:17:51.898661+00:00"
+  },
+  {
+    "id": "problem_type_000139",
+    "problem_id": "problem_000145",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:51.940810+00:00",
+    "updated_at": "2026-05-03T17:17:51.940815+00:00"
+  },
+  {
+    "id": "problem_type_000140",
+    "problem_id": "problem_000146",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:51.983707+00:00",
+    "updated_at": "2026-05-03T17:17:51.983715+00:00"
+  },
+  {
+    "id": "problem_type_000141",
+    "problem_id": "problem_000147",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:52.022724+00:00",
+    "updated_at": "2026-05-03T17:17:52.022728+00:00"
+  },
+  {
+    "id": "problem_type_000142",
+    "problem_id": "problem_000148",
+    "type_id": "type_0008",
+    "created_at": "2026-05-03T17:17:52.062298+00:00",
+    "updated_at": "2026-05-03T17:17:52.062303+00:00"
+  },
+  {
+    "id": "problem_type_000143",
+    "problem_id": "problem_000149",
+    "type_id": "type_0001",
+    "created_at": "2026-05-03T17:17:52.102300+00:00",
+    "updated_at": "2026-05-03T17:17:52.102304+00:00"
+  },
+  {
+    "id": "problem_type_000144",
+    "problem_id": "problem_000150",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:52.140854+00:00",
+    "updated_at": "2026-05-03T17:17:52.140859+00:00"
+  },
+  {
+    "id": "problem_type_000145",
+    "problem_id": "problem_000151",
+    "type_id": "type_0009",
+    "created_at": "2026-05-03T17:17:52.182806+00:00",
+    "updated_at": "2026-05-03T17:17:52.182815+00:00"
+  },
+  {
+    "id": "problem_type_000146",
+    "problem_id": "problem_000152",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:52.231653+00:00",
+    "updated_at": "2026-05-03T17:17:52.231658+00:00"
+  },
+  {
+    "id": "problem_type_000147",
+    "problem_id": "problem_000153",
+    "type_id": "type_0013",
+    "created_at": "2026-05-03T17:17:52.272187+00:00",
+    "updated_at": "2026-05-03T17:17:52.272192+00:00"
+  },
+  {
+    "id": "problem_type_000148",
+    "problem_id": "problem_000154",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:52.312690+00:00",
+    "updated_at": "2026-05-03T17:17:52.312697+00:00"
+  },
+  {
+    "id": "problem_type_000149",
+    "problem_id": "problem_000155",
+    "type_id": "type_0004",
+    "created_at": "2026-05-03T17:17:52.351615+00:00",
+    "updated_at": "2026-05-03T17:17:52.351620+00:00"
+  },
+  {
+    "id": "problem_type_000150",
+    "problem_id": "problem_000156",
+    "type_id": "type_0012",
+    "created_at": "2026-05-03T17:17:52.391455+00:00",
+    "updated_at": "2026-05-03T17:17:52.391459+00:00"
+  },
+  {
+    "id": "problem_type_000151",
+    "problem_id": "problem_000157",
+    "type_id": "type_0003",
+    "created_at": "2026-05-03T17:17:52.429584+00:00",
+    "updated_at": "2026-05-03T17:17:52.429588+00:00"
+  },
+  {
+    "id": "problem_type_000152",
+    "problem_id": "problem_000158",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:52.468608+00:00",
+    "updated_at": "2026-05-03T17:17:52.468614+00:00"
+  },
+  {
+    "id": "problem_type_000153",
+    "problem_id": "problem_000159",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:52.512548+00:00",
+    "updated_at": "2026-05-03T17:17:52.512553+00:00"
+  },
+  {
+    "id": "problem_type_000154",
+    "problem_id": "problem_000160",
+    "type_id": "type_0003",
+    "created_at": "2026-05-03T17:17:52.552577+00:00",
+    "updated_at": "2026-05-03T17:17:52.552583+00:00"
+  },
+  {
+    "id": "problem_type_000155",
+    "problem_id": "problem_000161",
+    "type_id": "type_0010",
+    "created_at": "2026-05-03T17:17:52.592601+00:00",
+    "updated_at": "2026-05-03T17:17:52.592606+00:00"
+  },
+  {
+    "id": "problem_type_000156",
+    "problem_id": "problem_000162",
+    "type_id": "type_0001",
+    "created_at": "2026-05-03T17:17:52.641320+00:00",
+    "updated_at": "2026-05-03T17:17:52.641325+00:00"
+  },
+  {
+    "id": "problem_type_000157",
+    "problem_id": "problem_000163",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:52.679554+00:00",
+    "updated_at": "2026-05-03T17:17:52.679562+00:00"
+  },
+  {
+    "id": "problem_type_000158",
+    "problem_id": "problem_000164",
+    "type_id": "type_0005",
+    "created_at": "2026-05-03T17:17:52.719252+00:00",
+    "updated_at": "2026-05-03T17:17:52.719257+00:00"
+  },
+  {
+    "id": "problem_type_000159",
+    "problem_id": "problem_000165",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:52.760884+00:00",
+    "updated_at": "2026-05-03T17:17:52.760889+00:00"
+  },
+  {
+    "id": "problem_type_000160",
+    "problem_id": "problem_000166",
+    "type_id": "type_0008",
+    "created_at": "2026-05-03T17:17:52.801428+00:00",
+    "updated_at": "2026-05-03T17:17:52.801432+00:00"
+  },
+  {
+    "id": "problem_type_000161",
+    "problem_id": "problem_000167",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:52.841680+00:00",
+    "updated_at": "2026-05-03T17:17:52.841685+00:00"
+  },
+  {
+    "id": "problem_type_000162",
+    "problem_id": "problem_000168",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:52.881581+00:00",
+    "updated_at": "2026-05-03T17:17:52.881585+00:00"
+  },
+  {
+    "id": "problem_type_000163",
+    "problem_id": "problem_000169",
+    "type_id": "type_0009",
+    "created_at": "2026-05-03T17:17:52.921178+00:00",
+    "updated_at": "2026-05-03T17:17:52.921182+00:00"
+  },
+  {
+    "id": "problem_type_000164",
+    "problem_id": "problem_000170",
+    "type_id": "type_0004",
+    "created_at": "2026-05-03T17:17:52.961479+00:00",
+    "updated_at": "2026-05-03T17:17:52.961484+00:00"
+  },
+  {
+    "id": "problem_type_000165",
+    "problem_id": "problem_000171",
+    "type_id": "type_0006",
+    "created_at": "2026-05-03T17:17:53.000027+00:00",
+    "updated_at": "2026-05-03T17:17:53.000031+00:00"
+  },
+  {
+    "id": "problem_type_000166",
+    "problem_id": "problem_000172",
+    "type_id": "type_0003",
+    "created_at": "2026-05-03T17:17:53.040271+00:00",
+    "updated_at": "2026-05-03T17:17:53.040278+00:00"
+  },
+  {
+    "id": "problem_type_000167",
+    "problem_id": "problem_000173",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:53.083251+00:00",
+    "updated_at": "2026-05-03T17:17:53.083256+00:00"
+  },
+  {
+    "id": "problem_type_000168",
+    "problem_id": "problem_000174",
+    "type_id": "type_0005",
+    "created_at": "2026-05-03T17:17:53.121996+00:00",
+    "updated_at": "2026-05-03T17:17:53.122000+00:00"
+  },
+  {
+    "id": "problem_type_000169",
+    "problem_id": "problem_000175",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:53.160711+00:00",
+    "updated_at": "2026-05-03T17:17:53.160715+00:00"
+  },
+  {
+    "id": "problem_type_000170",
+    "problem_id": "problem_000176",
+    "type_id": "type_0001",
+    "created_at": "2026-05-03T17:17:53.201298+00:00",
+    "updated_at": "2026-05-03T17:17:53.201303+00:00"
+  },
+  {
+    "id": "problem_type_000171",
+    "problem_id": "problem_000177",
+    "type_id": "type_0003",
+    "created_at": "2026-05-03T17:17:53.242072+00:00",
+    "updated_at": "2026-05-03T17:17:53.242077+00:00"
+  },
+  {
+    "id": "problem_type_000172",
+    "problem_id": "problem_000178",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:53.282510+00:00",
+    "updated_at": "2026-05-03T17:17:53.282517+00:00"
+  },
+  {
+    "id": "problem_type_000173",
+    "problem_id": "problem_000179",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:53.323173+00:00",
+    "updated_at": "2026-05-03T17:17:53.323179+00:00"
+  },
+  {
+    "id": "problem_type_000174",
+    "problem_id": "problem_000180",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:53.363313+00:00",
+    "updated_at": "2026-05-03T17:17:53.363318+00:00"
+  },
+  {
+    "id": "problem_type_000175",
+    "problem_id": "problem_000181",
+    "type_id": "type_0009",
+    "created_at": "2026-05-03T17:17:53.402921+00:00",
+    "updated_at": "2026-05-03T17:17:53.402925+00:00"
+  },
+  {
+    "id": "problem_type_000176",
+    "problem_id": "problem_000182",
+    "type_id": "type_0001",
+    "created_at": "2026-05-03T17:17:53.444010+00:00",
+    "updated_at": "2026-05-03T17:17:53.444015+00:00"
+  },
+  {
+    "id": "problem_type_000177",
+    "problem_id": "problem_000183",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:53.485581+00:00",
+    "updated_at": "2026-05-03T17:17:53.485587+00:00"
+  },
+  {
+    "id": "problem_type_000178",
+    "problem_id": "problem_000184",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:53.524782+00:00",
+    "updated_at": "2026-05-03T17:17:53.524787+00:00"
+  },
+  {
+    "id": "problem_type_000179",
+    "problem_id": "problem_000185",
+    "type_id": "type_0003",
+    "created_at": "2026-05-03T17:17:53.564713+00:00",
+    "updated_at": "2026-05-03T17:17:53.564718+00:00"
+  },
+  {
+    "id": "problem_type_000180",
+    "problem_id": "problem_000186",
+    "type_id": "type_0009",
+    "created_at": "2026-05-03T17:17:53.605220+00:00",
+    "updated_at": "2026-05-03T17:17:53.605227+00:00"
+  },
+  {
+    "id": "problem_type_000181",
+    "problem_id": "problem_000187",
+    "type_id": "type_0006",
+    "created_at": "2026-05-03T17:17:53.644585+00:00",
+    "updated_at": "2026-05-03T17:17:53.644613+00:00"
+  },
+  {
+    "id": "problem_type_000182",
+    "problem_id": "problem_000188",
+    "type_id": "type_0003",
+    "created_at": "2026-05-03T17:17:53.688832+00:00",
+    "updated_at": "2026-05-03T17:17:53.688836+00:00"
+  },
+  {
+    "id": "problem_type_000183",
+    "problem_id": "problem_000189",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:53.730357+00:00",
+    "updated_at": "2026-05-03T17:17:53.730362+00:00"
+  },
+  {
+    "id": "problem_type_000184",
+    "problem_id": "problem_000190",
+    "type_id": "type_0009",
+    "created_at": "2026-05-03T17:17:53.771930+00:00",
+    "updated_at": "2026-05-03T17:17:53.771933+00:00"
+  },
+  {
+    "id": "problem_type_000185",
+    "problem_id": "problem_000191",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:53.815416+00:00",
+    "updated_at": "2026-05-03T17:17:53.815421+00:00"
+  },
+  {
+    "id": "problem_type_000186",
+    "problem_id": "problem_000192",
+    "type_id": "type_0001",
+    "created_at": "2026-05-03T17:17:53.854840+00:00",
+    "updated_at": "2026-05-03T17:17:53.854842+00:00"
+  },
+  {
+    "id": "problem_type_000187",
+    "problem_id": "problem_000193",
+    "type_id": "type_0003",
+    "created_at": "2026-05-03T17:17:53.896572+00:00",
+    "updated_at": "2026-05-03T17:17:53.896578+00:00"
+  },
+  {
+    "id": "problem_type_000188",
+    "problem_id": "problem_000194",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:53.937623+00:00",
+    "updated_at": "2026-05-03T17:17:53.937629+00:00"
+  },
+  {
+    "id": "problem_type_000189",
+    "problem_id": "problem_000195",
+    "type_id": "type_0008",
+    "created_at": "2026-05-03T17:17:53.979266+00:00",
+    "updated_at": "2026-05-03T17:17:53.979271+00:00"
+  },
+  {
+    "id": "problem_type_000190",
+    "problem_id": "problem_000196",
+    "type_id": "type_0013",
+    "created_at": "2026-05-03T17:17:54.020331+00:00",
+    "updated_at": "2026-05-03T17:17:54.020334+00:00"
+  },
+  {
+    "id": "problem_type_000191",
+    "problem_id": "problem_000197",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:54.059155+00:00",
+    "updated_at": "2026-05-03T17:17:54.059161+00:00"
+  },
+  {
+    "id": "problem_type_000192",
+    "problem_id": "problem_000198",
+    "type_id": "type_0010",
+    "created_at": "2026-05-03T17:17:54.099743+00:00",
+    "updated_at": "2026-05-03T17:17:54.099748+00:00"
+  },
+  {
+    "id": "problem_type_000193",
+    "problem_id": "problem_000199",
+    "type_id": "type_0006",
+    "created_at": "2026-05-03T17:17:54.139941+00:00",
+    "updated_at": "2026-05-03T17:17:54.139945+00:00"
+  },
+  {
+    "id": "problem_type_000194",
+    "problem_id": "problem_000200",
+    "type_id": "type_0003",
+    "created_at": "2026-05-03T17:17:54.177670+00:00",
+    "updated_at": "2026-05-03T17:17:54.177675+00:00"
+  },
+  {
+    "id": "problem_type_000195",
+    "problem_id": "problem_000201",
+    "type_id": "type_0003",
+    "created_at": "2026-05-03T17:17:54.219046+00:00",
+    "updated_at": "2026-05-03T17:17:54.219053+00:00"
+  },
+  {
+    "id": "problem_type_000196",
+    "problem_id": "problem_000202",
+    "type_id": "type_0012",
+    "created_at": "2026-05-03T17:17:54.261207+00:00",
+    "updated_at": "2026-05-03T17:17:54.261212+00:00"
+  },
+  {
+    "id": "problem_type_000197",
+    "problem_id": "problem_000203",
+    "type_id": "type_0008",
+    "created_at": "2026-05-03T17:17:54.300840+00:00",
+    "updated_at": "2026-05-03T17:17:54.300847+00:00"
+  },
+  {
+    "id": "problem_type_000198",
+    "problem_id": "problem_000204",
+    "type_id": "type_0001",
+    "created_at": "2026-05-03T17:17:54.341603+00:00",
+    "updated_at": "2026-05-03T17:17:54.341608+00:00"
+  },
+  {
+    "id": "problem_type_000199",
+    "problem_id": "problem_000205",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:54.382278+00:00",
+    "updated_at": "2026-05-03T17:17:54.382283+00:00"
+  },
+  {
+    "id": "problem_type_000200",
+    "problem_id": "problem_000206",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:54.421566+00:00",
+    "updated_at": "2026-05-03T17:17:54.421569+00:00"
+  },
+  {
+    "id": "problem_type_000201",
+    "problem_id": "problem_000207",
+    "type_id": "type_0009",
+    "created_at": "2026-05-03T17:17:54.462245+00:00",
+    "updated_at": "2026-05-03T17:17:54.462252+00:00"
+  },
+  {
+    "id": "problem_type_000202",
+    "problem_id": "problem_000208",
+    "type_id": "type_0001",
+    "created_at": "2026-05-03T17:17:54.502904+00:00",
+    "updated_at": "2026-05-03T17:17:54.502909+00:00"
+  },
+  {
+    "id": "problem_type_000203",
+    "problem_id": "problem_000209",
+    "type_id": "type_0001",
+    "created_at": "2026-05-03T17:17:54.542730+00:00",
+    "updated_at": "2026-05-03T17:17:54.542735+00:00"
+  },
+  {
+    "id": "problem_type_000204",
+    "problem_id": "problem_000210",
+    "type_id": "type_0009",
+    "created_at": "2026-05-03T17:17:54.585360+00:00",
+    "updated_at": "2026-05-03T17:17:54.585365+00:00"
+  },
+  {
+    "id": "problem_type_000205",
+    "problem_id": "problem_000211",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:54.624784+00:00",
+    "updated_at": "2026-05-03T17:17:54.624788+00:00"
+  },
+  {
+    "id": "problem_type_000206",
+    "problem_id": "problem_000212",
+    "type_id": "type_0008",
+    "created_at": "2026-05-03T17:17:54.662960+00:00",
+    "updated_at": "2026-05-03T17:17:54.662964+00:00"
+  },
+  {
+    "id": "problem_type_000207",
+    "problem_id": "problem_000213",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:54.704469+00:00",
+    "updated_at": "2026-05-03T17:17:54.704474+00:00"
+  },
+  {
+    "id": "problem_type_000208",
+    "problem_id": "problem_000214",
+    "type_id": "type_0003",
+    "created_at": "2026-05-03T17:17:54.743648+00:00",
+    "updated_at": "2026-05-03T17:17:54.743653+00:00"
+  },
+  {
+    "id": "problem_type_000209",
+    "problem_id": "problem_000215",
+    "type_id": "type_0001",
+    "created_at": "2026-05-03T17:17:54.783335+00:00",
+    "updated_at": "2026-05-03T17:17:54.783339+00:00"
+  },
+  {
+    "id": "problem_type_000210",
+    "problem_id": "problem_000216",
+    "type_id": "type_0010",
+    "created_at": "2026-05-03T17:17:54.823536+00:00",
+    "updated_at": "2026-05-03T17:17:54.823541+00:00"
+  },
+  {
+    "id": "problem_type_000211",
+    "problem_id": "problem_000217",
+    "type_id": "type_0003",
+    "created_at": "2026-05-03T17:17:54.864542+00:00",
+    "updated_at": "2026-05-03T17:17:54.864545+00:00"
+  },
+  {
+    "id": "problem_type_000212",
+    "problem_id": "problem_000218",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:54.909844+00:00",
+    "updated_at": "2026-05-03T17:17:54.909849+00:00"
+  },
+  {
+    "id": "problem_type_000213",
+    "problem_id": "problem_000219",
+    "type_id": "type_0010",
+    "created_at": "2026-05-03T17:17:54.958383+00:00",
+    "updated_at": "2026-05-03T17:17:54.958387+00:00"
+  },
+  {
+    "id": "problem_type_000214",
+    "problem_id": "problem_000220",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:54.998319+00:00",
+    "updated_at": "2026-05-03T17:17:54.998324+00:00"
+  },
+  {
+    "id": "problem_type_000215",
+    "problem_id": "problem_000221",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:55.039617+00:00",
+    "updated_at": "2026-05-03T17:17:55.039623+00:00"
+  },
+  {
+    "id": "problem_type_000216",
+    "problem_id": "problem_000222",
+    "type_id": "type_0013",
+    "created_at": "2026-05-03T17:17:55.080019+00:00",
+    "updated_at": "2026-05-03T17:17:55.080024+00:00"
+  },
+  {
+    "id": "problem_type_000217",
+    "problem_id": "problem_000223",
+    "type_id": "type_0010",
+    "created_at": "2026-05-03T17:17:55.119239+00:00",
+    "updated_at": "2026-05-03T17:17:55.119243+00:00"
+  },
+  {
+    "id": "problem_type_000218",
+    "problem_id": "problem_000224",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:55.160255+00:00",
+    "updated_at": "2026-05-03T17:17:55.160258+00:00"
+  },
+  {
+    "id": "problem_type_000219",
+    "problem_id": "problem_000225",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:55.199969+00:00",
+    "updated_at": "2026-05-03T17:17:55.199973+00:00"
+  },
+  {
+    "id": "problem_type_000220",
+    "problem_id": "problem_000226",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:55.241891+00:00",
+    "updated_at": "2026-05-03T17:17:55.241896+00:00"
+  },
+  {
+    "id": "problem_type_000221",
+    "problem_id": "problem_000227",
+    "type_id": "type_0012",
+    "created_at": "2026-05-03T17:17:55.284155+00:00",
+    "updated_at": "2026-05-03T17:17:55.284160+00:00"
+  },
+  {
+    "id": "problem_type_000222",
+    "problem_id": "problem_000228",
+    "type_id": "type_0005",
+    "created_at": "2026-05-03T17:17:55.323608+00:00",
+    "updated_at": "2026-05-03T17:17:55.323612+00:00"
+  },
+  {
+    "id": "problem_type_000223",
+    "problem_id": "problem_000229",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:55.364124+00:00",
+    "updated_at": "2026-05-03T17:17:55.364129+00:00"
+  },
+  {
+    "id": "problem_type_000224",
+    "problem_id": "problem_000230",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:55.402854+00:00",
+    "updated_at": "2026-05-03T17:17:55.402859+00:00"
+  },
+  {
+    "id": "problem_type_000225",
+    "problem_id": "problem_000231",
+    "type_id": "type_0010",
+    "created_at": "2026-05-03T17:17:55.443457+00:00",
+    "updated_at": "2026-05-03T17:17:55.443461+00:00"
+  },
+  {
+    "id": "problem_type_000226",
+    "problem_id": "problem_000232",
+    "type_id": "type_0004",
+    "created_at": "2026-05-03T17:17:55.501878+00:00",
+    "updated_at": "2026-05-03T17:17:55.501882+00:00"
+  },
+  {
+    "id": "problem_type_000227",
+    "problem_id": "problem_000233",
+    "type_id": "type_0010",
+    "created_at": "2026-05-03T17:17:55.543289+00:00",
+    "updated_at": "2026-05-03T17:17:55.543293+00:00"
+  },
+  {
+    "id": "problem_type_000228",
+    "problem_id": "problem_000234",
+    "type_id": "type_0005",
+    "created_at": "2026-05-03T17:17:55.583381+00:00",
+    "updated_at": "2026-05-03T17:17:55.583385+00:00"
+  },
+  {
+    "id": "problem_type_000229",
+    "problem_id": "problem_000235",
+    "type_id": "type_0003",
+    "created_at": "2026-05-03T17:17:55.623454+00:00",
+    "updated_at": "2026-05-03T17:17:55.623458+00:00"
+  },
+  {
+    "id": "problem_type_000230",
+    "problem_id": "problem_000236",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:55.663940+00:00",
+    "updated_at": "2026-05-03T17:17:55.663944+00:00"
+  },
+  {
+    "id": "problem_type_000231",
+    "problem_id": "problem_000237",
+    "type_id": "type_0004",
+    "created_at": "2026-05-03T17:17:55.703520+00:00",
+    "updated_at": "2026-05-03T17:17:55.703525+00:00"
+  },
+  {
+    "id": "problem_type_000232",
+    "problem_id": "problem_000238",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:55.743059+00:00",
+    "updated_at": "2026-05-03T17:17:55.743063+00:00"
+  },
+  {
+    "id": "problem_type_000233",
+    "problem_id": "problem_000239",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:55.781747+00:00",
+    "updated_at": "2026-05-03T17:17:55.781751+00:00"
+  },
+  {
+    "id": "problem_type_000234",
+    "problem_id": "problem_000240",
+    "type_id": "type_0012",
+    "created_at": "2026-05-03T17:17:55.823019+00:00",
+    "updated_at": "2026-05-03T17:17:55.823023+00:00"
+  },
+  {
+    "id": "problem_type_000235",
+    "problem_id": "problem_000241",
+    "type_id": "type_0006",
+    "created_at": "2026-05-03T17:17:55.864680+00:00",
+    "updated_at": "2026-05-03T17:17:55.864687+00:00"
+  },
+  {
+    "id": "problem_type_000236",
+    "problem_id": "problem_000242",
+    "type_id": "type_0003",
+    "created_at": "2026-05-03T17:17:55.909350+00:00",
+    "updated_at": "2026-05-03T17:17:55.909355+00:00"
+  },
+  {
+    "id": "problem_type_000237",
+    "problem_id": "problem_000243",
+    "type_id": "type_0005",
+    "created_at": "2026-05-03T17:17:55.952170+00:00",
+    "updated_at": "2026-05-03T17:17:55.952175+00:00"
+  },
+  {
+    "id": "problem_type_000238",
+    "problem_id": "problem_000244",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:55.992122+00:00",
+    "updated_at": "2026-05-03T17:17:55.992126+00:00"
+  },
+  {
+    "id": "problem_type_000239",
+    "problem_id": "problem_000245",
+    "type_id": "type_0012",
+    "created_at": "2026-05-03T17:17:56.040096+00:00",
+    "updated_at": "2026-05-03T17:17:56.040099+00:00"
+  },
+  {
+    "id": "problem_type_000240",
+    "problem_id": "problem_000246",
+    "type_id": "type_0007",
+    "created_at": "2026-05-03T17:17:56.079548+00:00",
+    "updated_at": "2026-05-03T17:17:56.079554+00:00"
+  },
+  {
+    "id": "problem_type_000241",
+    "problem_id": "problem_000247",
+    "type_id": "type_0004",
+    "created_at": "2026-05-03T17:17:56.126188+00:00",
+    "updated_at": "2026-05-03T17:17:56.126191+00:00"
+  },
+  {
+    "id": "problem_type_000242",
+    "problem_id": "problem_000248",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:56.164463+00:00",
+    "updated_at": "2026-05-03T17:17:56.164467+00:00"
+  },
+  {
+    "id": "problem_type_000243",
+    "problem_id": "problem_000249",
+    "type_id": "type_0009",
+    "created_at": "2026-05-03T17:17:56.211866+00:00",
+    "updated_at": "2026-05-03T17:17:56.211868+00:00"
+  },
+  {
+    "id": "problem_type_000244",
+    "problem_id": "problem_000250",
+    "type_id": "type_0003",
+    "created_at": "2026-05-03T17:17:56.256873+00:00",
+    "updated_at": "2026-05-03T17:17:56.256878+00:00"
+  },
+  {
+    "id": "problem_type_000245",
+    "problem_id": "problem_000251",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:56.298362+00:00",
+    "updated_at": "2026-05-03T17:17:56.298368+00:00"
+  },
+  {
+    "id": "problem_type_000246",
+    "problem_id": "problem_000252",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:56.348305+00:00",
+    "updated_at": "2026-05-03T17:17:56.348309+00:00"
+  },
+  {
+    "id": "problem_type_000247",
+    "problem_id": "problem_000253",
+    "type_id": "type_0008",
+    "created_at": "2026-05-03T17:17:56.387810+00:00",
+    "updated_at": "2026-05-03T17:17:56.387816+00:00"
+  },
+  {
+    "id": "problem_type_000248",
+    "problem_id": "problem_000254",
+    "type_id": "type_0011",
+    "created_at": "2026-05-03T17:17:56.427816+00:00",
+    "updated_at": "2026-05-03T17:17:56.427822+00:00"
+  },
+  {
+    "id": "problem_type_000249",
+    "problem_id": "problem_000255",
+    "type_id": "type_0002",
+    "created_at": "2026-05-03T17:17:56.468582+00:00",
+    "updated_at": "2026-05-03T17:17:56.468587+00:00"
+  },
+  {
+    "id": "problem_type_000250",
+    "problem_id": "problem_000256",
+    "type_id": "type_0009",
+    "created_at": "2026-05-03T17:17:56.510929+00:00",
+    "updated_at": "2026-05-03T17:17:56.510935+00:00"
+  }
+]
