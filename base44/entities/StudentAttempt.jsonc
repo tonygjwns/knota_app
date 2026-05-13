@@ -100,6 +100,28 @@
     "target_tool_id": {
       "type": "string",
       "description": "\ubcf4\uac15 \uc911\uc778 \ub9e4\ub4ed tool_id"
+    },
+    "student_answer": {
+      "type": "string",
+      "description": "\ud559\uc0dd\uc774 \ub2f5\uc548 input \uce78\uc5d0 \uc785\ub825\ud55c \ub2f5\uc548 \ud14d\uc2a4\ud2b8 (\ub2e8\uc77c \uc22b\uc790 \ub610\ub294 \uc218\uc2dd). UX-1 \ud68c\ucc28\uc5d0\uc11c \ucc44\uc6cc\uc9d0."
+    },
+    "answer_check_result": {
+      "type": "string",
+      "enum": [
+        "correct",
+        "correct_via_solution",
+        "wrong"
+      ],
+      "description": "Stage 1/2 \ucc44\uc810 \uacb0\uacfc \ubd84\ub958. correct = Stage 1 \ub2f5 \ub9e4\uce6d, correct_via_solution = Stage 2 \ud480\uc774\uc0c1 \uc815\ub2f5, wrong = Stage 3 \uae4a\uc774 \ucc44\uc810 \uc9c4\uc785. UX-1/UX-2 \ud68c\ucc28\uc5d0\uc11c \ucc44\uc6cc\uc9d0."
+    },
+    "tool_mapping_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "done",
+        "failed"
+      ],
+      "description": "\uc815\ub2f5 \uc2dc \ubc31\uadf8\ub77c\uc6b4\ub4dc \ub3c4\uad6c \ub9e4\ud551 \uc9c4\ud589 \uc0c1\ud0dc. UX-2 \ud68c\ucc28\uc5d0\uc11c \ucc44\uc6cc\uc9d0."
     }
   },
   "required": [

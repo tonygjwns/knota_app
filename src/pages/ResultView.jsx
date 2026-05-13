@@ -526,8 +526,8 @@ export default function ResultView() {
 
                   return (
                     <div key={gi} className="space-y-2">
-                      {/* Group header — show only if multiple items and matched solution exists */}
-                      {g.items.length > 1 && solStep && toolName && (
+                      {/* Group header — show whenever matched solution step + tool resolved */}
+                      {solStep && toolName && (
                         <div className="text-xs text-muted-foreground flex items-center gap-2 pl-1">
                           <span>📍 정해 Step {g.key} — {toolName} (학생 풀이 {g.items.length}줄에 해당)</span>
                         </div>

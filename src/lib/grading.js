@@ -66,7 +66,6 @@ export const GRADING_SCHEMA = {
 
 /**
  * MathTool 배열 → prompt용 도구 블록 문자열
- * @param {Array} tools - MathTool 배열
  */
 export function buildToolsBlock(tools) {
   if (!tools || tools.length === 0) return '(도구 정보 없음)';
@@ -77,9 +76,6 @@ export function buildToolsBlock(tools) {
 
 /**
  * Solution 배열 → prompt용 별해 블록 문자열
- * @param {Array} solutions - Solution 배열 (이미 slice된 최대 5개)
- * @param {Map} stepsBySolutionId - Map<solution_id, SolutionStep[]>
- * @param {Array} tools - MathTool 배열 (도구 이름 매핑용)
  */
 export function buildSolutionsBlock(solutions, stepsBySolutionId, tools) {
   if (!solutions || solutions.length === 0) return '(별해 데이터 없음)';
@@ -118,12 +114,6 @@ ${pathText}
 
 /**
  * 채점 prompt 문자열 생성
- * @param {Object} params
- * @param {string} params.problemText
- * @param {string} params.verifiedAnswer
- * @param {string} params.solutionsBlock
- * @param {string} params.toolsBlock
- * @param {string} params.studentOcrSolution
  */
 export function buildGradingPrompt({ problemText, verifiedAnswer, solutionsBlock, toolsBlock, studentOcrSolution }) {
   const answerText = verifiedAnswer || '(검증된 정답 없음)';
@@ -147,16 +137,22 @@ export function buildGradingPrompt({ problemText, verifiedAnswer, solutionsBlock
 6. 할루시 방지 — 학생이 안 쓴 내용 추측 금지. 확신 없으면 confidence ↓
 7. OCR 검증 — 의심스러우면 ocr_quality_concern에 명시
 8. Actionable feedback — 모호한 표현 금지. 어느 자리/왜를 명시.
-9. 매듭 매핑 — step_feedback/error_locations/gap_locations 의 tool_id는 반드시
-   <available_tools> 안 ID만 사용. 매칭된 별해의 path 도구를 우선 매핑.
-   불명확하면 null.
-10. 학생 step → 정해 step 매핑 (매우 중요):
-    - 정해 path는 N개의 step (Step 1 = 도구 X, Step 2 = 도구 Y, …)
-    - 학생 풀이는 M개의 step. 일반적으로 N ≠ M.
-    - 각 학생 step에 대해 어느 정해 step에 해당하는지 matched_solution_step_number 에 채우기 (1부터 시작, 매칭 안 되면 null).
-    - 여러 학생 step이 같은 정해 step에 매핑 가능 (N:1).
-    - tool_id는 반드시 매핑된 정해 step의 도구만 사용. 다른 도구 부여 금지.
-    - matched_solution_id가 null이면 모든 step의 matched_solution_step_number도 null.
+10. 학생 step → 정해 step 매핑 (가장 중요):
+    - 정해 path 는 N 개 step, 학생 풀이는 여러 줄로 구성됩니다.
+    - **한 정해 step 에 대응하는 학생 풀이는 step_feedback 한 개로 합쳐서 출력하세요.**
+      학생이 그 부분에 여러 줄을 썼다면 student_step 에 줄바꿈으로 합쳐 넣으세요.
+      한 도구가 step_feedback 에 반복해서 등장하면 안 됩니다.
+    - 각 항목의 matched_solution_step_number 를 정확히 채우는 것이 가장 중요합니다.
+    - matched_solution_id 가 null 이면 모든 step 의 matched_solution_step_number 도 null.
+11. tool_id 채우기:
+    - tool_id 는 서버가 matched_solution_step_number 에서 자동으로 도출하므로,
+      잘 모르겠으면 null 로 두세요.
+    - matched_solution_id 가 null 인 케이스에서만 가장 가까운 도구를
+      <available_tools> 에서 선택해 채워주세요.
+12. 학생이 정해 path 와 다른 순서로 풀었더라도 step_feedback 항목 자체는
+    학생이 쓴 순서로 출력하세요. matched_solution_step_number 만 정해 순서를 가리킵니다.
+13. 학생이 도구의 이름을 명시적으로 쓰지 않더라도, 그 도구의 결과
+    (공식·정리의 산물) 를 사용했다면 그 정해 step 에 매핑하세요.
 
 ## 점수 기준
 - 100 = 정답 + 풀이 완전
@@ -197,8 +193,95 @@ ${studentOcrSolution}
 위 학생 풀이를 GradingOutput 양식으로 채점해 주세요.`;
 }
 
+// ─── Status priority for merging ────────────────
+const STATUS_PRIORITY = { wrong: 4, partial: 3, missing: 2, correct: 1 };
+
 /**
- * LLM 채점 결과 sanitize — tool_id / solution_id 유효성 검증
+ * 같은 matched_solution_step_number 를 가진 step_feedback 항목들을 1개로 병합.
+ * null 인 항목은 각각 그대로 유지.
+ * @param {Array} items - 원본 step_feedback 배열
+ * @returns {Array} 병합된 배열 (step_number 오름차순)
+ */
+export function mergeStepFeedback(items) {
+  const groups = new Map();
+  const nullItems = [];
+
+  for (const sf of items) {
+    const key = sf.matched_solution_step_number;
+    if (key === null || key === undefined) {
+      nullItems.push(sf);
+    } else {
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(sf);
+    }
+  }
+
+  const merged = [];
+
+  for (const [stepNum, arr] of groups) {
+    arr.sort((a, b) => (a.step_number ?? 0) - (b.step_number ?? 0));
+    const baseStepNumber = Math.min(...arr.map(x => x.step_number ?? 0));
+    const joinedStudent = arr.map(x => x.student_step || '').filter(Boolean).join('\n');
+    const worstStatus = arr.reduce((acc, x) => {
+      const p = STATUS_PRIORITY[x.status] ?? 0;
+      const accP = STATUS_PRIORITY[acc] ?? 0;
+      return p > accP ? x.status : acc;
+    }, 'correct');
+    const seenComments = new Set();
+    const joinedComment = arr.map(x => x.comment || '').filter(c => {
+      if (!c || seenComments.has(c)) return false;
+      seenComments.add(c);
+      return true;
+    }).join('\n');
+    const firstCorrection = arr.find(x => x.correction)?.correction || '';
+
+    merged.push({
+      step_number: baseStepNumber,
+      student_step: joinedStudent,
+      status: worstStatus,
+      comment: joinedComment,
+      correction: firstCorrection,
+      matched_solution_step_number: stepNum,
+      tool_id: null, // Step 3 에서 결정
+    });
+  }
+
+  for (const sf of nullItems) {
+    merged.push({ ...sf, tool_id: sf.tool_id });
+  }
+
+  merged.sort((a, b) => (a.step_number ?? 0) - (b.step_number ?? 0));
+  return merged;
+}
+
+/**
+ * matched_solution_id 가 있을 때 step_feedback 각 항목의 tool_id 를
+ * SolutionStep 데이터에서 결정적으로 도출 (override).
+ * 매칭 실패 시 원본 LLM tool_id 를 validToolIds 로 검증.
+ * @param {Array} mergedSteps - mergeStepFeedback 결과
+ * @param {Array} matchedSteps - matched solution 의 SolutionStep[]
+ * @param {Set} validToolIds
+ * @param {Array} originalItems - sanitize 진입 전 원본 step_feedback (tool_id 참조용)
+ * @returns {Array}
+ */
+export function deriveToolIdsFromMatchedSolution(mergedSteps, matchedSteps, validToolIds, originalItems) {
+  const stepByOrder = new Map((matchedSteps || []).map(s => [s.sequence_order, s]));
+  const hasMatchedSolution = matchedSteps && matchedSteps.length > 0;
+
+  return mergedSteps.map(sf => {
+    const stepNum = sf.matched_solution_step_number;
+    if (hasMatchedSolution && stepByOrder.has(stepNum)) {
+      return { ...sf, tool_id: stepByOrder.get(stepNum).tool_id };
+    }
+    // matched_solution_id 가 없거나 stepNum 매칭 실패 → 원본 LLM 값 검증
+    const originalItem = (originalItems || []).find(x => x.step_number === sf.step_number);
+    const originalToolId = originalItem?.tool_id;
+    return { ...sf, tool_id: validToolIds.has(originalToolId) ? originalToolId : null };
+  });
+}
+
+/**
+ * LLM 채점 결과 sanitize — tool_id / solution_id 유효성 검증 + step 병합 + tool_id 결정적 도출
  * @param {Object} result - LLM 응답 채점 결과 (원본 불변)
  * @param {Object} opts
  * @param {Set<string>} opts.validToolIds
@@ -207,38 +290,36 @@ ${studentOcrSolution}
  * @returns {Object} 새 객체
  */
 export function sanitizeGradingResult(result, { validToolIds, validSolutionIds, stepsBySolutionId }) {
-  const sanitizeArr = (arr) => (arr || []).map(item => ({
-    ...item,
-    tool_id: validToolIds.has(item.tool_id) ? item.tool_id : null
-  }));
-
-  let sanitized = {
-    ...result,
-    step_feedback: sanitizeArr(result.step_feedback),
-    error_locations: sanitizeArr(result.error_locations),
-    gap_locations: sanitizeArr(result.gap_locations),
-  };
-
-  // matched_solution_id 검증
+  // Step 1. matched_solution_id 검증
+  let sanitized = { ...result };
   if (!validSolutionIds.has(sanitized.matched_solution_id)) {
     sanitized = { ...sanitized, matched_solution_id: null, matched_solution_priority: null };
   }
 
-  // matched_solution_step_number 검증
   const matchedSolId = sanitized.matched_solution_id;
-  let validSolStepNums = new Set();
-  if (matchedSolId) {
-    const matchedSteps = stepsBySolutionId.get(matchedSolId) || [];
-    validSolStepNums = new Set(matchedSteps.map(s => s.sequence_order));
-  }
+  const matchedSteps = matchedSolId ? (stepsBySolutionId.get(matchedSolId) || []) : [];
+
+  // Step 2. step_feedback 병합 (같은 matched_solution_step_number → 1개)
+  const originalItems = result.step_feedback || [];
+  const merged = mergeStepFeedback(originalItems);
+
+  // Step 3. tool_id 결정적 도출
+  const derivedSteps = deriveToolIdsFromMatchedSolution(merged, matchedSteps, validToolIds, originalItems);
+  sanitized = { ...sanitized, step_feedback: derivedSteps };
+
+  // Step 4. error_locations / gap_locations 의 tool_id
+  const matchedSolToolIds = new Set(matchedSteps.map(s => s.tool_id).filter(Boolean));
+  const allowedToolIds = matchedSolId ? matchedSolToolIds : validToolIds;
+
+  const sanitizeAux = (arr) => (arr || []).map(item => ({
+    ...item,
+    tool_id: allowedToolIds.has(item.tool_id) ? item.tool_id : null,
+  }));
+
   sanitized = {
     ...sanitized,
-    step_feedback: (sanitized.step_feedback || []).map(sf => ({
-      ...sf,
-      matched_solution_step_number: validSolStepNums.has(sf.matched_solution_step_number)
-        ? sf.matched_solution_step_number
-        : null,
-    })),
+    error_locations: sanitizeAux(result.error_locations),
+    gap_locations: sanitizeAux(result.gap_locations),
   };
 
   return sanitized;
