@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
+import { gradeLabel, extractGradeOptions } from '@/lib/grade-labels.js';
+import { toast } from 'sonner';
 
 const parseProblemText = (content) => {
   try {
@@ -19,7 +21,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -30,7 +31,7 @@ import {
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Search, X, RotateCcw, Eye } from 'lucide-react';
+import { Search, X, Eye } from 'lucide-react';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import MathRenderer from '@/components/MathRenderer';
 
@@ -100,136 +101,150 @@ function ProblemCard({ problem, checked, onToggle, onPreview, compact = false })
 }
 
 export default function AssignmentForm({ classId, onSave, onClose, assignment, preselectedToolId }) {
-  // user는 handleSave에서 base44.auth.me()로 직접 조회
   const [title, setTitle] = useState(assignment?.title || '');
   const [description, setDescription] = useState(assignment?.description || '');
   const [deadline, setDeadline] = useState(assignment?.deadline || '');
   const [tempDeadline, setTempDeadline] = useState(assignment?.deadline || '');
   const initialProblemIds = assignment ? JSON.parse(assignment.problem_ids || '[]') : [];
   const [selectedProblems, setSelectedProblems] = useState(initialProblemIds);
-  const [selectionTab, setSelectionTab] = useState(preselectedToolId ? 'tool' : 'tool');
   const [saving, setSaving] = useState(false);
   const [previewProblem, setPreviewProblem] = useState(null);
 
-  // 도구별 출제
-  const [selectedTool, setSelectedTool] = useState(preselectedToolId || '');
-  const [toolCount, setToolCount] = useState(10);
-  const [toolPreview, setToolPreview] = useState([]);
-  const [selectedToolPreviewIds, setSelectedToolPreviewIds] = useState(new Set());
-  const [tools, setTools] = useState([]);
-  const [toolsLoading, setToolsLoading] = useState(true);
-  const [toolDifficultyMin, setToolDifficultyMin] = useState('');
-  const [toolDifficultyMax, setToolDifficultyMax] = useState('');
-  const [toolMinSolutions, setToolMinSolutions] = useState('');
+  // 학년 / 단원 필터
+  const [selectedGrade, setSelectedGrade] = useState('');
+  const [selectedDomainId, setSelectedDomainId] = useState('');
+  const [grades, setGrades] = useState([]);
+  const [allDomains, setAllDomains] = useState([]);
+  const [allTools, setAllTools] = useState([]);
+  const [allProblems, setAllProblems] = useState([]);
+  const [dataLoading, setDataLoading] = useState(true);
+  const [classGradeNotice, setClassGradeNotice] = useState(false);
 
-  // 단원별 출제
-  const [selectedDomain, setSelectedDomain] = useState('');
-  const [domainCount, setDomainCount] = useState(10);
-  const [domainPreview, setDomainPreview] = useState([]);
-  const [selectedDomainPreviewIds, setSelectedDomainPreviewIds] = useState(new Set());
-  const [domains, setDomains] = useState([]);
-  const [domainsLoading, setDomainsLoading] = useState(true);
-  const [domainDifficultyMin, setDomainDifficultyMin] = useState('');
-  const [domainDifficultyMax, setDomainDifficultyMax] = useState('');
-  const [domainMinSolutions, setDomainMinSolutions] = useState('');
+  // 선택된 도구 Set
+  const [selectedToolIds, setSelectedToolIds] = useState(
+    preselectedToolId ? new Set([preselectedToolId]) : new Set()
+  );
 
   // 직접 선택
   const [searchQuery, setSearchQuery] = useState('');
-  const [allProblems, setAllProblems] = useState([]);
-  const [problemsLoading, setProblemsLoading] = useState(true);
 
   // 즐겨찾기
   const [bookmarkedProblems, setBookmarkedProblems] = useState([]);
-  const [bookmarksLoading, setBookmarksLoading] = useState(true);
   const [selectedBookmarkIds, setSelectedBookmarkIds] = useState(new Set());
 
   useEffect(() => setTempDeadline(deadline), [deadline]);
 
   // 초기화
-  React.useEffect(() => {
+  useEffect(() => {
     const init = async () => {
       const [toolsData, domainsData, problemsData] = await Promise.all([
-        base44.entities.MathTool.list('name', 100),
-        base44.entities.Domain.list('name', 100),
+        base44.entities.MathTool.list('name', 300),
+        base44.entities.Domain.list('grade_range', 100),
         base44.entities.Problem.list('-created_date', 1000),
       ]);
-      setTools(toolsData);
-      setDomains(domainsData);
+      setAllTools(toolsData);
+      setAllDomains(domainsData);
       setAllProblems(problemsData);
-      setToolsLoading(false);
-      setDomainsLoading(false);
-      setProblemsLoading(false);
-      if (preselectedToolId && toolsData.length > 0) {
-        setSelectedTool(preselectedToolId);
+      setGrades(extractGradeOptions(domainsData));
+      setDataLoading(false);
+
+      // 학급 grade_range default
+      if (classId) {
+        try {
+          const cls = await base44.entities.Class.filter({ id: classId }, '', 1);
+          if (cls[0]?.grade_range) {
+            setSelectedGrade(cls[0].grade_range);
+          } else {
+            setClassGradeNotice(true);
+          }
+        } catch { /* silent */ }
       }
 
       // 즐겨찾기 로드
       try {
         const me = await base44.auth.me();
         const bookmarks = await base44.entities.BookmarkedProblem.filter({ user_id: me.id }, '-created_date', 200);
-        // bookmark에 실제 문제 데이터 병합
         const bmProblemIds = bookmarks.map(b => b.problem_id);
-        // problem_id는 Problem 엔티티의 id(UUID) 또는 problem_id 필드값 둘 다 허용
         const bmProblems = problemsData.filter(p =>
           bmProblemIds.includes(p.id) || bmProblemIds.includes(p.problem_id)
         );
         setBookmarkedProblems(bmProblems);
       } catch { /* silent */ }
-      setBookmarksLoading(false);
     };
     init();
-  }, [preselectedToolId]);
+  }, [classId, preselectedToolId]);
 
-  // 공통 필터 함수
-  const applyFilters = (problems, diffMin, diffMax, minSolutions) => {
-    return problems.filter(p => {
-      if (diffMin !== '' && (p.difficulty || 0) < Number(diffMin)) return false;
-      if (diffMax !== '' && (p.difficulty || 0) > Number(diffMax)) return false;
-      return true;
+  // 학년 선택 시 단원/도구 리셋
+  const handleGradeChange = (g) => {
+    setSelectedGrade(g);
+    setSelectedDomainId('');
+    setSelectedToolIds(new Set());
+  };
+
+  // 단원 선택 시 도구 리셋
+  const handleDomainChange = (d) => {
+    setSelectedDomainId(d);
+    setSelectedToolIds(new Set());
+  };
+
+  const filteredDomains = useMemo(
+    () => allDomains.filter(d => d.grade_range === selectedGrade),
+    [allDomains, selectedGrade]
+  );
+
+  const selectedDomainObj = allDomains.find(d => d.domain_id === selectedDomainId);
+
+  const filteredTools = useMemo(() => {
+    if (!selectedDomainId) return [];
+    return allTools.filter(t => {
+      try {
+        const ids = JSON.parse(t.domain_ids || '[]');
+        return ids.includes(selectedDomainId);
+      } catch { return false; }
+    });
+  }, [allTools, selectedDomainId]);
+
+  const toggleToolId = (toolId) => {
+    setSelectedToolIds(prev => {
+      const next = new Set(prev);
+      next.has(toolId) ? next.delete(toolId) : next.add(toolId);
+      return next;
     });
   };
 
-  // 도구별 미리보기 재생성
-  const regenerateToolPreview = useCallback(() => {
-    if (!selectedTool) return;
-    const base = allProblems.filter(p => {
-      const toolIds = p.tool_ids ? JSON.parse(p.tool_ids) : [];
-      return toolIds.includes(selectedTool);
-    });
-    const filtered = applyFilters(base, toolDifficultyMin, toolDifficultyMax, toolMinSolutions);
-    const shuffled = filtered.sort(() => Math.random() - 0.5).slice(0, toolCount);
-    setToolPreview(shuffled);
-    setSelectedToolPreviewIds(new Set(shuffled.map(p => p.id)));
-  }, [selectedTool, toolCount, allProblems, toolDifficultyMin, toolDifficultyMax, toolMinSolutions]);
+  // 선택된 도구들의 문제 합집합 (미리보기)
+  const previewProblems = useMemo(() => {
+    if (selectedToolIds.size === 0) return [];
+    const seen = new Set();
+    const out = [];
+    for (const p of allProblems) {
+      try {
+        const tids = JSON.parse(p.tool_ids || '[]');
+        if (tids.some(t => selectedToolIds.has(t)) && !seen.has(p.id)) {
+          seen.add(p.id);
+          out.push(p);
+        }
+      } catch { /* skip */ }
+    }
+    return out;
+  }, [allProblems, selectedToolIds]);
 
-  React.useEffect(() => { regenerateToolPreview(); }, [selectedTool, toolCount, regenerateToolPreview]);
+  // previewProblems 변경 시 selectedProblems 동기화 (도구 선택 기반 자동 추가 — 단, 직접 제외한 것은 유지)
+  const [manuallyExcluded, setManuallyExcluded] = useState(new Set());
 
-  // 단원별 미리보기 재생성
-  const regenerateDomainPreview = useCallback(() => {
-    if (!selectedDomain) return;
-    const base = allProblems.filter(p => p.domain_id === selectedDomain);
-    const filtered = applyFilters(base, domainDifficultyMin, domainDifficultyMax, domainMinSolutions);
-    const shuffled = filtered.sort(() => Math.random() - 0.5).slice(0, domainCount);
-    setDomainPreview(shuffled);
-    setSelectedDomainPreviewIds(new Set(shuffled.map(p => p.id)));
-  }, [selectedDomain, domainCount, allProblems, domainDifficultyMin, domainDifficultyMax, domainMinSolutions]);
+  useEffect(() => {
+    const autoIds = previewProblems.map(p => p.id).filter(id => !manuallyExcluded.has(id));
+    setSelectedProblems(autoIds);
+  }, [previewProblems]);
 
-  React.useEffect(() => { regenerateDomainPreview(); }, [selectedDomain, domainCount, regenerateDomainPreview]);
+  const excludeProblem = (id) => {
+    setManuallyExcluded(prev => new Set([...prev, id]));
+    setSelectedProblems(prev => prev.filter(x => x !== id));
+  };
 
-  const toggleToolPreview = (id) => setSelectedToolPreviewIds(prev => {
-    const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next;
-  });
-  const toggleDomainPreview = (id) => setSelectedDomainPreviewIds(prev => {
-    const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next;
-  });
   const toggleBookmark = (id) => setSelectedBookmarkIds(prev => {
     const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next;
   });
-
-  const selectAllToolPreview = () => setSelectedToolPreviewIds(new Set(toolPreview.map(p => p.id)));
-  const deselectAllToolPreview = () => setSelectedToolPreviewIds(new Set());
-  const selectAllDomainPreview = () => setSelectedDomainPreviewIds(new Set(domainPreview.map(p => p.id)));
-  const deselectAllDomainPreview = () => setSelectedDomainPreviewIds(new Set());
   const selectAllBookmarks = () => setSelectedBookmarkIds(new Set(bookmarkedProblems.map(p => p.id)));
   const deselectAllBookmarks = () => setSelectedBookmarkIds(new Set());
 
@@ -252,14 +267,18 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
   };
 
   const handleSave = async () => {
-    if (!title.trim() || selectedProblems.length === 0) return;
+    if (!title.trim()) { toast.error('제목을 입력해 주세요'); return; }
+    if (!selectedGrade) { toast.error('학년을 선택해 주세요'); return; }
+    if (!selectedDomainId) { toast.error('단원을 선택해 주세요'); return; }
+    if (selectedToolIds.size === 0) { toast.error('도구를 1개 이상 선택해 주세요'); return; }
+    if (selectedProblems.length === 0) { toast.error('출제할 문제가 없어요'); return; }
     setSaving(true);
     try {
       const me = await base44.auth.me();
       const criteria = {
-        type: selectionTab,
-        ...(selectionTab === 'tool' && { tool: selectedTool }),
-        ...(selectionTab === 'domain' && { domain: selectedDomain }),
+        grade: selectedGrade,
+        domain: selectedDomainId,
+        tools: [...selectedToolIds],
       };
       const data = {
         title: title.trim(),
@@ -324,209 +343,102 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
               )}
             </div>
 
-            {/* 문제 선택 */}
-            <div>
-              <label className="block text-sm font-semibold mb-3">문제 선택 *</label>
-              <Tabs value={selectionTab} onValueChange={setSelectionTab}>
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="tool">도구별</TabsTrigger>
-                  <TabsTrigger value="domain">단원별</TabsTrigger>
-                  <TabsTrigger value="direct">직접 선택</TabsTrigger>
-                  <TabsTrigger value="bookmark">즐겨찾기</TabsTrigger>
-                </TabsList>
+            {/* 학년 / 단원 / 도구 단일 흐름 */}
+            {dataLoading ? <InlineLoader message="데이터 불러오는 중..." /> : (
+              <div className="space-y-4">
+                {classGradeNotice && (
+                  <p className="text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">
+                    이 학급의 기본 학년이 설정되지 않았어요. 학년을 선택해 주세요
+                  </p>
+                )}
 
-                {/* 도구별 */}
-                <TabsContent value="tool" className="space-y-3 mt-3">
-                  {toolsLoading ? <InlineLoader message="도구 로딩 중..." /> : (
-                    <>
-                      <Select value={selectedTool} onValueChange={setSelectedTool}>
-                        <SelectTrigger><SelectValue placeholder="도구를 선택하세요" /></SelectTrigger>
-                        <SelectContent>
-                          {tools.map(t => <SelectItem key={t.tool_id} value={t.tool_id}>{t.name}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      {selectedTool && (
-                         <>
-                           {/* 필터 */}
-                           <div className="bg-muted/50 rounded-lg p-3 space-y-2">
-                             <p className="text-xs font-medium text-muted-foreground">필터 (선택)</p>
-                             <div className="flex gap-2 items-center">
-                               <span className="text-xs text-muted-foreground w-14">난이도</span>
-                               <Input type="number" min={1} max={5} placeholder="최소" value={toolDifficultyMin}
-                                 onChange={e => setToolDifficultyMin(e.target.value)} className="w-16 h-7 text-xs" />
-                               <span className="text-xs">~</span>
-                               <Input type="number" min={1} max={5} placeholder="최대" value={toolDifficultyMax}
-                                 onChange={e => setToolDifficultyMax(e.target.value)} className="w-16 h-7 text-xs" />
-                               <span className="text-xs text-muted-foreground">(1-5)</span>
-                             </div>
-                           </div>
-                           <div className="flex justify-between items-center">
-                             <label className="text-sm font-medium">문제 수</label>
-                             <div className="flex items-center gap-2">
-                               <Input type="number" min={1} max={50} value={toolCount}
-                                 onChange={e => setToolCount(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
-                                 className="w-20 h-8" />
-                               <span className="text-sm text-muted-foreground">개</span>
-                               <Button variant="outline" size="sm" onClick={regenerateToolPreview} className="gap-1">
-                                 <RotateCcw className="w-4 h-4" />다시 뽑기
-                               </Button>
-                             </div>
-                           </div>
-                          <div>
-                            <div className="flex justify-between items-center mb-2">
-                              <p className="text-xs text-muted-foreground">미리보기 ({toolPreview.length}개)</p>
-                              <div className="flex gap-1">
-                                <Button variant="ghost" size="sm" onClick={selectAllToolPreview} className="h-6 text-xs">전체 선택</Button>
-                                <Button variant="ghost" size="sm" onClick={deselectAllToolPreview} className="h-6 text-xs">전체 해제</Button>
+                {/* 학년 */}
+                <div>
+                  <label className="block text-sm font-semibold mb-2">학년 *</label>
+                  <Select value={selectedGrade} onValueChange={handleGradeChange}>
+                    <SelectTrigger><SelectValue placeholder="학년을 선택하세요" /></SelectTrigger>
+                    <SelectContent>
+                      {grades.map(g => <SelectItem key={g} value={g}>{gradeLabel(g)}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* 단원 */}
+                <div>
+                  <label className="block text-sm font-semibold mb-2">단원 *</label>
+                  <Select value={selectedDomainId} onValueChange={handleDomainChange} disabled={!selectedGrade}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={selectedGrade ? '단원을 선택하세요' : '학년을 먼저 선택해 주세요'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredDomains.map(d => <SelectItem key={d.domain_id} value={d.domain_id}>{d.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* 도구 목록 */}
+                {selectedDomainId && (
+                  <div>
+                    <label className="block text-sm font-semibold mb-2">
+                      도구 선택 * <span className="text-xs font-normal text-muted-foreground">({selectedToolIds.size}개 선택됨)</span>
+                    </label>
+                    {filteredTools.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">이 단원에 연결된 도구가 없어요</p>
+                    ) : (
+                      <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                        {filteredTools.map(t => (
+                          <button key={t.tool_id} className="w-full text-left" onClick={() => toggleToolId(t.tool_id)}>
+                            <Card className={`p-3 transition-all ${selectedToolIds.has(t.tool_id) ? 'border-primary bg-primary/5' : 'hover:bg-muted'}`}>
+                              <div className="flex items-center gap-2">
+                                <input type="checkbox" readOnly checked={selectedToolIds.has(t.tool_id)} className="flex-shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium">{t.name}</p>
+                                  {t.goal && <p className="text-xs text-muted-foreground truncate">{t.goal}</p>}
+                                </div>
                               </div>
-                            </div>
-                            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-                              {toolPreview.map(p => (
-                                <ProblemCard key={p.id} problem={p}
-                                  checked={selectedToolPreviewIds.has(p.id)}
-                                  onToggle={toggleToolPreview}
-                                  onPreview={setPreviewProblem} />
-                              ))}
-                            </div>
-                          </div>
-                          {toolPreview.length > 0 && (
-                            <Button onClick={() => addSelectedPreviewProblems(toolPreview, selectedToolPreviewIds)}
-                              className="w-full" disabled={selectedToolPreviewIds.size === 0}>
-                              선택한 {selectedToolPreviewIds.size}개 문제 추가
-                            </Button>
-                          )}
-                        </>
-                      )}
-                    </>
-                  )}
-                </TabsContent>
-
-                {/* 단원별 */}
-                <TabsContent value="domain" className="space-y-3 mt-3">
-                  {domainsLoading ? <InlineLoader message="단원 로딩 중..." /> : (
-                    <>
-                      <Select value={selectedDomain} onValueChange={setSelectedDomain}>
-                        <SelectTrigger><SelectValue placeholder="단원을 선택하세요" /></SelectTrigger>
-                        <SelectContent>
-                          {domains.map(d => <SelectItem key={d.domain_id} value={d.domain_id}>{d.name}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      {selectedDomain && (
-                         <>
-                           {/* 필터 */}
-                           <div className="bg-muted/50 rounded-lg p-3 space-y-2">
-                             <p className="text-xs font-medium text-muted-foreground">필터 (선택)</p>
-                             <div className="flex gap-2 items-center">
-                               <span className="text-xs text-muted-foreground w-14">난이도</span>
-                               <Input type="number" min={1} max={5} placeholder="최소" value={domainDifficultyMin}
-                                 onChange={e => setDomainDifficultyMin(e.target.value)} className="w-16 h-7 text-xs" />
-                               <span className="text-xs">~</span>
-                               <Input type="number" min={1} max={5} placeholder="최대" value={domainDifficultyMax}
-                                 onChange={e => setDomainDifficultyMax(e.target.value)} className="w-16 h-7 text-xs" />
-                               <span className="text-xs text-muted-foreground">(1-5)</span>
-                             </div>
-                           </div>
-                           <div className="flex justify-between items-center">
-                             <label className="text-sm font-medium">문제 수</label>
-                             <div className="flex items-center gap-2">
-                               <Input type="number" min={1} max={50} value={domainCount}
-                                 onChange={e => setDomainCount(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
-                                 className="w-20 h-8" />
-                               <span className="text-sm text-muted-foreground">개</span>
-                               <Button variant="outline" size="sm" onClick={regenerateDomainPreview} className="gap-1">
-                                 <RotateCcw className="w-4 h-4" />다시 뽑기
-                               </Button>
-                             </div>
-                           </div>
-                          <div>
-                            <div className="flex justify-between items-center mb-2">
-                              <p className="text-xs text-muted-foreground">미리보기 ({domainPreview.length}개)</p>
-                              <div className="flex gap-1">
-                                <Button variant="ghost" size="sm" onClick={selectAllDomainPreview} className="h-6 text-xs">전체 선택</Button>
-                                <Button variant="ghost" size="sm" onClick={deselectAllDomainPreview} className="h-6 text-xs">전체 해제</Button>
-                              </div>
-                            </div>
-                            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-                              {domainPreview.map(p => (
-                                <ProblemCard key={p.id} problem={p}
-                                  checked={selectedDomainPreviewIds.has(p.id)}
-                                  onToggle={toggleDomainPreview}
-                                  onPreview={setPreviewProblem} />
-                              ))}
-                            </div>
-                          </div>
-                          {domainPreview.length > 0 && (
-                            <Button onClick={() => addSelectedPreviewProblems(domainPreview, selectedDomainPreviewIds)}
-                              className="w-full" disabled={selectedDomainPreviewIds.size === 0}>
-                              선택한 {selectedDomainPreviewIds.size}개 문제 추가
-                            </Button>
-                          )}
-                        </>
-                      )}
-                    </>
-                  )}
-                </TabsContent>
-
-                {/* 직접 선택 */}
-                <TabsContent value="direct" className="space-y-3 mt-3">
-                  {problemsLoading ? <InlineLoader message="문제 로딩 중..." /> : (
-                    <>
-                      <div className="relative">
-                        <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
-                        <Input placeholder="문제 검색 (내용, 단원)..." value={searchQuery}
-                          onChange={e => setSearchQuery(e.target.value)} className="pl-10" />
-                      </div>
-                      <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-                        {searchResults.map(p => (
-                          <ProblemCard key={p.id} problem={p}
-                            checked={selectedProblems.includes(p.id)}
-                            onToggle={toggleProblem}
-                            onPreview={setPreviewProblem} />
+                            </Card>
+                          </button>
                         ))}
                       </div>
-                      {searchQuery && searchResults.length === 0 && (
-                        <p className="text-sm text-muted-foreground text-center py-4">검색 결과가 없습니다.</p>
-                      )}
-                    </>
-                  )}
-                </TabsContent>
+                    )}
+                  </div>
+                )}
 
-                {/* 즐겨찾기 */}
-                <TabsContent value="bookmark" className="space-y-3 mt-3">
-                  {bookmarksLoading ? <InlineLoader message="즐겨찾기 로딩 중..." /> : (
-                    <>
-                      {bookmarkedProblems.length === 0 ? (
-                        <p className="text-sm text-muted-foreground text-center py-8">즐겨찾기한 문제가 없어요</p>
-                      ) : (
-                        <>
-                          <div className="flex justify-between items-center">
-                            <p className="text-xs text-muted-foreground">즐겨찾기 문제 ({bookmarkedProblems.length}개)</p>
-                            <div className="flex gap-1">
-                              <Button variant="ghost" size="sm" onClick={selectAllBookmarks} className="h-6 text-xs">전체 선택</Button>
-                              <Button variant="ghost" size="sm" onClick={deselectAllBookmarks} className="h-6 text-xs">전체 해제</Button>
+                {/* 문제 미리보기 */}
+                {selectedToolIds.size > 0 && (
+                  <div>
+                    <label className="block text-sm font-semibold mb-2">
+                      출제 문제 <span className="text-xs font-normal text-muted-foreground">총 {selectedProblems.length}문제</span>
+                    </label>
+                    {selectedProblems.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">선택된 도구에 해당하는 문제가 없어요</p>
+                    ) : (
+                      <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                        {selectedProblemObjects.map(p => (
+                          <div key={p.id} className="flex items-start justify-between gap-2 p-2 bg-secondary rounded-lg">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-mono text-muted-foreground">{p.id.slice(0, 8)}</p>
+                              <p className="text-sm truncate">{parseProblemText(p.content).substring(0, 70)}...</p>
+                              {p.domain_name && <Badge variant="outline" className="text-xs mt-1">{p.domain_name}</Badge>}
+                            </div>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <button onClick={() => setPreviewProblem(p)}
+                                className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground">
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                              <button onClick={() => excludeProblem(p.id)}
+                                className="text-destructive hover:bg-destructive/10 p-1 rounded">
+                                <X className="w-4 h-4" />
+                              </button>
                             </div>
                           </div>
-                          <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-                            {bookmarkedProblems.map(p => (
-                              <ProblemCard key={p.id} problem={p}
-                                checked={selectedBookmarkIds.has(p.id)}
-                                onToggle={toggleBookmark}
-                                onPreview={setPreviewProblem} />
-                            ))}
-                          </div>
-                          {selectedBookmarkIds.size > 0 && (
-                            <Button onClick={() => addSelectedPreviewProblems(bookmarkedProblems, selectedBookmarkIds)}
-                              className="w-full">
-                              선택한 {selectedBookmarkIds.size}개 문제 추가
-                            </Button>
-                          )}
-                        </>
-                      )}
-                    </>
-                  )}
-                </TabsContent>
-              </Tabs>
-            </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* 선택된 문제 리스트 */}
             {selectedProblems.length > 0 && (

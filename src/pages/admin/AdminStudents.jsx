@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import PaginationBar from '@/components/ui/PaginationBar';
 import { Search, User, X, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { toast } from 'sonner';
 
 const PAGE_SIZE = 50;
 
@@ -140,6 +141,13 @@ export default function AdminStudents() {
     await loadAll();
   };
 
+  const handleInlineClassChange = async (student, newClassId) => {
+    await base44.entities.User.update(student.id, { class_id: newClassId || null });
+    const newClass = classes.find(c => c.id === newClassId);
+    toast.success(`${student.full_name || student.email}을(를) ${newClass?.name || '미배정'}으로 옮겼어요`);
+    await loadAll();
+  };
+
   const filtered = students
     .filter(u => classFilter === 'all' || u.class_id === classFilter)
     .filter(u => {
@@ -224,8 +232,20 @@ export default function AdminStudents() {
                     </div>
                     <p className="text-xs text-muted-foreground truncate">{u.email}</p>
                     {(academyName || className) && (
-                      <p className="text-xs text-muted-foreground mt-0.5">{[academyName, className].filter(Boolean).join(' › ')}</p>
-                    )}
+                          <p className="text-xs text-muted-foreground mt-0.5">{[academyName, className].filter(Boolean).join(' › ')}</p>
+                        )}
+                        <div className="mt-1" onClick={e => e.stopPropagation()}>
+                          <select
+                            value={u.class_id || ''}
+                            onChange={e => handleInlineClassChange(u, e.target.value || null)}
+                            className="text-xs h-6 px-1.5 rounded border border-input bg-background"
+                          >
+                            <option value="">(미배정)</option>
+                            {classes.filter(c => !u.academy_id || c.academy_id === u.academy_id).map(c => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                          </select>
+                        </div>
                     {u.approval_status === 'rejected' && u.rejected_reason && (
                       <p className="text-xs text-red-500 mt-0.5">사유: {u.rejected_reason}</p>
                     )}
