@@ -1,32 +1,39 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { useTeacher } from '@/lib/TeacherContext';
 import { base44 } from '@/api/base44Client';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
-import { Users, BookOpen, Target, TrendingUp } from 'lucide-react';
+import { BookOpen, AlertTriangle, ClipboardList, CheckSquare, ChevronRight } from 'lucide-react';
 import AssignmentForm from '@/components/AssignmentForm';
-import ClassSelectDialog from '@/components/ClassSelectDialog';
 import { toast } from 'sonner';
 
 export default function TeacherDashboard() {
   const navigate = useNavigate();
   const { data, loading, error } = useTeacher();
+  const [selectedClassId, setSelectedClassId] = useState(null);
   const [pendingTool, setPendingTool] = useState(null);
-  const [selectedClass, setSelectedClass] = useState(null);
   const [showForm, setShowForm] = useState(false);
 
-  if (loading) return <InlineLoader message="대시보드 불러오는 중..." />;
+  useEffect(() => {
+    if (data?.my_classes?.length > 0 && !selectedClassId) {
+      setSelectedClassId(data.my_classes[0].id);
+    }
+  }, [data, selectedClassId]);
 
+  if (loading) return <InlineLoader message="대시보드 불러오는 중..." />;
   if (error) return (
     <div className="flex flex-col items-center justify-center py-24 gap-2 text-center">
       <p className="text-red-500 font-semibold">데이터를 불러오지 못했어요</p>
       <p className="text-sm text-muted-foreground">{error}</p>
     </div>
   );
-
-  if (!data) return <InlineLoader message="초기화 중..." />;
+  if (!data || !data.my_classes) return <InlineLoader message="초기화 중..." />;
 
   if (data.my_classes.length === 0) {
     return (
@@ -38,58 +45,146 @@ export default function TeacherDashboard() {
     );
   }
 
-  const { my_classes, my_students, attempts_summary, weak_tools, tool_distribution, domain_summary, timing } = data;
+  const currentClass = data.my_classes.find(c => c.id === selectedClassId);
+  const classStudents = (data.my_students || []).filter(s => s.class_id === selectedClassId);
+  const weakTools = (data.weak_or_unattempted_tools_by_class?.[selectedClassId]) || [];
+  const top3WeakTools = weakTools.slice(0, 3);
+  const classAssignments = (data.active_assignments || []).filter(a => a.class_id === selectedClassId);
+  const atRiskStudents = classStudents.filter(s => (s.risk_flags || []).length > 0);
+  const domainData = (data.domain_summary_by_class?.[selectedClassId]) || [];
+  const reviewCount = data.review_request_count || 0;
 
-  // hardest problems from students
-  const hardestDomains = domain_summary
-    ? [...domain_summary].sort((a, b) => a.avg - b.avg).slice(0, 5)
-    : [];
+  const handleAssignTool = (toolId) => {
+    setPendingTool(toolId);
+    setShowForm(true);
+  };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between">
+    <div className="space-y-5">
+      {/* 헤더 */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-muted-foreground text-sm">내 학급 학생들의 학습 현황이에요</p>
-        {timing && (
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-lg">
-            로드 {timing.total_ms}ms
-          </span>
+        <Select value={selectedClassId || ''} onValueChange={setSelectedClassId}>
+          <SelectTrigger className="w-48"><SelectValue placeholder="학급 선택" /></SelectTrigger>
+          <SelectContent>
+            {data.my_classes.map(c => (
+              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Section 1: 약점·미경험 매듭 TOP 3 */}
+      <Card className="p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-semibold">📌 숙제로 낼 만한 매듭</h2>
+          <Link to="/teacher/assignments" className="text-xs text-primary hover:underline">더 보기 →</Link>
+        </div>
+        {top3WeakTools.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4 text-center">아직 데이터가 부족해요</p>
+        ) : (
+          <div className="space-y-2">
+            {top3WeakTools.map(t => (
+              <div key={t.tool_id} className="flex items-center justify-between p-3 border border-border rounded-lg">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{t.tool_name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {t.attempted_student_count > 0
+                      ? `${t.attempted_student_count}명 시도 · 평균 ${t.avg_score}점${t.unattempted_count > 0 ? ` · ${t.unattempted_count}명 시도 X` : ''}`
+                      : `${t.total_student_count}명 모두 안 풀어봄`}
+                  </p>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => handleAssignTool(t.tool_id)}>
+                  숙제 출제 <ChevronRight className="w-3 h-3 ml-1" />
+                </Button>
+              </div>
+            ))}
+          </div>
         )}
-      </div>
+      </Card>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { Icon: BookOpen, label: '담당 학급', value: my_classes.length, unit: '개', color: 'text-violet-600' },
-          { Icon: Users, label: '학생 수', value: my_students.length, unit: '명', color: 'text-blue-600' },
-          { Icon: Target, label: '평균 점수', value: attempts_summary.avg_score, unit: '점', color: 'text-emerald-600' },
-          { Icon: TrendingUp, label: '정답률', value: attempts_summary.correct_rate, unit: '%', color: 'text-amber-600' },
-        ].map(({ Icon, label, value, unit, color }) => (
-          <Card key={label} className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Icon className={`w-4 h-4 ${color}`} />
-              <span className="text-xs text-muted-foreground">{label}</span>
+      {/* Section 2: 위험 신호 학생 */}
+      {atRiskStudents.length > 0 && (
+        <Card className="p-4">
+          <h2 className="font-semibold mb-3 flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-500" />
+            신경 써야 할 학생
+          </h2>
+          <div className="space-y-2">
+            {atRiskStudents.map(s => (
+              <div key={s.id} className="flex items-center justify-between p-3 border border-border rounded-lg">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{s.full_name || s.email}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {s.risk_flags.includes('dormant') && `${s.days_since_last_attempt}일째 풀이 0건. `}
+                    {s.risk_flags.includes('homework_lag') && s.homework_lag_info &&
+                      `"${s.homework_lag_info.assignment_title}" 진행률 ${s.homework_lag_info.progress_pct}% (D-${s.homework_lag_info.days_left}). `}
+                    {s.risk_flags.includes('score_drop') && `최근 평균 ${s.score_drop_delta}점 하락.`}
+                  </p>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => navigate(`/teacher/students/${s.id}`)}>
+                  상세 <ChevronRight className="w-3 h-3 ml-1" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Section 3: 진행 중인 숙제 */}
+      {classAssignments.length > 0 && (
+        <Card className="p-4">
+          <h2 className="font-semibold mb-3 flex items-center gap-2">
+            <ClipboardList className="w-4 h-4 text-primary" />
+            진행 중인 숙제
+          </h2>
+          <div className="space-y-2">
+            {classAssignments.map(a => (
+              <div key={a.id}
+                className="flex items-center justify-between p-3 border border-border rounded-lg cursor-pointer hover:bg-muted/30 transition-colors"
+                onClick={() => navigate(`/teacher/assignments/${a.id}`)}>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{a.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    D-{a.days_left} · {a.submitted_students}/{a.total_students} 제출 ({a.progress_pct}%)
+                    {a.avg_score > 0 && ` · 평균 ${a.avg_score}점`}
+                  </p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Section 4: 검토 요청 카운트 */}
+      {reviewCount > 0 && (
+        <Card className="p-4 cursor-pointer hover:bg-muted/30 transition-colors"
+              onClick={() => navigate('/teacher/review')}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CheckSquare className="w-4 h-4 text-emerald-500" />
+              <span className="text-sm font-medium">검토 요청 {reviewCount}건</span>
             </div>
-            <p className="text-2xl font-bold">{value}<span className="text-sm font-normal text-muted-foreground ml-1">{unit}</span></p>
-          </Card>
-        ))}
-      </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          </div>
+        </Card>
+      )}
 
-      {/* 단원별 평균 점수 */}
-      {domain_summary && domain_summary.length > 0 && (
+      {/* Section 5: 단원별 평균 차트 */}
+      {domainData.length > 0 && (
         <Card className="p-5">
           <h2 className="font-semibold mb-1">단원별 평균 점수</h2>
-          <p className="text-xs text-muted-foreground mb-4">내 학급 학생들의 단원별 성취도</p>
+          <p className="text-xs text-muted-foreground mb-4">{currentClass?.name} 단원별 성취도</p>
           <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={domain_summary} margin={{ top: 5, right: 10, bottom: 60, left: 0 }}>
+            <BarChart data={domainData} margin={{ top: 5, right: 10, bottom: 60, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="name" angle={-35} textAnchor="end" tick={{ fontSize: 11 }} />
               <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
-              <Tooltip
-                formatter={(v) => [`${v}점`, '평균 점수']}
-                contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }}
-              />
+              <Tooltip formatter={(v) => [`${v}점`, '평균 점수']}
+                contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
               <Bar dataKey="avg" radius={[4, 4, 0, 0]}>
-                {domain_summary.map((entry, i) => (
+                {domainData.map((entry, i) => (
                   <Cell key={i} fill={entry.avg < 50 ? '#ef4444' : entry.avg < 70 ? '#f59e0b' : '#10b981'} />
                 ))}
               </Bar>
@@ -98,80 +193,18 @@ export default function TeacherDashboard() {
         </Card>
       )}
 
-      {/* 자주 막히는 매듭 */}
-      {weak_tools.length > 0 && (
-        <Card className="p-4">
-          <h2 className="font-semibold text-sm mb-1">학급 학생들이 자주 막히는 매듭</h2>
-          <p className="text-xs text-muted-foreground mb-4">평균 점수 낮은 순 — 막대를 클릭하면 숙제 출제</p>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={weak_tools} layout="vertical" margin={{ left: 8, right: 24 }}>
-              <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11 }} />
-              <Tooltip formatter={(v) => [`${v}점`, '평균 점수']} />
-              <Bar dataKey="avg_score" radius={[0, 4, 4, 0]} onClick={(d) => {
-                const tool = weak_tools.find(t => t.name === d.name);
-                if (!tool) return;
-                setPendingTool(tool.tool_id);
-                if (my_classes.length === 1) {
-                  setSelectedClass(my_classes[0].id);
-                  setShowForm(true);
-                }
-              }} style={{ cursor: 'pointer' }}>
-                {weak_tools.map((entry, i) => (
-                  <Cell key={i} fill={entry.avg_score < 50 ? '#ef4444' : entry.avg_score < 70 ? '#f59e0b' : '#10b981'} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-      )}
-
-      {/* 자주 풀이된 매듭 */}
-      {tool_distribution.length > 0 && (
-        <Card className="p-4">
-          <h2 className="font-semibold text-sm mb-1">학급에서 자주 풀이된 매듭 Top 10</h2>
-          <p className="text-xs text-muted-foreground mb-4">어느 도구가 수업에 자주 등장했는지</p>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={tool_distribution} layout="vertical" margin={{ left: 8, right: 24 }}>
-              <XAxis type="number" tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11 }} />
-              <Tooltip formatter={(v) => [`${v}회`, '시도 수']} />
-              <Bar dataKey="attempts" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-      )}
-
-      {attempts_summary.total === 0 && (
-        <Card className="p-8 text-center text-muted-foreground text-sm">학생들의 제출 데이터가 없어요</Card>
-      )}
-
-      {/* Class select dialog */}
-      {pendingTool && !selectedClass && my_classes.length > 1 && (
-        <ClassSelectDialog
-          classes={my_classes}
-          onSelect={(cid) => { setSelectedClass(cid); setShowForm(true); }}
-          onClose={() => { setPendingTool(null); }}
-        />
-      )}
-
-      {/* Assignment form */}
-      {showForm && selectedClass && (
+      {/* Assignment form modal */}
+      {showForm && selectedClassId && (
         <AssignmentForm
-          classId={selectedClass}
+          classId={selectedClassId}
           preselectedToolId={pendingTool}
           onSave={async (d) => {
             await base44.entities.Assignment.create(d);
             setShowForm(false);
-            setSelectedClass(null);
             setPendingTool(null);
             toast.success('숙제가 출제됐어요');
           }}
-          onClose={() => {
-            setShowForm(false);
-            setSelectedClass(null);
-            setPendingTool(null);
-          }}
+          onClose={() => { setShowForm(false); setPendingTool(null); }}
         />
       )}
     </div>

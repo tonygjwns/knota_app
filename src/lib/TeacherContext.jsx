@@ -14,7 +14,7 @@ export function TeacherProvider({ children }) {
   const loadedAtRef = useRef(null);
 
   const load = useCallback(async (force = false) => {
-    if (!user || user.role !== 'teacher') return;
+    if (!user || (user.role !== 'teacher' && user.role !== 'owner')) return;
     // TTL 캐시: 5분 내 재진입 시 스킵 (force 아닌 경우)
     if (!force && data && loadedAtRef.current) {
       const age = Date.now() - loadedAtRef.current;

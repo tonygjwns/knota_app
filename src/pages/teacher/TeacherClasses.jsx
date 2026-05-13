@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTeacher } from '@/lib/TeacherContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
@@ -34,17 +34,15 @@ export default function TeacherClasses() {
   const [removeTarget, setRemoveTarget] = useState(null);
 
   // Student search state
-  const initialClassFilter = new URLSearchParams(window.location.search).get('class_id') || 'all';
-  const [classFilter, setClassFilter] = useState(initialClassFilter);
+  const [searchParams] = useSearchParams();
+  const [classFilter, setClassFilter] = useState(searchParams.get('class_id') || 'all');
   const [search, setSearch] = useState('');
   const [changingClass, setChangingClass] = useState({});
 
-  // Sync classFilter when URL changes (e.g. on class card click)
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const cid = params.get('class_id');
+    const cid = searchParams.get('class_id');
     if (cid) setClassFilter(cid);
-  }, [window.location.search]);
+  }, [searchParams]);
 
   const loadClassStudents = async (classId) => {
     if (classStudents[classId]) return;

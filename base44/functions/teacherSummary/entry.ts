@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    if (user.role !== 'teacher') {
+    if (user.role !== 'teacher' && user.role !== 'owner') {
       return Response.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -78,6 +78,10 @@ Deno.serve(async (req) => {
         weak_tools: [],
         tool_distribution: [],
         domain_summary: [],
+        active_assignments: [],
+        weak_or_unattempted_tools_by_class: {},
+        domain_summary_by_class: {},
+        review_request_count: 0,
         timing: { classes_ms, students_ms: 0, attempts_ms: 0, mastery_ms: 0, total_ms: Date.now() - t0 },
       });
     }
@@ -111,6 +115,10 @@ Deno.serve(async (req) => {
         weak_tools: [],
         tool_distribution: [],
         domain_summary: [],
+        active_assignments: [],
+        weak_or_unattempted_tools_by_class: {},
+        domain_summary_by_class: {},
+        review_request_count: 0,
         timing: { classes_ms, students_ms, attempts_ms: 0, mastery_ms: 0, total_ms: Date.now() - t0 },
       });
     }
@@ -137,14 +145,18 @@ Deno.serve(async (req) => {
 
     const t_mastery_start = Date.now();
 
-    // Step 4: Problem fetch (unique problem_ids only)
+    // Step 4: Problem fetch + Tools + Assignments 병렬
     const uniqueProblemIds = [...new Set(allAttempts.map(a => a.problem_id).filter(Boolean))];
-    // 전체 list 후 필터 (SDK $in 미지원 — 문제 전체 fetch가 빠름, 1000개 한 번)
-    const [allProblems, allTools] = await Promise.all([
+    const [allProblems, allTools, assignmentArrays] = await Promise.all([
       uniqueProblemIds.length > 0
         ? base44.asServiceRole.entities.Problem.list('-created_date', 5000)
         : Promise.resolve([]),
-      base44.asServiceRole.entities.MathTool.list('name', 100),
+      base44.asServiceRole.entities.MathTool.list('name', 500),
+      Promise.all(
+        myClasses.map(c =>
+          base44.asServiceRole.entities.Assignment.filter({ class_id: c.id }, '-created_date', 100)
+        )
+      ),
     ]);
 
     const problemSet = new Set(uniqueProblemIds);
@@ -193,13 +205,120 @@ Deno.serve(async (req) => {
       attemptsByStudent.get(a.student_id).push(a);
     }
 
+    // Step 7: active_assignments 계산
+    const now = Date.now();
+    const DAY_MS = 86400000;
+    const allAssignmentsFlat = assignmentArrays.flat();
+    const active = allAssignmentsFlat.filter(a =>
+      a.status === 'active' &&
+      a.deadline &&
+      new Date(a.deadline).getTime() > now
+    );
+
+    // assignment별 제출 통계
+    const assignmentsByClass = new Map();
+    for (const a of active) {
+      if (!assignmentsByClass.has(a.class_id)) assignmentsByClass.set(a.class_id, []);
+      assignmentsByClass.get(a.class_id).push(a);
+    }
+
+    // 학급별 학생 수 맵
+    const studentCountByClass = new Map();
+    const studentsByClass = new Map();
+    for (const u of allStudents) {
+      studentCountByClass.set(u.class_id, (studentCountByClass.get(u.class_id) || 0) + 1);
+      if (!studentsByClass.has(u.class_id)) studentsByClass.set(u.class_id, []);
+      studentsByClass.get(u.class_id).push(u);
+    }
+
+    // attempt별 assignment_id 인덱스
+    const attemptsByAssignment = new Map();
+    for (const a of allAttempts) {
+      if (!a.assignment_id) continue;
+      if (!attemptsByAssignment.has(a.assignment_id)) attemptsByAssignment.set(a.assignment_id, []);
+      attemptsByAssignment.get(a.assignment_id).push(a);
+    }
+
+    const active_assignments = active.map(a => {
+      const cls = classMap.get(a.class_id);
+      const total_students = studentCountByClass.get(a.class_id) || 0;
+      const assignAttempts = attemptsByAssignment.get(a.id) || [];
+      const submittedSet = new Set(assignAttempts.map(x => x.student_id));
+      const submitted_students = submittedSet.size;
+      const scores = assignAttempts.map(x => x.score || 0);
+      const avg_score = scores.length > 0
+        ? Math.round(scores.reduce((s, x) => s + x, 0) / scores.length)
+        : 0;
+      const days_left = Math.ceil((new Date(a.deadline).getTime() - now) / DAY_MS);
+      const progress_pct = total_students > 0
+        ? Math.round(submitted_students / total_students * 100)
+        : 0;
+      return {
+        id: a.id,
+        title: a.title,
+        class_id: a.class_id,
+        class_name: cls?.name || '—',
+        deadline: a.deadline,
+        total_students,
+        submitted_students,
+        progress_pct,
+        avg_score,
+        days_left,
+        submitted_student_ids: [...submittedSet],
+      };
+    });
+
+    // Step 8: my_students — risk_flags 포함
+    const review_request_count = allAttempts.filter(a =>
+      a.admin_review_status === 'needs_correction'
+    ).length;
+
     const my_students = allStudents.map(u => {
-      const ua = attemptsByStudent.get(u.id) || [];
+      const ua = (attemptsByStudent.get(u.id) || [])
+        .slice()
+        .sort((a, b) => new Date(b.submitted_at || 0) - new Date(a.submitted_at || 0));
       const avg_score = ua.length > 0
         ? Math.round(ua.reduce((s, a) => s + (a.score || 0), 0) / ua.length)
         : 0;
       const correct_count = ua.filter(a => a.correctness === 'correct').length;
       const cls = classMap.get(u.class_id);
+
+      // risk signals
+      const last_attempt_at = ua.length > 0 ? (ua[0].submitted_at || null) : null;
+      const days_since_last_attempt = last_attempt_at
+        ? Math.floor((now - new Date(last_attempt_at).getTime()) / DAY_MS)
+        : null;
+
+      const recent10 = ua.slice(0, 10);
+      const older10 = ua.slice(10, 20);
+      const recent10_avg = recent10.length > 0
+        ? Math.round(recent10.reduce((s, a) => s + (a.score || 0), 0) / recent10.length)
+        : 0;
+      const older10_avg = older10.length > 0
+        ? Math.round(older10.reduce((s, a) => s + (a.score || 0), 0) / older10.length)
+        : 0;
+      const score_drop_delta = older10.length > 0 ? recent10_avg - older10_avg : 0;
+
+      const risk_flags = [];
+      if (last_attempt_at && days_since_last_attempt > 7) risk_flags.push('dormant');
+      if (ua.length >= 20 && score_drop_delta < -20) risk_flags.push('score_drop');
+
+      // homework_lag: check active assignments for this student's class
+      let homework_lag_info = null;
+      const classAssignmentsForStudent = active_assignments.filter(a => a.class_id === u.class_id);
+      for (const asn of classAssignmentsForStudent) {
+        if (!asn.submitted_student_ids.includes(u.id) && asn.days_left <= 3) {
+          risk_flags.push('homework_lag');
+          homework_lag_info = {
+            assignment_id: asn.id,
+            assignment_title: asn.title,
+            days_left: asn.days_left,
+            progress_pct: asn.progress_pct,
+          };
+          break;
+        }
+      }
+
       return {
         id: u.id,
         full_name: u.full_name || '',
@@ -210,14 +329,15 @@ Deno.serve(async (req) => {
         attempt_count: ua.length,
         avg_score,
         correct_count,
+        last_attempt_at,
+        days_since_last_attempt,
+        score_drop_delta,
+        risk_flags,
+        homework_lag_info,
       };
     });
 
-    // my_classes with student_count
-    const studentCountByClass = new Map();
-    for (const u of allStudents) {
-      studentCountByClass.set(u.class_id, (studentCountByClass.get(u.class_id) || 0) + 1);
-    }
+    // Step 9: my_classes with student_count
     const my_classes = myClasses.map(c => ({
       id: c.id,
       name: c.name,
@@ -229,24 +349,138 @@ Deno.serve(async (req) => {
       grade_range: c.grade_range || '',
     }));
 
-    // domain_summary: 단원별 평균 점수
-    const domainMap = new Map();
+    // Step 10: domain_summary (전체) + domain_summary_by_class
+    const domainMapGlobal = new Map();
+    const domainMapByClass = new Map(); // classId → Map(domainName → {sum, count})
+
     for (const a of allAttempts) {
       const d = a.problem_domain || '미분류';
-      if (!domainMap.has(d)) domainMap.set(d, { sum: 0, count: 0 });
-      const entry = domainMap.get(d);
-      entry.sum += a.score || 0;
-      entry.count += 1;
+      // global
+      if (!domainMapGlobal.has(d)) domainMapGlobal.set(d, { sum: 0, count: 0 });
+      const ge = domainMapGlobal.get(d);
+      ge.sum += a.score || 0;
+      ge.count += 1;
+
+      // by class
+      const student = allStudents.find(u => u.id === a.student_id);
+      if (student?.class_id) {
+        if (!domainMapByClass.has(student.class_id)) domainMapByClass.set(student.class_id, new Map());
+        const cm = domainMapByClass.get(student.class_id);
+        if (!cm.has(d)) cm.set(d, { sum: 0, count: 0 });
+        const ce = cm.get(d);
+        ce.sum += a.score || 0;
+        ce.count += 1;
+      }
     }
+
     const domain_summary = [];
-    domainMap.forEach((entry, name) => {
+    domainMapGlobal.forEach((entry, name) => {
       domain_summary.push({ name, avg: Math.round(entry.sum / entry.count), count: entry.count });
     });
     domain_summary.sort((a, b) => b.count - a.count);
 
+    const domain_summary_by_class = {};
+    domainMapByClass.forEach((cm, classId) => {
+      const arr = [];
+      cm.forEach((entry, name) => {
+        arr.push({ name, avg: Math.round(entry.sum / entry.count), count: entry.count });
+      });
+      arr.sort((a, b) => b.count - a.count);
+      domain_summary_by_class[classId] = arr;
+    });
+
+    // Step 11: weak_or_unattempted_tools_by_class
+    // 학생별 attempt의 tool_id 집합 추출 (같은 로직)
+    const studentAttemptedTools = new Map(); // studentId → Set<toolId>
+    for (const attempt of allAttempts) {
+      const problem = problemMap.get(attempt.problem_id);
+      if (!problem) continue;
+      let toolIds = [];
+      if (attempt.claude_grade_json) {
+        try {
+          const grading = JSON.parse(attempt.claude_grade_json);
+          const g = grading?.response ?? grading;
+          const errorToolIds = (g?.error_locations || []).map(e => e.tool_id).filter(Boolean);
+          if (errorToolIds.length > 0) toolIds = [...new Set(errorToolIds)];
+        } catch {}
+      }
+      if (toolIds.length === 0 && problem.tool_ids) {
+        try {
+          const parsed = JSON.parse(problem.tool_ids);
+          if (Array.isArray(parsed)) toolIds = parsed.filter(Boolean);
+        } catch {}
+      }
+      if (!studentAttemptedTools.has(attempt.student_id)) {
+        studentAttemptedTools.set(attempt.student_id, new Map()); // toolId → scores[]
+      }
+      const studentToolMap = studentAttemptedTools.get(attempt.student_id);
+      for (const toolId of toolIds) {
+        if (!studentToolMap.has(toolId)) studentToolMap.set(toolId, []);
+        studentToolMap.get(toolId).push(attempt.score || 0);
+      }
+    }
+
+    const weak_or_unattempted_tools_by_class = {};
+    for (const cls of myClasses) {
+      const classStudentList = studentsByClass.get(cls.id) || [];
+      const total_student_count = classStudentList.length;
+      if (total_student_count === 0) {
+        weak_or_unattempted_tools_by_class[cls.id] = [];
+        continue;
+      }
+
+      // 이 학급에서 등장한 모든 tool_id 수집
+      const toolScoresByClass = new Map(); // toolId → { scores[], studentSet }
+      for (const student of classStudentList) {
+        const toolMap2 = studentAttemptedTools.get(student.id) || new Map();
+        toolMap2.forEach((scores, toolId) => {
+          if (!toolScoresByClass.has(toolId)) {
+            toolScoresByClass.set(toolId, { scores: [], studentSet: new Set() });
+          }
+          const entry2 = toolScoresByClass.get(toolId);
+          entry2.scores.push(...scores);
+          entry2.studentSet.add(student.id);
+        });
+      }
+
+      // 전체 tool 목록 (MathTool)
+      const toolEntries = [];
+      allTools.forEach(tool => {
+        const entry2 = toolScoresByClass.get(tool.tool_id);
+        const attempted_student_count = entry2 ? entry2.studentSet.size : 0;
+        const unattempted_count = total_student_count - attempted_student_count;
+        const avg_sc = entry2 && entry2.scores.length > 0
+          ? Math.round(entry2.scores.reduce((s, x) => s + x, 0) / entry2.scores.length)
+          : 0;
+        const priority_score = attempted_student_count > 0
+          ? (100 - avg_sc) + (unattempted_count * 10)
+          : 100 + unattempted_count * 10;
+
+        let domain_ids = [];
+        try {
+          if (tool.domain_ids) domain_ids = JSON.parse(tool.domain_ids);
+        } catch {}
+
+        toolEntries.push({
+          tool_id: tool.tool_id,
+          tool_name: tool.name || tool.name_en || tool.tool_id,
+          domain_ids,
+          attempted_student_count,
+          total_student_count,
+          unattempted_count,
+          avg_score: avg_sc,
+          priority_score,
+        });
+      });
+
+      // priority 내림차순 정렬 후 top 30
+      toolEntries.sort((a, b) => b.priority_score - a.priority_score);
+      weak_or_unattempted_tools_by_class[cls.id] = toolEntries.slice(0, 30);
+    }
+
     // attempts_summary
     const total = allAttempts.length;
-    const avg_score = total > 0
+    const avg_score_global = total > 0
       ? Math.round(allAttempts.reduce((s, a) => s + (a.score || 0), 0) / total)
       : 0;
     const correct_rate = total > 0
@@ -261,10 +495,14 @@ Deno.serve(async (req) => {
       loaded_at: new Date().toISOString(),
       my_classes,
       my_students,
-      attempts_summary: { total, avg_score, correct_rate },
+      attempts_summary: { total, avg_score: avg_score_global, correct_rate },
       weak_tools: top_weak,
       tool_distribution: top_dist,
       domain_summary,
+      active_assignments,
+      weak_or_unattempted_tools_by_class,
+      domain_summary_by_class,
+      review_request_count,
       timing: { classes_ms, students_ms, attempts_ms, mastery_ms, total_ms },
     });
 
