@@ -13,7 +13,7 @@ import {
   Shuffle, BookOpen, Wrench, AlertCircle, ChevronRight, ArrowLeft,
   Clock, ClipboardList, Star, Sparkles, BarChart3
 } from 'lucide-react';
-import { HALF_LIFE_MS, STALE_MS, buildMasteryMap, getMasteryColor } from '@/lib/mastery';
+import { buildMasteryMap, computeWeakness, getMasteryColor } from '@/lib/mastery';
 
 // ──────────────────────────────────────────────
 // Hub placeholder card
@@ -150,7 +150,6 @@ function ProblemHub() {
   const [assignments, setAssignments] = useState({ active: [], closed: [] });
   const [loading, setLoading] = useState(true);
   const [showClosed, setShowClosed] = useState(false);
-  const [bookmarkCount, setBookmarkCount] = useState(0);
   const [goingRandom, setGoingRandom] = useState(false);
 
   const handleGoRandom = async () => {
@@ -167,13 +166,6 @@ function ProblemHub() {
 
   useEffect(() => {
     (async () => {
-      try {
-        const [bookmarks] = await Promise.all([
-          base44.entities.BookmarkedTool.filter({ user_id: user?.id }, '-created_date', 100),
-        ]);
-        setBookmarkCount(bookmarks.length);
-      } catch {}
-
       if (user?.class_id) {
         try {
           const all = await base44.entities.Assignment.filter({ class_id: user.class_id }, '-created_date', 100);
@@ -247,27 +239,6 @@ function ProblemHub() {
             </div>
           )}
         </section>
-
-        {/* 즐겨찾기 매듭 */}
-        {bookmarkCount > 0 && (
-          <section className="space-y-2">
-            <h2 className="text-base font-semibold text-foreground">내 즐겨찾기 매듭</h2>
-            <Link to="/bookmarks">
-              <Card className="p-4 card-hover cursor-pointer">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-amber-500 bg-amber-50">
-                    <Star className="w-5 h-5" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm text-foreground">내 즐겨찾기 매듭 ({bookmarkCount})</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">나중에 다시 공부하려고 표시한 매듭들</p>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                </div>
-              </Card>
-            </Link>
-          </section>
-        )}
 
         {/* 내 진단 */}
         <section className="space-y-2">
@@ -389,8 +360,7 @@ function ProblemModeView({ mode, user, navigate }) {
   const loadData = async () => {
     try {
       if (mode === 'recommended' && user) {
-        const [bookmarks, attempts, allProblems, allTools, allDomains] = await Promise.all([
-          base44.entities.BookmarkedTool.filter({ user_id: user.id }, '-created_date', 100),
+        const [attempts, allProblems, allTools, allDomains] = await Promise.all([
           base44.entities.StudentAttempt.filter({ student_id: user.id }, '-submitted_at', 500),
           base44.entities.Problem.list('-created_date', 1000, 0),
           base44.entities.MathTool.list('name', 200),
@@ -400,27 +370,17 @@ function ProblemModeView({ mode, user, navigate }) {
         const problemMap = new Map(allProblems.map(p => [p.id, p]));
         const toolMap = new Map(allTools.map(t => [t.tool_id, t]));
         const masteryMap = buildMasteryMap(attempts, problemMap);
-        const now = Date.now();
 
-        // weak tools (가중평균 < 70, weight >= 1)
-        const weakEntries = [];
+        const candidates = [];
         for (const [tid, m] of masteryMap) {
-          if (m.weight >= 1) {
-            const avg = m.weightedScore / m.weight;
-            if (avg < 70) weakEntries.push({ tool_id: tid, avg: Math.round(avg), count: Math.round(m.weight * 10) / 10 });
-          }
+          const weakness = computeWeakness(m);
+          if (weakness === null) continue;
+          const tool = toolMap.get(tid);
+          if (!tool) continue;
+          const avg = Math.round(m.weightedScore / m.weight);
+          candidates.push({ tool_id: tid, tool, weakness, avg });
         }
-        weakEntries.sort((a, b) => a.avg - b.avg);
-
-        // stale tools (14일 이상)
-        const staleEntries = [];
-        for (const [tid, m] of masteryMap) {
-          const ageMs = now - m.lastAt;
-          if (ageMs > STALE_MS) staleEntries.push({ tool_id: tid, ageDays: Math.round(ageMs / (24 * 60 * 60 * 1000)) });
-        }
-
-        const recs = [];
-        const usedToolIds = new Set();
+        candidates.sort((a, b) => b.weakness - a.weakness);
 
         const pickProblem = (toolId) => {
           const probs = allProblems.filter(p => {
@@ -429,39 +389,30 @@ function ProblemModeView({ mode, user, navigate }) {
           return probs.length > 0 ? probs[Math.floor(Math.random() * probs.length)] : null;
         };
 
-        // bookmarked (최대 2개)
-        for (const b of bookmarks.slice(0, 2)) {
-          const tool = toolMap.get(b.tool_id);
-          if (!tool) continue;
-          const prob = pickProblem(b.tool_id);
-          if (!prob) continue;
-          recs.push({ problem: prob, reason: { type: 'bookmarked', label: '⭐ 즐겨찾기', detail: tool.name, strength: 4 } });
-          usedToolIds.add(b.tool_id);
-        }
+        const strengthOf = (w) => {
+          if (w >= 80) return 5;
+          if (w >= 60) return 4;
+          if (w >= 40) return 3;
+          if (w >= 20) return 2;
+          return 1;
+        };
 
-        // weak (최대 3개)
-        for (const w of weakEntries.slice(0, 3)) {
-          if (usedToolIds.has(w.tool_id)) continue;
-          const tool = toolMap.get(w.tool_id);
-          if (!tool) continue;
-          const prob = pickProblem(w.tool_id);
-          if (!prob) continue;
-          recs.push({ problem: prob, reason: { type: 'weak_tool', label: '🎯 약점 매듭', detail: `${tool.name} · 평균 ${w.avg}점`, strength: w.avg < 50 ? 5 : 4 } });
-          usedToolIds.add(w.tool_id);
+        const recs = [];
+        const usedToolIds = new Set();
+        for (const c of candidates) {
           if (recs.length >= 5) break;
-        }
-
-        // stale (1개)
-        if (recs.length < 5) {
-          for (const s of staleEntries.slice(0, 1)) {
-            if (usedToolIds.has(s.tool_id)) continue;
-            const tool = toolMap.get(s.tool_id);
-            if (!tool) continue;
-            const prob = pickProblem(s.tool_id);
-            if (!prob) continue;
-            recs.push({ problem: prob, reason: { type: 'stale', label: '⏰ 복습 시점', detail: `${tool.name} · ${s.ageDays}일 전`, strength: 2 } });
-            usedToolIds.add(s.tool_id);
-          }
+          if (usedToolIds.has(c.tool_id)) continue;
+          const prob = pickProblem(c.tool_id);
+          if (!prob) continue;
+          recs.push({
+            problem: prob,
+            reason: {
+              type: 'weak',
+              detail: `${c.tool.name} · 평균 ${c.avg}점`,
+              strength: strengthOf(c.weakness),
+            },
+          });
+          usedToolIds.add(c.tool_id);
         }
 
         setRecommendedItems(recs);
@@ -648,22 +599,13 @@ function ProblemModeView({ mode, user, navigate }) {
                   <>
                     {recommendedItems.map((rec, idx) => {
                       const r = rec.reason;
-                      const reasonBg = {
-                        'weak_tool': 'bg-red-50 border-l-red-400',
-                        'bookmarked': 'bg-amber-50 border-l-amber-400',
-                        'stale': 'bg-blue-50 border-l-blue-400',
-                      }[r.type] || 'bg-muted border-l-border';
-
                       return (
                         <Card key={idx}
-                              className={`p-4 card-hover cursor-pointer border-l-4 ${reasonBg}`}
+                              className="p-4 card-hover cursor-pointer border-l-4 bg-red-50 border-l-red-400"
                               onClick={() => navigate(`/problem/${rec.problem.id}?from=recommend&reason=${r.type}`)}>
                           <div className="flex items-start gap-3">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1.5">
-                                <span className="text-xs font-semibold text-foreground bg-white/80 px-2 py-0.5 rounded-full border border-border/50">
-                                  {r.label}
-                                </span>
                                 {r.strength && (
                                   <span className="text-xs text-muted-foreground">
                                     {'★'.repeat(r.strength)}{'☆'.repeat(5 - r.strength)}

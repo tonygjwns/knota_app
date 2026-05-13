@@ -13,19 +13,19 @@ export default function Diagnosis() {
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState(null);
   const [domains, setDomains] = useState([]);
-  const [user, setUser] = useState(null);
 
   useEffect(() => {
     (async () => {
       const me = await base44.auth.me();
-      setUser(me);
-      const [attempts, tools, domainsData] = await Promise.all([
+      const [attempts, tools, domainsData, allProblems] = await Promise.all([
         base44.entities.StudentAttempt.filter({ student_id: me.id }, '-submitted_at', 200),
         base44.entities.MathTool.list('name', 500),
         base44.entities.Domain.list('name', 100),
+        base44.entities.Problem.list('-created_date', 1000),
       ]);
+      const problemMap = new Map(allProblems.map(p => [p.id, p]));
       setDomains(domainsData);
-      setSummary(summarizeMastery(attempts, tools));
+      setSummary(summarizeMastery(attempts, problemMap, tools));
       setLoading(false);
     })();
   }, []);
@@ -51,12 +51,13 @@ export default function Diagnosis() {
     );
   }
 
-  const { overallScore, trend, weakTools, domainMap, totalAttempts } = summary;
-  const overallColor = getMasteryColor(overallScore);
+  const { overallAvg, recentTrend, weakTools, domainMap, totalAttempts } = summary;
 
-  const TrendIcon = trend > 3 ? TrendingUp : trend < -3 ? TrendingDown : Minus;
-  const trendColor = trend > 3 ? 'text-emerald-600' : trend < -3 ? 'text-red-500' : 'text-muted-foreground';
-  const trendLabel = trend > 3 ? `+${Math.round(trend)}점 향상 중` : trend < -3 ? `${Math.round(trend)}점 하락 중` : '유지 중';
+  const TrendIcon = recentTrend > 3 ? TrendingUp : recentTrend < -3 ? TrendingDown : Minus;
+  const trendColor = recentTrend > 3 ? 'text-emerald-600' : recentTrend < -3 ? 'text-red-500' : 'text-muted-foreground';
+  const trendLabel = recentTrend > 3 ? `+${Math.round(recentTrend)}점 향상 중` : recentTrend < -3 ? `${Math.round(recentTrend)}점 하락 중` : '유지 중';
+
+  const overallColorClass = overallAvg != null ? getMasteryColor(overallAvg, false) : 'text-muted-foreground';
 
   // Map domain_id -> domain name
   const domainNameMap = {};
@@ -76,7 +77,9 @@ export default function Diagnosis() {
         {/* Summary cards */}
         <div className="grid grid-cols-3 gap-3">
           <Card className="p-4 text-center">
-            <p className={`text-3xl font-bold ${overallColor.text}`}>{overallScore}</p>
+            <p className={`text-3xl font-bold ${overallColorClass}`}>
+              {overallAvg != null ? overallAvg : '-'}
+            </p>
             <p className="text-xs text-muted-foreground mt-1">평균 숙련도</p>
           </Card>
           <Card className="p-4 text-center">
@@ -94,20 +97,22 @@ export default function Diagnosis() {
           <section className="space-y-2">
             <h2 className="text-base font-semibold">집중 보완 필요 매듭 (TOP {weakTools.length})</h2>
             <div className="space-y-2">
-              {weakTools.map(({ toolId, score, tool }) => {
-                const c = getMasteryColor(score);
+              {weakTools.map(({ tool, avg }) => {
+                const barColor = avg >= 90 ? 'bg-emerald-500' : avg >= 70 ? 'bg-amber-400' : 'bg-red-400';
+                const bgColor  = avg >= 90 ? 'bg-emerald-100' : avg >= 70 ? 'bg-amber-100' : 'bg-red-100';
+                const textColor = getMasteryColor(avg, false);
                 return (
-                  <Card key={toolId} className="p-3 flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${c.bg}`}>
-                      <span className={`text-sm font-bold ${c.text}`}>{score}</span>
+                  <Card key={tool.tool_id} className="p-3 flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${bgColor}`}>
+                      <span className={`text-sm font-bold ${textColor}`}>{avg}</span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{tool?.name || toolId}</p>
+                      <p className="text-sm font-medium truncate">{tool.name}</p>
                       <div className="w-full bg-muted rounded-full h-1.5 mt-1">
-                        <div className={`h-1.5 rounded-full ${c.bar}`} style={{ width: `${score}%` }} />
+                        <div className={`h-1.5 rounded-full ${barColor}`} style={{ width: `${avg}%` }} />
                       </div>
                     </div>
-                    <Link to={`/problems?tool=${toolId}`}>
+                    <Link to={`/problems?tool=${tool.tool_id}`}>
                       <Button size="sm" variant="outline" className="text-xs flex-shrink-0">
                         더 풀기 <ChevronRight className="w-3 h-3" />
                       </Button>
@@ -127,16 +132,17 @@ export default function Diagnosis() {
               {Object.entries(domainMap)
                 .sort(([, a], [, b]) => a.avgScore - b.avgScore)
                 .map(([domainId, data]) => {
-                  const c = getMasteryColor(data.avgScore);
+                  const barColor = data.avgScore >= 90 ? 'bg-emerald-500' : data.avgScore >= 70 ? 'bg-amber-400' : 'bg-red-400';
+                  const textColor = getMasteryColor(data.avgScore, false);
                   const name = domainNameMap[domainId] || domainId;
                   return (
                     <Card key={domainId} className="p-4 space-y-2">
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-medium">{name}</p>
-                        <span className={`text-sm font-bold ${c.text}`}>{data.avgScore}점</span>
+                        <span className={`text-sm font-bold ${textColor}`}>{data.avgScore}점</span>
                       </div>
                       <div className="w-full bg-muted rounded-full h-2">
-                        <div className={`h-2 rounded-full transition-all ${c.bar}`} style={{ width: `${data.avgScore}%` }} />
+                        <div className={`h-2 rounded-full transition-all ${barColor}`} style={{ width: `${data.avgScore}%` }} />
                       </div>
                     </Card>
                   );

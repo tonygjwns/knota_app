@@ -1,129 +1,154 @@
-// Shared mastery calculation utilities
-
-export const HALF_LIFE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
-export const STALE_MS = 30 * 24 * 60 * 60 * 1000;    // 30 days
+export const HALF_LIFE_MS = 180 * 24 * 60 * 60 * 1000; // 반감기 180일
+export const WEIGHT_THRESHOLD = 1; // 후보 채택 최소 weight
 
 /**
- * Build a map of tool_id -> mastery score (0-100) from attempt history.
- * Uses exponential decay weighting so recent attempts count more.
+ * Build a Map of tool_id -> { weightedScore, weight, wrongnessSum, lastAt }
+ * @param {Array} attempts - StudentAttempt records
+ * @param {Map} problemMap - Map<problem.id, problem>
  */
-export function buildMasteryMap(attempts) {
+export function buildMasteryMap(attempts, problemMap) {
+  const masteryMap = new Map();
   const now = Date.now();
-  const toolData = {}; // tool_id -> { weightedScore, totalWeight }
 
   for (const attempt of attempts) {
-    if (!attempt.claude_grade_json || attempt.score == null) continue;
-
-    let toolIds = [];
-    try {
-      const grade = JSON.parse(attempt.claude_grade_json);
-      toolIds = grade.tool_ids || [];
-    } catch {
-      continue;
-    }
+    const problem = problemMap.get(attempt.problem_id);
+    if (!problem) continue;
 
     const submittedAt = attempt.submitted_at ? new Date(attempt.submitted_at).getTime() : now;
-    const age = now - submittedAt;
-    const weight = Math.exp(-age / HALF_LIFE_MS);
+    const ageMs = now - submittedAt;
+    const w = Math.pow(0.5, ageMs / HALF_LIFE_MS);
     const score = attempt.score ?? 0;
 
-    for (const toolId of toolIds) {
-      if (!toolData[toolId]) toolData[toolId] = { weightedScore: 0, totalWeight: 0 };
-      toolData[toolId].weightedScore += score * weight;
-      toolData[toolId].totalWeight += weight;
+    // 도구 추출 우선순위
+    let toolIds = [];
+    if (attempt.claude_grade_json) {
+      try {
+        const raw = JSON.parse(attempt.claude_grade_json);
+        const g = raw?.response ?? raw;
+        const errIds = (g?.error_locations || []).map(e => e.tool_id).filter(Boolean);
+        if (errIds.length > 0) toolIds = [...new Set(errIds)];
+      } catch {}
     }
-  }
+    if (toolIds.length === 0 && problem.tool_ids) {
+      try {
+        const parsed = JSON.parse(problem.tool_ids);
+        if (Array.isArray(parsed)) toolIds = parsed.filter(Boolean);
+      } catch {}
+    }
 
-  const masteryMap = {};
-  for (const [toolId, data] of Object.entries(toolData)) {
-    masteryMap[toolId] = data.totalWeight > 0
-      ? Math.round(data.weightedScore / data.totalWeight)
-      : 0;
+    for (const tid of toolIds) {
+      if (!masteryMap.has(tid)) {
+        masteryMap.set(tid, { weightedScore: 0, weight: 0, wrongnessSum: 0, lastAt: 0 });
+      }
+      const m = masteryMap.get(tid);
+      m.weightedScore += score * w;
+      m.weight += w;
+      m.wrongnessSum += (100 - score) * w;
+      m.lastAt = Math.max(m.lastAt, submittedAt);
+    }
   }
   return masteryMap;
 }
 
 /**
- * Returns Tailwind color classes based on mastery score.
+ * Returns Tailwind text color class based on mastery score.
  */
-export function getMasteryColor(score) {
-  if (score >= 80) return { bg: 'bg-emerald-100', text: 'text-emerald-700', bar: 'bg-emerald-500' };
-  if (score >= 50) return { bg: 'bg-amber-100', text: 'text-amber-700', bar: 'bg-amber-400' };
-  return { bg: 'bg-red-100', text: 'text-red-700', bar: 'bg-red-400' };
+export function getMasteryColor(avg, isNew) {
+  if (isNew) return 'text-muted-foreground';
+  if (avg < 70) return 'text-red-500';
+  if (avg < 90) return 'text-amber-500';
+  return 'text-emerald-500';
+}
+
+/**
+ * Compute a unified weakness score for a mastery entry.
+ * Returns null if the entry doesn't meet the threshold (not a candidate).
+ */
+export function computeWeakness(m) {
+  if (m.weight < WEIGHT_THRESHOLD) return null;
+  const ageDays = (Date.now() - m.lastAt) / (24 * 60 * 60 * 1000);
+  const ratio = ageDays / 180;
+  const stalenessBonus = Math.max(0, Math.min((ratio - 0.5) * 60, 30));
+  return m.wrongnessSum + stalenessBonus;
 }
 
 /**
  * Summarize mastery data for the Diagnosis page.
- * Returns { overallScore, trend, weakTools, staleTools, domainMap }
+ * @param {Array} attempts
+ * @param {Map} problemMap - Map<problem.id, problem>
+ * @param {Array} tools - MathTool records
  */
-export function summarizeMastery(attempts, tools) {
+export function summarizeMastery(attempts, problemMap, tools) {
   if (!attempts || attempts.length < 5) return null;
 
-  const now = Date.now();
-  const masteryMap = buildMasteryMap(attempts);
+  const masteryMap = buildMasteryMap(attempts, problemMap);
+  const toolMap = new Map(tools.map(t => [t.tool_id, t]));
 
-  // Overall score = average of all tool mastery scores
-  const scores = Object.values(masteryMap);
-  const overallScore = scores.length > 0
-    ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
-    : 0;
+  // Overall average
+  let totalWeightedScore = 0, totalWeight = 0;
+  for (const m of masteryMap.values()) {
+    if (m.weight >= WEIGHT_THRESHOLD) {
+      totalWeightedScore += m.weightedScore;
+      totalWeight += m.weight;
+    }
+  }
+  const overallAvg = totalWeight > 0 ? Math.round(totalWeightedScore / totalWeight) : null;
 
-  // Trend: compare last 10 vs previous 10 attempts
+  // Recent trend: last 10 vs previous 10
   const sorted = [...attempts]
     .filter(a => a.score != null)
     .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
   const recent = sorted.slice(0, 10);
   const older = sorted.slice(10, 20);
-  const recentAvg = recent.length > 0
-    ? recent.reduce((s, a) => s + a.score, 0) / recent.length : 0;
-  const olderAvg = older.length > 0
-    ? older.reduce((s, a) => s + a.score, 0) / older.length : recentAvg;
-  const trend = recentAvg - olderAvg; // positive = improving
+  const recentAvg = recent.length > 0 ? recent.reduce((s, a) => s + a.score, 0) / recent.length : 0;
+  const olderAvg = older.length > 0 ? older.reduce((s, a) => s + a.score, 0) / older.length : recentAvg;
+  const recentTrend = recentAvg - olderAvg;
 
-  // Weak tools: mastery < 60, sorted ascending
-  const toolMap = {};
-  for (const t of (tools || [])) toolMap[t.tool_id] = t;
-
-  const weakTools = Object.entries(masteryMap)
-    .filter(([, score]) => score < 60)
-    .sort(([, a], [, b]) => a - b)
-    .slice(0, 5)
-    .map(([toolId, score]) => ({ toolId, score, tool: toolMap[toolId] }));
-
-  // Stale tools: last attempt > 30 days ago
-  const lastAttemptByTool = {};
-  for (const attempt of attempts) {
-    let toolIds = [];
-    try {
-      const grade = JSON.parse(attempt.claude_grade_json || '{}');
-      toolIds = grade.tool_ids || [];
-    } catch { continue; }
-    const t = attempt.submitted_at ? new Date(attempt.submitted_at).getTime() : 0;
-    for (const tid of toolIds) {
-      if (!lastAttemptByTool[tid] || t > lastAttemptByTool[tid]) {
-        lastAttemptByTool[tid] = t;
-      }
-    }
+  // New tool ids (weight < 0.5)
+  const newToolIds = new Set();
+  for (const [tid, m] of masteryMap) {
+    if (m.weight < 0.5) newToolIds.add(tid);
   }
-  const staleTools = Object.entries(lastAttemptByTool)
-    .filter(([, t]) => now - t > STALE_MS)
-    .map(([toolId]) => ({ toolId, tool: toolMap[toolId] }));
 
-  // Domain map: domain_name -> { tools: [{toolId, score}], avgScore }
+  // Weak tools: weight >= WEIGHT_THRESHOLD, sorted by weakness desc, top 5
+  const weakTools = [];
+  for (const [tid, m] of masteryMap) {
+    const weakness = computeWeakness(m);
+    if (weakness === null) continue;
+    const tool = toolMap.get(tid);
+    if (!tool) continue;
+    const avg = Math.round(m.weightedScore / m.weight);
+    weakTools.push({ tool, avg, weakness });
+  }
+  weakTools.sort((a, b) => b.weakness - a.weakness);
+  const top5Weak = weakTools.slice(0, 5);
+
+  // Domain map: tool.domain_ids[0] as group key
   const domainMap = {};
-  for (const [toolId, score] of Object.entries(masteryMap)) {
-    const tool = toolMap[toolId];
+  for (const [tid, m] of masteryMap) {
+    if (m.weight < WEIGHT_THRESHOLD) continue;
+    const tool = toolMap.get(tid);
     if (!tool) continue;
     let domainIds = [];
-    try { domainIds = JSON.parse(tool.domain_ids || '[]'); } catch { domainIds = []; }
-    const domainLabel = domainIds[0] || '기타';
-    if (!domainMap[domainLabel]) domainMap[domainLabel] = { tools: [], totalScore: 0 };
-    domainMap[domainLabel].tools.push({ toolId, score, tool });
-    domainMap[domainLabel].totalScore += score;
+    try { domainIds = JSON.parse(tool.domain_ids || '[]'); } catch {}
+    const domainKey = domainIds[0] || '기타';
+    if (!domainMap[domainKey]) domainMap[domainKey] = { tools: [], totalScore: 0, totalWeight: 0 };
+    const avg = Math.round(m.weightedScore / m.weight);
+    domainMap[domainKey].tools.push({ toolId: tid, avg, tool });
+    domainMap[domainKey].totalScore += m.weightedScore;
+    domainMap[domainKey].totalWeight += m.weight;
   }
   for (const d of Object.values(domainMap)) {
-    d.avgScore = Math.round(d.totalScore / d.tools.length);
+    d.avgScore = d.totalWeight > 0 ? Math.round(d.totalScore / d.totalWeight) : 0;
   }
 
-  return { overallScore, trend, weakTools, staleTools, domainMap, masteryMap, totalAttempts: attempts.length };
+  return {
+    masteryMap,
+    weakTools: top5Weak,
+    newToolIds,
+    totalAttempts: attempts.length,
+    overallAvg,
+    recentTrend,
+    domainMap,
+  };
 }
