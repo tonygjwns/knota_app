@@ -27,12 +27,30 @@ import {
   AlertDialogDescription,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, MoreVertical } from 'lucide-react';
+import { Plus, MoreVertical, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AssignmentForm from '@/components/AssignmentForm';
 import ClassSelectDialog from '@/components/ClassSelectDialog';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { format } from 'date-fns';
+
+function ToolRecRow({ tool, onAssign }) {
+  return (
+    <div className="flex items-center justify-between p-3 border border-border rounded-lg">
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium truncate">{tool.tool_name}</p>
+        <p className="text-xs text-muted-foreground">
+          {tool.attempted_student_count > 0
+            ? `${tool.attempted_student_count}명 시도 · 평균 ${tool.avg_score}점${tool.unattempted_count > 0 ? ` · ${tool.unattempted_count}명 시도 X` : ''}`
+            : `${tool.total_student_count}명 모두 안 풀어봄`}
+        </p>
+      </div>
+      <Button size="sm" variant="outline" onClick={onAssign} className="flex-shrink-0 gap-1">
+        숙제 출제 <ChevronRight className="w-3 h-3" />
+      </Button>
+    </div>
+  );
+}
 
 export default function TeacherAssignments() {
   const { data, loading: teacherLoading } = useTeacher();
@@ -47,17 +65,32 @@ export default function TeacherAssignments() {
   const [classFilter, setClassFilter] = useState('all');
   const [deleteId, setDeleteId] = useState(null);
   const [classNames, setClassNames] = useState({});
+  const [allDomains, setAllDomains] = useState([]);
+  const [selectedDomainId, setSelectedDomainId] = useState(null);
+  const [recTab, setRecTab] = useState('weak');
+  const [pendingToolId, setPendingToolId] = useState(null);
 
   // 클래스 이름 맵 구성
   useEffect(() => {
     if (my_classes.length > 0) {
       const names = {};
-      my_classes.forEach(c => {
-        names[c.id] = c.name;
-      });
+      my_classes.forEach(c => { names[c.id] = c.name; });
       setClassNames(names);
     }
   }, [my_classes]);
+
+  // 도메인 fetch
+  useEffect(() => {
+    (async () => {
+      const ds = await base44.entities.Domain.list('grade_range', 200);
+      setAllDomains(ds);
+    })();
+  }, []);
+
+  // 학급 필터 변경 시 단원 필터 초기화
+  useEffect(() => {
+    setSelectedDomainId(null);
+  }, [classFilter]);
 
   // 숙제 로드
   const loadAssignments = React.useCallback(async () => {
@@ -112,12 +145,21 @@ export default function TeacherAssignments() {
     return result.sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
   }, [assignments, statusFilter, classFilter]);
 
+  // 추천 매듭 → 숙제 출제
+  const handleAssignTool = (toolId) => {
+    const targetClassId = classFilter !== 'all' ? classFilter : (my_classes[0]?.id || null);
+    setPendingToolId(toolId);
+    setSelectedClassForForm(targetClassId);
+    setShowForm(true);
+  };
+
   // 숙제 저장
   const handleSave = async assignmentData => {
     await base44.entities.Assignment.create(assignmentData);
     await loadAssignments();
     setShowForm(false);
     setSelectedClassForForm(null);
+    setPendingToolId(null);
   };
 
   // 삭제
@@ -158,6 +200,24 @@ export default function TeacherAssignments() {
     return <InlineLoader message="숙제 로딩 중..." />;
   }
 
+  // 추천 매듭 계산
+  const recClassId = classFilter !== 'all' ? classFilter : (my_classes[0]?.id || null);
+  const recClass = my_classes.find(c => c.id === recClassId);
+  const recTools = (data?.weak_or_unattempted_tools_by_class?.[recClassId]) || [];
+  const weakTools = recTools.filter(t => t.attempted_student_count > 0 && t.avg_score < 70);
+  const unattemptedTools = recTools.filter(t => t.attempted_student_count === 0);
+
+  const recDomainIds = new Set();
+  for (const t of recTools) { (t.domain_ids || []).forEach(d => recDomainIds.add(d)); }
+  const availableDomains = allDomains.filter(d =>
+    recClass?.grade_range && d.grade_range === recClass.grade_range && recDomainIds.has(d.domain_id)
+  );
+
+  const filterByDomain = (arr) =>
+    selectedDomainId ? arr.filter(t => (t.domain_ids || []).includes(selectedDomainId)) : arr;
+  const displayWeak = filterByDomain(weakTools);
+  const displayUnattempted = filterByDomain(unattemptedTools);
+
   return (
     <div className="flex-1 p-6 space-y-6">
       {/* 헤더 */}
@@ -174,6 +234,83 @@ export default function TeacherAssignments() {
           새 숙제
         </Button>
       </div>
+
+      {/* 추천 매듭 섹션 */}
+      {recClassId && (
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="font-semibold">📌 이 학급에서 약한 매듭 / 미경험 매듭</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {recClass?.name} · 클릭해서 숙제 출제
+              </p>
+            </div>
+          </div>
+
+          {availableDomains.length > 0 && (
+            <div className="flex gap-2 flex-wrap mb-3">
+              <button
+                onClick={() => setSelectedDomainId(null)}
+                className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${
+                  selectedDomainId === null
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-card text-foreground border-border hover:bg-muted'
+                }`}
+              >전체</button>
+              {availableDomains.map(d => (
+                <button
+                  key={d.domain_id}
+                  onClick={() => setSelectedDomainId(selectedDomainId === d.domain_id ? null : d.domain_id)}
+                  className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${
+                    selectedDomainId === d.domain_id
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-card text-foreground border-border hover:bg-muted'
+                  }`}
+                >{d.name}</button>
+              ))}
+            </div>
+          )}
+
+          <Tabs value={recTab} onValueChange={setRecTab}>
+            <TabsList className="grid grid-cols-2 w-full">
+              <TabsTrigger value="weak">⚠️ 약점 ({displayWeak.length})</TabsTrigger>
+              <TabsTrigger value="unattempted">🆕 미경험 ({displayUnattempted.length})</TabsTrigger>
+            </TabsList>
+            <TabsContent value="weak" className="mt-3">
+              {displayWeak.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-6 text-center">
+                  {selectedDomainId ? '이 단원에 해당하는 약점 매듭이 없어요' : '약점 매듭이 없어요'}
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {displayWeak.map(t => (
+                    <ToolRecRow key={t.tool_id} tool={t} onAssign={() => handleAssignTool(t.tool_id)} />
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+            <TabsContent value="unattempted" className="mt-3">
+              {displayUnattempted.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-6 text-center">
+                  {selectedDomainId ? '이 단원에 해당하는 미경험 매듭이 없어요' : '학급 전원이 모든 매듭을 한 번씩 풀어봤어요'}
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {displayUnattempted.map(t => (
+                    <ToolRecRow key={t.tool_id} tool={t} onAssign={() => handleAssignTool(t.tool_id)} />
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+
+          {classFilter === 'all' && (
+            <p className="text-xs text-muted-foreground mt-3">
+              💡 학급 필터로 특정 학급을 선택하면 그 학급 기준으로 분석돼요.
+            </p>
+          )}
+        </Card>
+      )}
 
       {/* 필터 */}
       <div className="flex gap-4 items-center">
@@ -316,10 +453,12 @@ export default function TeacherAssignments() {
       {showForm && selectedClassForForm && (
         <AssignmentForm
           classId={selectedClassForForm}
+          preselectedToolId={pendingToolId}
           onSave={handleSave}
           onClose={() => {
             setShowForm(false);
             setSelectedClassForForm(null);
+            setPendingToolId(null);
           }}
         />
       )}
