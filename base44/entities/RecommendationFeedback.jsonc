@@ -1,0 +1,33 @@
+{
+  "name": "RecommendationFeedback",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "\ud53c\ub4dc\ubc31 \ub0a8\uae34 \uc0ac\uc6a9\uc790"
+    },
+    "attempt_id": {
+      "type": "string",
+      "description": "\uc5b4\ub5a4 attempt\uc5d0 \ub300\ud55c \ud53c\ub4dc\ubc31"
+    },
+    "problem_id": {
+      "type": "string"
+    },
+    "reason_type": {
+      "type": "string",
+      "description": "\ucd94\ucc9c \uc774\uc720 \uc720\ud615 (weak_tool / bookmarked / stale)"
+    },
+    "feedback": {
+      "type": "string",
+      "enum": [
+        "helpful",
+        "not_helpful"
+      ]
+    }
+  },
+  "required": [
+    "user_id",
+    "problem_id",
+    "feedback"
+  ]
+}

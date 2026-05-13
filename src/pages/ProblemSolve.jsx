@@ -46,6 +46,8 @@ export default function ProblemSolve() {
   const [searchParams] = useSearchParams();
   const assignmentId = searchParams.get('assignment_id');
   const remediationFor = searchParams.get('remediation_for');
+  const fromRecommend = searchParams.get('from') === 'recommend';
+  const recommendReason = searchParams.get('reason');
 
   const [problem, setProblem] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -459,7 +461,10 @@ ${ocrText}
       });
 
       setStage(null);
-      navigate(`/result/${attempt.id}`);
+      const resultUrl = fromRecommend
+        ? `/result/${attempt.id}?from=recommend&reason=${recommendReason || ''}`
+        : `/result/${attempt.id}`;
+      navigate(resultUrl);
     } catch (err) {
       setStage(null);
       console.error(err);

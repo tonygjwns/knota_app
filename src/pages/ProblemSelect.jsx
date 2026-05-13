@@ -8,7 +8,11 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import ScoreBadge from '@/components/ScoreBadge';
-import { Shuffle, BookOpen, Wrench, AlertCircle, ChevronRight, ArrowLeft, Clock, ClipboardList, Star } from 'lucide-react';
+import { gradeLabel, extractGradeOptions } from '@/lib/grade-labels.js';
+import {
+  Shuffle, BookOpen, Wrench, AlertCircle, ChevronRight, ArrowLeft,
+  Clock, ClipboardList, Star, Sparkles
+} from 'lucide-react';
 
 // ──────────────────────────────────────────────
 // Hub placeholder card
@@ -33,39 +37,32 @@ function ComingSoonCard({ title, desc }) {
 }
 
 // ──────────────────────────────────────────────
-// Closed assignment card (gray, expired)
+// Closed assignment card
 // ──────────────────────────────────────────────
 function ClosedAssignmentCard({ assignment, user }) {
   const navigate = useNavigate();
   const [progress, setProgress] = useState({ done: 0, total: 0 });
 
   useEffect(() => {
-    const loadProgress = async () => {
+    (async () => {
       try {
         const problemIds = JSON.parse(assignment.problem_ids || '[]');
         const attempts = await base44.entities.StudentAttempt.filter(
-          { student_id: user.id, assignment_id: assignment.id },
-          '-submitted_at',
-          100
+          { student_id: user.id, assignment_id: assignment.id }, '-submitted_at', 100
         );
         const uniqueDone = new Set(attempts.map(a => a.problem_id)).size;
         setProgress({ done: uniqueDone, total: problemIds.length });
-      } catch (e) {
-        console.error('Failed to load progress:', e);
-      }
-    };
-    loadProgress();
+      } catch {}
+    })();
   }, [assignment, user.id]);
 
   return (
-    <Card
-      className="p-4 cursor-pointer border-2 border-gray-200 bg-gray-50/50"
-      onClick={() => navigate(`/assignment/${assignment.id}`)}
-    >
+    <Card className="p-4 cursor-pointer border-2 border-gray-200 bg-gray-50/50"
+          onClick={() => navigate(`/assignment/${assignment.id}`)}>
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <p className="font-semibold text-foreground truncate text-gray-500">{assignment.title}</p>
+            <p className="font-semibold truncate text-gray-500">{assignment.title}</p>
             <Badge className="bg-gray-400 text-white text-xs">마감됨</Badge>
           </div>
           <p className="text-xs text-muted-foreground">
@@ -80,10 +77,8 @@ function ClosedAssignmentCard({ assignment, user }) {
           <span>{progress.done}/{progress.total} 문제</span>
         </div>
         <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-          <div
-            className="bg-gray-400 h-full transition-all"
-            style={{ width: `${progress.total > 0 ? (progress.done / progress.total) * 100 : 0}%` }}
-          />
+          <div className="bg-gray-400 h-full transition-all"
+               style={{ width: `${progress.total > 0 ? (progress.done / progress.total) * 100 : 0}%` }} />
         </div>
       </div>
     </Card>
@@ -91,28 +86,23 @@ function ClosedAssignmentCard({ assignment, user }) {
 }
 
 // ──────────────────────────────────────────────
-// Assignment card for student
+// Assignment card
 // ──────────────────────────────────────────────
 function AssignmentCard({ assignment, user }) {
   const navigate = useNavigate();
   const [progress, setProgress] = useState({ done: 0, total: 0 });
 
   useEffect(() => {
-    const loadProgress = async () => {
+    (async () => {
       try {
         const problemIds = JSON.parse(assignment.problem_ids || '[]');
         const attempts = await base44.entities.StudentAttempt.filter(
-          { student_id: user.id, assignment_id: assignment.id },
-          '-submitted_at',
-          100
+          { student_id: user.id, assignment_id: assignment.id }, '-submitted_at', 100
         );
         const uniqueDone = new Set(attempts.map(a => a.problem_id)).size;
         setProgress({ done: uniqueDone, total: problemIds.length });
-      } catch (e) {
-        console.error('Failed to load progress:', e);
-      }
-    };
-    loadProgress();
+      } catch {}
+    })();
   }, [assignment, user.id]);
 
   const deadline = assignment.deadline ? new Date(assignment.deadline) : null;
@@ -121,17 +111,12 @@ function AssignmentCard({ assignment, user }) {
   const daysLeft = deadline ? Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
 
   return (
-    <Card
-      className="p-4 card-hover cursor-pointer"
-      onClick={() => navigate(`/assignment/${assignment.id}`)}
-    >
+    <Card className="p-4 card-hover cursor-pointer" onClick={() => navigate(`/assignment/${assignment.id}`)}>
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <p className="font-semibold text-foreground truncate">{assignment.title}</p>
-            {isUrgent && (
-              <Badge className="bg-red-500 text-white text-xs">마감 임박</Badge>
-            )}
+            {isUrgent && <Badge className="bg-red-500 text-white text-xs">마감 임박</Badge>}
           </div>
           <p className="text-xs text-muted-foreground">
             {deadline
@@ -141,18 +126,14 @@ function AssignmentCard({ assignment, user }) {
         </div>
         <ClipboardList className="w-5 h-5 text-primary flex-shrink-0" />
       </div>
-
-      {/* Progress */}
       <div className="space-y-1">
         <div className="flex justify-between text-xs text-muted-foreground">
           <span>진행률</span>
           <span>{progress.done}/{progress.total} 문제</span>
         </div>
         <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-          <div
-            className="bg-primary h-full transition-all"
-            style={{ width: `${progress.total > 0 ? (progress.done / progress.total) * 100 : 0}%` }}
-          />
+          <div className="bg-primary h-full transition-all"
+               style={{ width: `${progress.total > 0 ? (progress.done / progress.total) * 100 : 0}%` }} />
         </div>
       </div>
     </Card>
@@ -160,16 +141,14 @@ function AssignmentCard({ assignment, user }) {
 }
 
 // ──────────────────────────────────────────────
-// Hub main (no mode param)
+// Hub main
 // ──────────────────────────────────────────────
 function ProblemHub() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [assignments, setAssignments] = useState([]);
+  const [assignments, setAssignments] = useState({ active: [], closed: [] });
   const [loading, setLoading] = useState(true);
   const [showClosed, setShowClosed] = useState(false);
-  const [recommendedProblems, setRecommendedProblems] = useState([]);
-  const [recsLoading, setRecsLoading] = useState(true);
   const [bookmarkCount, setBookmarkCount] = useState(0);
   const [goingRandom, setGoingRandom] = useState(false);
 
@@ -179,126 +158,40 @@ function ProblemHub() {
     try {
       const all = await base44.entities.Problem.list('-created_date', 1000, 0);
       if (all.length === 0) return;
-      const random = all[Math.floor(Math.random() * all.length)];
-      navigate(`/problem/${random.id}`);
+      navigate(`/problem/${all[Math.floor(Math.random() * all.length)].id}`);
     } finally {
       setGoingRandom(false);
     }
   };
 
   useEffect(() => {
-    const loadAssignments = async () => {
-      if (!user?.class_id) {
-        setLoading(false);
-        return;
-      }
+    (async () => {
       try {
-        const all = await base44.entities.Assignment.filter({ class_id: user.class_id }, '-created_date', 100);
-        const now = new Date();
-        const isClosed = (a) => a.status === 'closed' || (a.deadline && new Date(a.deadline) <= now);
-        const closed = all.filter(isClosed);
-        const active = all.filter(a => !isClosed(a));
-        setAssignments({ active, closed });
-      } catch (e) {
-        console.error('Failed to load assignments:', e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadAssignments();
-  }, [user]);
-
-  // Load recommended problems (bookmarked + weak tools)
-  useEffect(() => {
-    const loadRecs = async () => {
-      if (!user) {
-        setRecsLoading(false);
-        return;
-      }
-      try {
-        const [bookmarks, allAttempts, allProblems, allTools] = await Promise.all([
-          base44.entities.BookmarkedTool.filter({ student_id: user.id }, '-created_date', 100),
-          base44.entities.StudentAttempt.filter({ student_id: user.id }, '-submitted_at', 500),
-          base44.entities.Problem.list('-created_date', 1000, 0),
-          base44.entities.MathTool.list('name', 100),
+        const [bookmarks] = await Promise.all([
+          base44.entities.BookmarkedTool.filter({ user_id: user?.id }, '-created_date', 100),
         ]);
-
-        // Build problem map
-        const problemMap = new Map(allProblems.map(p => [p.id, p]));
-        const toolMap = new Map(allTools.map(t => [t.tool_id, t]));
-
-        // Calculate weak tools
-        const masteryMap = new Map();
-        allAttempts.forEach(attempt => {
-          const problem = problemMap.get(attempt.problem_id);
-          if (!problem) return;
-          let toolIds = [];
-          if (attempt.claude_grade_json) {
-            try {
-              const g = JSON.parse(attempt.claude_grade_json);
-              const grading = g?.response ?? g;
-              const errorToolIds = (grading?.error_locations || []).map(e => e.tool_id).filter(Boolean);
-              if (errorToolIds.length > 0) toolIds = [...new Set(errorToolIds)];
-            } catch {}
-          }
-          if (toolIds.length === 0 && problem.tool_ids) {
-            try {
-              const parsed = JSON.parse(problem.tool_ids);
-              if (Array.isArray(parsed)) toolIds = parsed.filter(Boolean);
-            } catch {}
-          }
-          toolIds.forEach(toolId => {
-            if (!masteryMap.has(toolId)) masteryMap.set(toolId, { attempts: 0, scores: [] });
-            const entry = masteryMap.get(toolId);
-            entry.attempts += 1;
-            entry.scores.push(attempt.score || 0);
-          });
-        });
-
-        // Weak tools (avg_score < 70, attempts >= 3)
-        const weakToolIds = [];
-        masteryMap.forEach((entry, toolId) => {
-          if (entry.attempts >= 3) {
-            const avg = entry.scores.reduce((s, x) => s + x, 0) / entry.scores.length;
-            if (avg < 70) weakToolIds.push(toolId);
-          }
-        });
-
-        // Combine bookmarked + weak tools (bookmarked first)
-        const recommendedToolIds = [
-          ...new Set([
-            ...bookmarks.map(b => b.tool_id),
-            ...weakToolIds.slice(0, 5)
-          ])
-        ];
-
-        // Pick 1-2 problems per recommended tool
-        const recProblems = [];
-        recommendedToolIds.slice(0, 3).forEach(toolId => {
-          const toolProblems = allProblems.filter(p => {
-            try {
-              const ids = JSON.parse(p.tool_ids || '[]');
-              return ids.includes(toolId);
-            } catch { return false; }
-          });
-          if (toolProblems.length > 0) {
-            const shuffled = toolProblems.sort(() => Math.random() - 0.5);
-            recProblems.push(...shuffled.slice(0, 2));
-          }
-        });
-
-        // Fallback: random problems if no recommendations
-        const finalRecs = recProblems.length > 0 ? recProblems : allProblems.slice(0, 5);
-        setRecommendedProblems(finalRecs);
         setBookmarkCount(bookmarks.length);
-      } catch (e) {
-        console.error('Failed to load recommendations:', e);
-      } finally {
-        setRecsLoading(false);
+      } catch {}
+
+      if (user?.class_id) {
+        try {
+          const all = await base44.entities.Assignment.filter({ class_id: user.class_id }, '-created_date', 100);
+          const now = new Date();
+          const isClosed = (a) => a.status === 'closed' || (a.deadline && new Date(a.deadline) <= now);
+          setAssignments({ active: all.filter(a => !isClosed(a)), closed: all.filter(isClosed) });
+        } catch {}
       }
-    };
-    loadRecs();
+      setLoading(false);
+    })();
   }, [user]);
+
+  const FREE_PRACTICE_ITEMS = [
+    { id: 'recommended', icon: Sparkles, label: '추천', desc: '내가 틀릴 확률이 높은 문제', color: 'text-primary bg-primary/10', action: 'navigate-mode' },
+    { id: 'random', icon: Shuffle, label: '랜덤', desc: '무작위 문제', color: 'text-blue-500 bg-blue-50', action: 'go-random' },
+    { id: 'domain', icon: BookOpen, label: '단원별', desc: '학년/단원을 골라서 연습', color: 'text-purple-500 bg-purple-50', action: 'navigate-mode' },
+    { id: 'tool', icon: Wrench, label: '도구별', desc: '약점 매듭부터 연습', color: 'text-amber-500 bg-amber-50', action: 'navigate-mode' },
+    { id: 'wrong', icon: AlertCircle, label: '틀렸던 문제', desc: '틀렸던 문제만 골라서 연습', color: 'text-red-500 bg-red-50', action: 'navigate-mode' },
+  ];
 
   return (
     <AppLayout>
@@ -311,22 +204,30 @@ function ProblemHub() {
         <section className="space-y-2">
           <h2 className="text-base font-semibold text-foreground">받은 숙제</h2>
           {loading ? (
-            <div className="text-center py-6"><InlineLoader message="숙제 불러오는 중..." /></div>
-          ) : !assignments.active || assignments.active.length === 0 ? (
-            <ComingSoonCard title="받은 숙제가 없어요" desc="강사님이 숙제를 출제하면 여기에 표시돼요" />
+            <InlineLoader message="숙제 불러오는 중..." />
           ) : (
             <div className="space-y-3">
-              <div>
-                <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
-                  📋 진행 중 ({assignments.active.length})
-                </h3>
-                <div className="space-y-2">
-                  {assignments.active.map(assignment => (
-                    <AssignmentCard key={assignment.id} assignment={assignment} user={user} />
-                  ))}
+              {/* 진행 중 */}
+              {assignments.active.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground mb-2">📋 진행 중 ({assignments.active.length})</h3>
+                  <div className="space-y-2">
+                    {assignments.active.map(a => <AssignmentCard key={a.id} assignment={a} user={user} />)}
+                  </div>
                 </div>
+              )}
+              {assignments.active.length === 0 && (
+                <ComingSoonCard title="받은 숙제가 없어요" desc="강사님이 숙제를 출제하면 여기에 표시돼요" />
+              )}
+
+              {/* 진단 평가 */}
+              <div>
+                <h3 className="text-sm font-semibold text-foreground mb-2">📝 진단 평가</h3>
+                <ComingSoonCard title="진단 평가 준비 중" desc="곧 진단 평가가 추가돼요" />
               </div>
-              {assignments.closed && assignments.closed.length > 0 && (
+
+              {/* 마감된 숙제 */}
+              {assignments.closed.length > 0 && (
                 <div>
                   <button
                     onClick={() => setShowClosed(!showClosed)}
@@ -337,9 +238,7 @@ function ProblemHub() {
                   </button>
                   {showClosed && (
                     <div className="space-y-2">
-                      {assignments.closed.map(assignment => (
-                        <ClosedAssignmentCard key={assignment.id} assignment={assignment} user={user} />
-                      ))}
+                      {assignments.closed.map(a => <ClosedAssignmentCard key={a.id} assignment={a} user={user} />)}
                     </div>
                   )}
                 </div>
@@ -369,58 +268,11 @@ function ProblemHub() {
           </section>
         )}
 
-        {/* 진단 평가 */}
-        <section className="space-y-2">
-          <h2 className="text-base font-semibold text-foreground">진단 평가</h2>
-          <ComingSoonCard
-            title="진단 평가 준비 중"
-            desc="곧 진단 평가가 추가돼요"
-          />
-        </section>
-
-        {/* 추천 문제 */}
-        <section className="space-y-2">
-          <h2 className="text-base font-semibold text-foreground">추천 문제</h2>
-          {recsLoading ? (
-            <div className="text-center py-4"><InlineLoader message="추천 문제 불러오는 중..." /></div>
-          ) : recommendedProblems.length === 0 ? (
-            <ComingSoonCard
-              title="추천 문제 준비 중"
-              desc="더 많은 문제를 풀면 추천이 생겨요"
-            />
-          ) : (
-            <div className="grid grid-cols-1 gap-2">
-              {recommendedProblems.slice(0, 5).map((problem) => (
-                <Link key={problem.id} to={`/problem/${problem.id}`}>
-                  <Card className="p-4 card-hover cursor-pointer">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-primary bg-primary/10">
-                        <Star className="w-5 h-5" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm text-foreground">
-                          {problem.domain_name || '추천 문제'}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-0.5">탭해서 풀기</p>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                    </div>
-                  </Card>
-                </Link>
-              ))}
-            </div>
-          )}
-        </section>
-
         {/* 자유 연습 */}
         <section className="space-y-2">
           <h2 className="text-base font-semibold text-foreground">자유 연습</h2>
           <div className="grid grid-cols-1 gap-2">
-            {[
-              { id: 'random', icon: Shuffle, label: '랜덤', desc: '무작위 문제', color: 'text-blue-500 bg-blue-50', action: 'go-random' },
-              { id: 'domain', icon: BookOpen, label: '단원별', desc: '단원을 골라서 연습', color: 'text-purple-500 bg-purple-50', action: 'navigate-mode' },
-              { id: 'tool', icon: Wrench, label: '도구별', desc: '수학 도구를 골라서 연습', color: 'text-amber-500 bg-amber-50', action: 'navigate-mode' },
-            ].map(item => {
+            {FREE_PRACTICE_ITEMS.map(item => {
               const cardContent = (
                 <Card className="p-4 card-hover cursor-pointer">
                   <div className="flex items-center gap-3">
@@ -429,7 +281,9 @@ function ProblemHub() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm text-foreground">{item.label}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{goingRandom && item.action === 'go-random' ? '불러오는 중...' : item.desc}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {goingRandom && item.action === 'go-random' ? '불러오는 중...' : item.desc}
+                      </p>
                     </div>
                     <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                   </div>
@@ -450,32 +304,13 @@ function ProblemHub() {
             })}
           </div>
         </section>
-
-        {/* 복습 */}
-        <section className="space-y-2">
-          <h2 className="text-base font-semibold text-foreground">복습</h2>
-          <Link to="/problems?mode=wrong">
-            <Card className="p-4 card-hover cursor-pointer">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-red-500 bg-red-50">
-                  <AlertCircle className="w-5 h-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm text-foreground">틀렸던 문제</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">틀렸던 문제만 골라서 복습</p>
-                </div>
-                <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-              </div>
-            </Card>
-          </Link>
-        </section>
       </div>
     </AppLayout>
   );
 }
 
 // ──────────────────────────────────────────────
-// Mode screens (existing behaviour)
+// Mode view
 // ──────────────────────────────────────────────
 export default function ProblemSelect() {
   const { user } = useAuth();
@@ -489,66 +324,222 @@ export default function ProblemSelect() {
     if (user.role === 'teacher' || user.role === 'owner') { navigate('/teacher', { replace: true }); return; }
   }, [user]);
 
-  // No mode → hub
   if (!mode) return <ProblemHub />;
-
   return <ProblemModeView mode={mode} user={user} navigate={navigate} />;
 }
 
+// ──────────────────────────────────────────────
+// Helpers
+// ──────────────────────────────────────────────
+const HALF_LIFE_MS = 30 * 24 * 60 * 60 * 1000;
+
+function buildMasteryMap(attempts, problemMap) {
+  const now = Date.now();
+  const masteryMap = new Map();
+  for (const a of attempts) {
+    const problem = problemMap.get(a.problem_id);
+    if (!problem) continue;
+    const submittedAt = a.submitted_at ? new Date(a.submitted_at).getTime() : now;
+    const ageMs = now - submittedAt;
+    const w = Math.pow(0.5, ageMs / HALF_LIFE_MS);
+    let toolIds = [];
+    if (a.claude_grade_json) {
+      try {
+        const raw = JSON.parse(a.claude_grade_json);
+        const g = raw?.response ?? raw;
+        const errIds = (g?.error_locations || []).map(e => e.tool_id).filter(Boolean);
+        if (errIds.length > 0) toolIds = [...new Set(errIds)];
+      } catch {}
+    }
+    if (toolIds.length === 0 && problem.tool_ids) {
+      try {
+        const parsed = JSON.parse(problem.tool_ids);
+        if (Array.isArray(parsed)) toolIds = parsed.filter(Boolean);
+      } catch {}
+    }
+    for (const tid of toolIds) {
+      if (!masteryMap.has(tid)) masteryMap.set(tid, { weightedScore: 0, weight: 0, lastAt: 0 });
+      const m = masteryMap.get(tid);
+      m.weightedScore += (a.score || 0) * w;
+      m.weight += w;
+      m.lastAt = Math.max(m.lastAt, submittedAt);
+    }
+  }
+  return masteryMap;
+}
+
+function getMasteryColor(avg, isNew) {
+  if (isNew) return 'text-muted-foreground';
+  if (avg < 70) return 'text-red-500';
+  if (avg < 90) return 'text-amber-500';
+  return 'text-emerald-500';
+}
+
+// ──────────────────────────────────────────────
+// ProblemModeView
+// ──────────────────────────────────────────────
 function ProblemModeView({ mode, user, navigate }) {
   const [domains, setDomains] = useState([]);
   const [tools, setTools] = useState([]);
-  const [wrongAttempts, setWrongAttempts] = useState([]);
   const [problems, setProblems] = useState([]);
+  const [wrongAttempts, setWrongAttempts] = useState([]);
+  const [recommendedItems, setRecommendedItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // domain drill-down
+  const [subMode, setSubMode] = useState('grade');
+  const [selectedGrade, setSelectedGrade] = useState(null);
+
+  // tool filters
+  const [toolFilterGrade, setToolFilterGrade] = useState('');
+  const [toolFilterDomain, setToolFilterDomain] = useState('');
+
+  // wrong filters
+  const [wrongFilterGrade, setWrongFilterGrade] = useState('');
+  const [wrongFilterDomain, setWrongFilterDomain] = useState('');
+  const [wrongSort, setWrongSort] = useState('recent');
+
   useEffect(() => {
+    setLoading(true);
+    setSubMode('grade');
+    setSelectedGrade(null);
     loadData();
   }, [mode]);
 
-  useEffect(() => {
-    if (mode === 'random' && problems.length > 0) {
-      const idx = Math.floor(Math.random() * problems.length);
-      navigate(`/problem/${problems[idx].id}`, { replace: true });
-    }
-  }, [mode, problems]);
-
   const loadData = async () => {
-    setLoading(true);
     try {
-      if (mode === 'domain') {
+      if (mode === 'recommended' && user) {
+        const [bookmarks, attempts, allProblems, allTools, allDomains] = await Promise.all([
+          base44.entities.BookmarkedTool.filter({ user_id: user.id }, '-created_date', 100),
+          base44.entities.StudentAttempt.filter({ student_id: user.id }, '-submitted_at', 500),
+          base44.entities.Problem.list('-created_date', 1000, 0),
+          base44.entities.MathTool.list('name', 200),
+          base44.entities.Domain.list('grade_range', 100),
+        ]);
+
+        const problemMap = new Map(allProblems.map(p => [p.id, p]));
+        const toolMap = new Map(allTools.map(t => [t.tool_id, t]));
+        const masteryMap = buildMasteryMap(attempts, problemMap);
+        const now = Date.now();
+
+        // weak tools (가중평균 < 70, weight >= 1)
+        const weakEntries = [];
+        for (const [tid, m] of masteryMap) {
+          if (m.weight >= 1) {
+            const avg = m.weightedScore / m.weight;
+            if (avg < 70) weakEntries.push({ tool_id: tid, avg: Math.round(avg), count: Math.round(m.weight * 10) / 10 });
+          }
+        }
+        weakEntries.sort((a, b) => a.avg - b.avg);
+
+        // stale tools (14일 이상)
+        const STALE_MS = 14 * 24 * 60 * 60 * 1000;
+        const staleEntries = [];
+        for (const [tid, m] of masteryMap) {
+          const ageMs = now - m.lastAt;
+          if (ageMs > STALE_MS) staleEntries.push({ tool_id: tid, ageDays: Math.round(ageMs / (24 * 60 * 60 * 1000)) });
+        }
+
+        const recs = [];
+        const usedToolIds = new Set();
+
+        const pickProblem = (toolId) => {
+          const probs = allProblems.filter(p => {
+            try { return JSON.parse(p.tool_ids || '[]').includes(toolId); } catch { return false; }
+          });
+          return probs.length > 0 ? probs[Math.floor(Math.random() * probs.length)] : null;
+        };
+
+        // bookmarked (최대 2개)
+        for (const b of bookmarks.slice(0, 2)) {
+          const tool = toolMap.get(b.tool_id);
+          if (!tool) continue;
+          const prob = pickProblem(b.tool_id);
+          if (!prob) continue;
+          recs.push({ problem: prob, reason: { type: 'bookmarked', label: '⭐ 즐겨찾기', detail: tool.name, strength: 4 } });
+          usedToolIds.add(b.tool_id);
+        }
+
+        // weak (최대 3개)
+        for (const w of weakEntries.slice(0, 3)) {
+          if (usedToolIds.has(w.tool_id)) continue;
+          const tool = toolMap.get(w.tool_id);
+          if (!tool) continue;
+          const prob = pickProblem(w.tool_id);
+          if (!prob) continue;
+          recs.push({ problem: prob, reason: { type: 'weak_tool', label: '🎯 약점 매듭', detail: `${tool.name} · 평균 ${w.avg}점`, strength: w.avg < 50 ? 5 : 4 } });
+          usedToolIds.add(w.tool_id);
+          if (recs.length >= 5) break;
+        }
+
+        // stale (1개)
+        if (recs.length < 5) {
+          for (const s of staleEntries.slice(0, 1)) {
+            if (usedToolIds.has(s.tool_id)) continue;
+            const tool = toolMap.get(s.tool_id);
+            if (!tool) continue;
+            const prob = pickProblem(s.tool_id);
+            if (!prob) continue;
+            recs.push({ problem: prob, reason: { type: 'stale', label: '⏰ 복습 시점', detail: `${tool.name} · ${s.ageDays}일 전`, strength: 2 } });
+            usedToolIds.add(s.tool_id);
+          }
+        }
+
+        setRecommendedItems(recs);
+        setDomains(allDomains);
+        setProblems(allProblems);
+
+      } else if (mode === 'domain') {
         const [d, allP] = await Promise.all([
-          base44.entities.Domain.list('name', 50),
+          base44.entities.Domain.list('name', 200),
           base44.entities.Problem.list('domain_id', 5000),
         ]);
-        // Count problems per domain dynamically
         const countMap = {};
-        allP.forEach(p => {
-          if (p.domain_id) countMap[p.domain_id] = (countMap[p.domain_id] || 0) + 1;
-        });
+        allP.forEach(p => { if (p.domain_id) countMap[p.domain_id] = (countMap[p.domain_id] || 0) + 1; });
         setDomains(d.map(dom => ({ ...dom, problem_count: countMap[dom.domain_id] || 0 })));
+        setProblems(allP);
+
       } else if (mode === 'tool') {
-        const [t, allP] = await Promise.all([
-          base44.entities.MathTool.list('name', 50),
+        const [t, allP, allD, allAttempts] = await Promise.all([
+          base44.entities.MathTool.list('name', 200),
           base44.entities.Problem.list('tool_ids', 5000),
+          base44.entities.Domain.list('grade_range', 100),
+          user ? base44.entities.StudentAttempt.filter({ student_id: user.id }, '-submitted_at', 500) : Promise.resolve([]),
         ]);
-        // Count problems per tool dynamically
+        const problemMap = new Map(allP.map(p => [p.id, p]));
+        const masteryMap = buildMasteryMap(allAttempts, problemMap);
         const toolCountMap = {};
         allP.forEach(p => {
-          try {
-            const ids = JSON.parse(p.tool_ids || '[]');
-            ids.forEach(tid => { toolCountMap[tid] = (toolCountMap[tid] || 0) + 1; });
-          } catch {}
+          try { JSON.parse(p.tool_ids || '[]').forEach(tid => { toolCountMap[tid] = (toolCountMap[tid] || 0) + 1; }); } catch {}
         });
-        setTools(t.map(tool => ({ ...tool, problem_count: toolCountMap[tool.tool_id] || 0 })));
+        const toolsWithMastery = t.map(tool => {
+          const m = masteryMap.get(tool.tool_id);
+          const isNew = !m || m.weight < 0.5;
+          const avg = isNew ? null : Math.round(m.weightedScore / m.weight);
+          return { ...tool, problem_count: toolCountMap[tool.tool_id] || 0, isNew, avg, weight: m?.weight || 0 };
+        });
+        // sort: 미경험 먼저, 그 다음 avg 오름차순
+        toolsWithMastery.sort((a, b) => {
+          if (a.isNew && !b.isNew) return -1;
+          if (!a.isNew && b.isNew) return 1;
+          if (a.isNew && b.isNew) return 0;
+          return (a.avg ?? 100) - (b.avg ?? 100);
+        });
+        setTools(toolsWithMastery);
+        setProblems(allP);
+        setDomains(allD);
+
       } else if (mode === 'wrong') {
-        if (user) {
-          const attempts = await base44.entities.StudentAttempt.filter(
-            { student_id: user.id }, '-submitted_at', 50
-          );
-          const wrong = attempts.filter(a => (a.score || 0) < 60 || a.correctness === 'wrong');
-          setWrongAttempts(wrong);
-        }
+        const [attempts, allD, allP] = await Promise.all([
+          user ? base44.entities.StudentAttempt.filter({ student_id: user.id }, '-submitted_at', 100) : Promise.resolve([]),
+          base44.entities.Domain.list('grade_range', 100),
+          base44.entities.Problem.list('domain_id', 5000),
+        ]);
+        const wrong = attempts.filter(a => (a.score || 0) < 60 || a.correctness === 'wrong');
+        setWrongAttempts(wrong);
+        setDomains(allD);
+        setProblems(allP);
+
       } else {
         const p = await base44.entities.Problem.list('-created_date', 1000, 0);
         setProblems(p);
@@ -560,22 +551,12 @@ function ProblemModeView({ mode, user, navigate }) {
     }
   };
 
-  const handleRandom = () => {
-    if (problems.length === 0) return;
-    const idx = Math.floor(Math.random() * problems.length);
-    navigate(`/problem/${problems[idx].id}`);
-  };
-
   const handleDomainSelect = async (domain) => {
     setLoading(true);
     try {
       const all = await base44.entities.Problem.filter({ domain_id: domain.domain_id }, '-created_date', 1000, 0);
-      if (all.length === 0) {
-        const allP = await base44.entities.Problem.list('-created_date', 1000, 0);
-        if (allP.length > 0) navigate(`/problem/${allP[Math.floor(Math.random() * allP.length)].id}`);
-        return;
-      }
-      navigate(`/problem/${all[Math.floor(Math.random() * all.length)].id}`);
+      const pool = all.length > 0 ? all : problems;
+      if (pool.length > 0) navigate(`/problem/${pool[Math.floor(Math.random() * pool.length)].id}`);
     } finally {
       setLoading(false);
     }
@@ -584,28 +565,70 @@ function ProblemModeView({ mode, user, navigate }) {
   const handleToolSelect = async (tool) => {
     setLoading(true);
     try {
-      const all = await base44.entities.Problem.list('-created_date', 1000, 0);
-      const filtered = all.filter(p => {
-        try {
-          const ids = JSON.parse(p.tool_ids || '[]');
-          return ids.includes(tool.tool_id);
-        } catch { return false; }
+      const filtered = problems.filter(p => {
+        try { return JSON.parse(p.tool_ids || '[]').includes(tool.tool_id); } catch { return false; }
       });
-      const pool = filtered.length > 0 ? filtered : all;
-      if (pool.length === 0) return;
-      navigate(`/problem/${pool[Math.floor(Math.random() * pool.length)].id}`);
+      const pool = filtered.length > 0 ? filtered : problems;
+      if (pool.length > 0) navigate(`/problem/${pool[Math.floor(Math.random() * pool.length)].id}`);
     } finally {
       setLoading(false);
     }
   };
 
   const modeConfig = {
+    recommended: { icon: Sparkles, title: '추천 문제', color: 'text-primary' },
     random: { icon: Shuffle, title: '랜덤 문제', color: 'text-blue-500' },
     domain: { icon: BookOpen, title: '단원별 문제', color: 'text-purple-500' },
     tool: { icon: Wrench, title: '도구별 문제', color: 'text-amber-500' },
     wrong: { icon: AlertCircle, title: '틀렸던 문제', color: 'text-red-500' },
   };
   const cfg = modeConfig[mode] || modeConfig.random;
+
+  const gradeOptions = extractGradeOptions(domains);
+
+  // filtered tools
+  const filteredTools = tools.filter(tool => {
+    if (!toolFilterDomain) return true;
+    const dom = domains.find(d => d.domain_id === toolFilterDomain);
+    if (!dom) return true;
+    try { return JSON.parse(dom.achvmt_prefix_patterns || '[]').length >= 0; } catch { return true; }
+    // domain_ids field on MathTool
+    try {
+      const dids = JSON.parse(tool.domain_ids || '[]');
+      return dids.includes(toolFilterDomain);
+    } catch { return true; }
+  }).filter(tool => {
+    if (!toolFilterGrade) return true;
+    // domain_ids → check if any of those domains has matching grade_range
+    try {
+      const dids = JSON.parse(tool.domain_ids || '[]');
+      return dids.some(did => {
+        const dom = domains.find(d => d.domain_id === did);
+        return dom?.grade_range === toolFilterGrade;
+      });
+    } catch { return true; }
+  });
+
+  const domainsForGrade = (grade) => domains.filter(d => !grade || d.grade_range === grade);
+
+  // filtered + sorted wrong attempts
+  const problemMap = new Map(problems.map(p => [p.id, p]));
+  const filteredWrong = wrongAttempts.filter(a => {
+    const prob = problemMap.get(a.problem_id);
+    if (wrongFilterGrade || wrongFilterDomain) {
+      if (!prob) return false;
+      const dom = domains.find(d => d.domain_id === prob.domain_id);
+      if (wrongFilterGrade && dom?.grade_range !== wrongFilterGrade) return false;
+      if (wrongFilterDomain && prob.domain_id !== wrongFilterDomain) return false;
+    }
+    return true;
+  }).sort((a, b) => {
+    if (wrongSort === 'recent') return new Date(b.submitted_at || 0) - new Date(a.submitted_at || 0);
+    if (wrongSort === 'oldest') return new Date(a.submitted_at || 0) - new Date(b.submitted_at || 0);
+    if (wrongSort === 'score_asc') return (a.score || 0) - (b.score || 0);
+    if (wrongSort === 'score_desc') return (b.score || 0) - (a.score || 0);
+    return 0;
+  });
 
   return (
     <AppLayout>
@@ -614,98 +637,243 @@ function ProblemModeView({ mode, user, navigate }) {
           <Button variant="ghost" size="icon" onClick={() => navigate('/problems')} className="btn-touch">
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <div>
-            <h1 className="text-xl font-bold flex items-center gap-2">
-              <cfg.icon className={`w-5 h-5 ${cfg.color}`} />
-              {cfg.title}
-            </h1>
-          </div>
+          <h1 className="text-xl font-bold flex items-center gap-2">
+            <cfg.icon className={`w-5 h-5 ${cfg.color}`} />
+            {cfg.title}
+          </h1>
         </div>
 
         {loading ? (
           <InlineLoader message="불러오는 중..." />
         ) : (
           <>
-            {mode === 'random' && (
-              <InlineLoader message="랜덤 문제로 이동하는 중..." />
+            {/* ── 추천 ── */}
+            {mode === 'recommended' && (
+              <div className="space-y-3">
+                {recommendedItems.length === 0 ? (
+                  <Card className="p-4 bg-muted/40">
+                    <p className="text-sm font-semibold mb-1">아직 추천이 준비되지 않았어요</p>
+                    <p className="text-xs text-muted-foreground">
+                      5문제 이상 풀면 약점 매듭을 분석해 맞춤 추천을 시작해요. 먼저 다양한 매듭을 경험해 봐요.
+                    </p>
+                    <Button size="sm" variant="outline" className="mt-3"
+                            onClick={() => navigate('/problems?mode=tool')}>
+                      도구별로 시작하기
+                    </Button>
+                  </Card>
+                ) : (
+                  <>
+                    {recommendedItems.map((rec, idx) => {
+                      const r = rec.reason;
+                      const reasonBg = {
+                        'weak_tool': 'bg-red-50 border-l-red-400',
+                        'bookmarked': 'bg-amber-50 border-l-amber-400',
+                        'stale': 'bg-blue-50 border-l-blue-400',
+                      }[r.type] || 'bg-muted border-l-border';
+
+                      return (
+                        <Card key={idx}
+                              className={`p-4 card-hover cursor-pointer border-l-4 ${reasonBg}`}
+                              onClick={() => navigate(`/problem/${rec.problem.id}?from=recommend&reason=${r.type}`)}>
+                          <div className="flex items-start gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1.5">
+                                <span className="text-xs font-semibold text-foreground bg-white/80 px-2 py-0.5 rounded-full border border-border/50">
+                                  {r.label}
+                                </span>
+                                {r.strength && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {'★'.repeat(r.strength)}{'☆'.repeat(5 - r.strength)}
+                                  </span>
+                                )}
+                              </div>
+                              {r.detail && <p className="text-xs text-foreground mb-1 font-medium">{r.detail}</p>}
+                              <p className="text-xs text-muted-foreground line-clamp-2">
+                                {(() => {
+                                  try {
+                                    const blocks = JSON.parse(rec.problem.content || '[]');
+                                    return blocks.map(b => b.text || '').join(' ').slice(0, 80);
+                                  } catch { return ''; }
+                                })()}
+                              </p>
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-1" />
+                          </div>
+                        </Card>
+                      );
+                    })}
+                    {recommendedItems.length < 3 && (
+                      <p className="text-xs text-muted-foreground mt-2 text-center">
+                        더 많은 문제를 풀수록 추천이 정교해져요
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
             )}
 
+            {/* ── 단원별 (학년 → 단원 drill-down) ── */}
             {mode === 'domain' && (
               <div>
-                <p className="text-muted-foreground mb-4">어떤 단원으로 연습할까요?</p>
-                {domains.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">단원 정보가 없어요.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {domains.map(domain => (
-                     <Card key={domain.id} className="p-4 card-hover cursor-pointer"
-                           onClick={() => handleDomainSelect(domain)}>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-semibold text-foreground">{domain.name}</p>
-                            {domain.grade_range && (
-                              <p className="text-xs text-muted-foreground mt-0.5">{domain.grade_range}학년</p>
-                            )}
-                          </div>
-                          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
+                {subMode === 'grade' && (
+                  <>
+                    <p className="text-muted-foreground mb-4 text-sm">어떤 학년으로 연습할까요?</p>
+                    {gradeOptions.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-8">학년 정보가 없어요.</p>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2">
+                        {gradeOptions.map(g => (
+                          <Card key={g} className="p-4 card-hover cursor-pointer"
+                                onClick={() => { setSelectedGrade(g); setSubMode('domain'); }}>
+                            <div className="flex items-center justify-between">
+                              <p className="font-semibold text-foreground text-sm">{gradeLabel(g)}</p>
+                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {subMode === 'domain' && (
+                  <>
+                    <button
+                      className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4"
+                      onClick={() => setSubMode('grade')}
+                    >
+                      <ArrowLeft className="w-4 h-4" /> {gradeLabel(selectedGrade)}
+                    </button>
+                    <p className="text-muted-foreground mb-4 text-sm">어떤 단원으로 연습할까요?</p>
+                    {domainsForGrade(selectedGrade).length === 0 ? (
+                      <p className="text-center text-muted-foreground py-8">해당 학년의 단원이 없어요.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {domainsForGrade(selectedGrade).map(domain => (
+                          <Card key={domain.id} className="p-4 card-hover cursor-pointer"
+                                onClick={() => handleDomainSelect(domain)}>
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="font-semibold text-foreground">{domain.name}</p>
+                                {domain.problem_count > 0 && (
+                                  <p className="text-xs text-muted-foreground mt-0.5">{domain.problem_count}문제</p>
+                                )}
+                              </div>
+                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
 
+            {/* ── 도구별 ── */}
             {mode === 'tool' && (
               <div>
-                <p className="text-muted-foreground mb-4">어떤 도구로 연습할까요?</p>
-                {tools.length === 0 ? (
+                {/* 필터 */}
+                <div className="flex gap-2 mb-4 flex-wrap">
+                  <select
+                    value={toolFilterGrade}
+                    onChange={e => { setToolFilterGrade(e.target.value); setToolFilterDomain(''); }}
+                    className="text-sm border border-border rounded-lg px-3 py-1.5 bg-card focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="">전체 학년</option>
+                    {gradeOptions.map(g => <option key={g} value={g}>{gradeLabel(g)}</option>)}
+                  </select>
+                  <select
+                    value={toolFilterDomain}
+                    onChange={e => setToolFilterDomain(e.target.value)}
+                    disabled={!toolFilterGrade}
+                    className="text-sm border border-border rounded-lg px-3 py-1.5 bg-card focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-40"
+                  >
+                    <option value="">전체 단원</option>
+                    {domainsForGrade(toolFilterGrade).map(d => <option key={d.id} value={d.domain_id}>{d.name}</option>)}
+                  </select>
+                </div>
+
+                {filteredTools.length === 0 ? (
                   <p className="text-center text-muted-foreground py-8">도구 정보가 없어요.</p>
                 ) : (
-                  <div className="space-y-2">
-                    {tools.map(tool => (
-                      <Card key={tool.id} className="p-4 card-hover cursor-pointer"
-                            onClick={() => handleToolSelect(tool)}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-foreground">{tool.name}</p>
-                            {tool.goal && (
-                              <p className="text-xs text-muted-foreground mt-0.5 truncate">{tool.goal}</p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {tool.problem_count && (
-                              <span className="text-xs bg-muted px-2 py-1 rounded-full text-muted-foreground">
-                                {tool.problem_count}문제
-                              </span>
-                            )}
-                            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                          </div>
+                  <>
+                    {/* 미경험 섹션 */}
+                    {filteredTools.some(t => t.isNew) && (
+                      <div className="mb-4">
+                        <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">미경험 도구</p>
+                        <div className="space-y-2">
+                          {filteredTools.filter(t => t.isNew).map(tool => (
+                            <ToolCard key={tool.id} tool={tool} onClick={() => handleToolSelect(tool)} />
+                          ))}
                         </div>
-                      </Card>
-                    ))}
-                  </div>
+                      </div>
+                    )}
+                    {/* 숙련도별 */}
+                    {filteredTools.some(t => !t.isNew) && (
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">숙련도 낮은 순</p>
+                        <div className="space-y-2">
+                          {filteredTools.filter(t => !t.isNew).map(tool => (
+                            <ToolCard key={tool.id} tool={tool} onClick={() => handleToolSelect(tool)} />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
 
+            {/* ── 틀렸던 문제 ── */}
             {mode === 'wrong' && (
               <div>
-                {wrongAttempts.length === 0 ? (
+                {/* 필터 + 정렬 */}
+                <div className="flex gap-2 mb-4 flex-wrap">
+                  <select
+                    value={wrongFilterGrade}
+                    onChange={e => { setWrongFilterGrade(e.target.value); setWrongFilterDomain(''); }}
+                    className="text-sm border border-border rounded-lg px-3 py-1.5 bg-card focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="">전체 학년</option>
+                    {gradeOptions.map(g => <option key={g} value={g}>{gradeLabel(g)}</option>)}
+                  </select>
+                  <select
+                    value={wrongFilterDomain}
+                    onChange={e => setWrongFilterDomain(e.target.value)}
+                    disabled={!wrongFilterGrade}
+                    className="text-sm border border-border rounded-lg px-3 py-1.5 bg-card focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-40"
+                  >
+                    <option value="">전체 단원</option>
+                    {domainsForGrade(wrongFilterGrade).map(d => <option key={d.id} value={d.domain_id}>{d.name}</option>)}
+                  </select>
+                  <select
+                    value={wrongSort}
+                    onChange={e => setWrongSort(e.target.value)}
+                    className="text-sm border border-border rounded-lg px-3 py-1.5 bg-card focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="recent">최근순</option>
+                    <option value="oldest">오래된 순</option>
+                    <option value="score_asc">점수 낮은 순</option>
+                    <option value="score_desc">점수 높은 순</option>
+                  </select>
+                </div>
+
+                {filteredWrong.length === 0 ? (
                   <div className="text-center py-12">
                     <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
                       <span className="text-3xl">🎉</span>
                     </div>
                     <p className="font-semibold text-lg text-foreground">아직 틀린 문제가 없어요!</p>
                     <p className="text-muted-foreground mt-2">다른 모드로 연습해 볼까요?</p>
-                    <Button className="mt-4" onClick={() => navigate('/problems?mode=random')}>
-                      랜덤으로 풀기
+                    <Button className="mt-4" onClick={() => navigate('/problems?mode=domain')}>
+                      단원별로 풀기
                     </Button>
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <p className="text-muted-foreground mb-4">다시 풀어볼 문제들이에요</p>
-                    {wrongAttempts.map(attempt => (
+                    <p className="text-sm text-muted-foreground mb-2">{filteredWrong.length}개의 문제</p>
+                    {filteredWrong.map(attempt => (
                       <Card key={attempt.id}
                             className="p-4 card-hover cursor-pointer border-l-4 border-l-red-300"
                             onClick={() => navigate(`/problem/${attempt.problem_id}`)}>
@@ -717,6 +885,7 @@ function ProblemModeView({ mode, user, navigate }) {
                                 : `문제 #${attempt.problem_id}`}
                             </p>
                             <p className="text-xs text-muted-foreground mt-0.5">
+                              {attempt.problem_domain && <span className="mr-2">{attempt.problem_domain}</span>}
                               {attempt.submitted_at ? new Date(attempt.submitted_at).toLocaleDateString('ko-KR') : ''}
                             </p>
                           </div>
@@ -732,5 +901,34 @@ function ProblemModeView({ mode, user, navigate }) {
         )}
       </div>
     </AppLayout>
+  );
+}
+
+// ── ToolCard sub-component ──
+function ToolCard({ tool, onClick }) {
+  const isNew = tool.isNew;
+  const avg = tool.avg;
+  const colorClass = getMasteryColor(avg, isNew);
+
+  return (
+    <Card className="p-4 card-hover cursor-pointer" onClick={onClick}>
+      <div className="flex items-center justify-between">
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-foreground">{tool.name}</p>
+          {tool.goal && <p className="text-xs text-muted-foreground mt-0.5 truncate">{tool.goal}</p>}
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <span className={`text-xs font-medium ${colorClass}`}>
+            {isNew ? '미경험' : `평균 ${avg}점`}
+          </span>
+          {tool.problem_count > 0 && (
+            <span className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground">
+              {tool.problem_count}문제
+            </span>
+          )}
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        </div>
+      </div>
+    </Card>
   );
 }

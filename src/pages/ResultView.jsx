@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { redirectByRole } from '@/lib/auth-utils';
 import { base44 } from '@/api/base44Client';
@@ -212,6 +212,9 @@ function StepCard({ step, getToolName, onToolClick, onBookmarkTool, bookmarkedTo
 export default function ResultView() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const fromRecommend = searchParams.get('from') === 'recommend';
+  const recommendReason = searchParams.get('reason');
   const { user } = useAuth();
   const [attempt, setAttempt] = useState(null);
   const [problem, setProblem] = useState(null);
@@ -232,6 +235,7 @@ export default function ResultView() {
   const [solutions, setSolutions] = useState([]);
   const [solutionSteps, setSolutionSteps] = useState([]);
   const [showMatchedSolution, setShowMatchedSolution] = useState(false);
+  const [feedbackSent, setFeedbackSent] = useState(false);
 
   useEffect(() => {
     loadAttempt();
@@ -899,6 +903,48 @@ export default function ResultView() {
             </Card>
           )}
         </div>
+
+        {/* 추천 피드백 카드 */}
+        {viewerIsOwner && fromRecommend && !feedbackSent && (
+          <Card className="p-4 bg-primary/5 border-primary/30">
+            <p className="text-sm font-medium mb-2">이 추천 문제는 어땠나요?</p>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={async () => {
+                try {
+                  await base44.entities.RecommendationFeedback.create({
+                    user_id: user.id,
+                    attempt_id: attempt.id,
+                    problem_id: attempt.problem_id,
+                    reason_type: recommendReason || 'unknown',
+                    feedback: 'helpful',
+                  });
+                  setFeedbackSent(true);
+                  toast.success('피드백 감사합니다');
+                } catch { toast.error('피드백 저장 실패'); }
+              }}>
+                👍 도움 됐어요
+              </Button>
+              <Button size="sm" variant="outline" onClick={async () => {
+                try {
+                  await base44.entities.RecommendationFeedback.create({
+                    user_id: user.id,
+                    attempt_id: attempt.id,
+                    problem_id: attempt.problem_id,
+                    reason_type: recommendReason || 'unknown',
+                    feedback: 'not_helpful',
+                  });
+                  setFeedbackSent(true);
+                  toast.success('피드백 감사합니다');
+                } catch { toast.error('피드백 저장 실패'); }
+              }}>
+                👎 안 맞아요
+              </Button>
+            </div>
+          </Card>
+        )}
+        {viewerIsOwner && fromRecommend && feedbackSent && (
+          <p className="text-xs text-muted-foreground">피드백을 보내주셔서 감사해요</p>
+        )}
 
         {/* 매듭 보강 권유 카드 — remediation 중이 아니면 표시 (소유자만) */}
         {viewerIsOwner && (attempt.correctness === 'partial' || attempt.correctness === 'wrong') && weakToolIds.length > 0 && attempt.attempt_type !== 'remediation_retry' && attempt.attempt_type !== 'remediation_practice' && !dismissedRemediation && (
