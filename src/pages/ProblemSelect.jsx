@@ -164,12 +164,27 @@ function AssignmentCard({ assignment, user }) {
 // ──────────────────────────────────────────────
 function ProblemHub() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showClosed, setShowClosed] = useState(false);
   const [recommendedProblems, setRecommendedProblems] = useState([]);
   const [recsLoading, setRecsLoading] = useState(true);
   const [bookmarkCount, setBookmarkCount] = useState(0);
+  const [goingRandom, setGoingRandom] = useState(false);
+
+  const handleGoRandom = async () => {
+    if (goingRandom) return;
+    setGoingRandom(true);
+    try {
+      const all = await base44.entities.Problem.list('-created_date', 1000, 0);
+      if (all.length === 0) return;
+      const random = all[Math.floor(Math.random() * all.length)];
+      navigate(`/problem/${random.id}`);
+    } finally {
+      setGoingRandom(false);
+    }
+  };
 
   useEffect(() => {
     const loadAssignments = async () => {
@@ -402,25 +417,37 @@ function ProblemHub() {
           <h2 className="text-base font-semibold text-foreground">자유 연습</h2>
           <div className="grid grid-cols-1 gap-2">
             {[
-              { id: 'random', icon: Shuffle, label: '랜덤', desc: '무작위 문제', color: 'text-blue-500 bg-blue-50' },
-              { id: 'domain', icon: BookOpen, label: '단원별', desc: '단원을 골라서 연습', color: 'text-purple-500 bg-purple-50' },
-              { id: 'tool', icon: Wrench, label: '도구별', desc: '수학 도구를 골라서 연습', color: 'text-amber-500 bg-amber-50' },
-            ].map(mode => (
-              <Link key={mode.id} to={`/problems?mode=${mode.id}`}>
+              { id: 'random', icon: Shuffle, label: '랜덤', desc: '무작위 문제', color: 'text-blue-500 bg-blue-50', action: 'go-random' },
+              { id: 'domain', icon: BookOpen, label: '단원별', desc: '단원을 골라서 연습', color: 'text-purple-500 bg-purple-50', action: 'navigate-mode' },
+              { id: 'tool', icon: Wrench, label: '도구별', desc: '수학 도구를 골라서 연습', color: 'text-amber-500 bg-amber-50', action: 'navigate-mode' },
+            ].map(item => {
+              const cardContent = (
                 <Card className="p-4 card-hover cursor-pointer">
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${mode.color}`}>
-                      <mode.icon className="w-5 h-5" />
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${item.color}`}>
+                      <item.icon className="w-5 h-5" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm text-foreground">{mode.label}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{mode.desc}</p>
+                      <p className="font-semibold text-sm text-foreground">{item.label}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{goingRandom && item.action === 'go-random' ? '불러오는 중...' : item.desc}</p>
                     </div>
                     <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                   </div>
                 </Card>
-              </Link>
-            ))}
+              );
+              if (item.action === 'go-random') {
+                return (
+                  <button key={item.id} className="w-full text-left" onClick={handleGoRandom} disabled={goingRandom}>
+                    {cardContent}
+                  </button>
+                );
+              }
+              return (
+                <Link key={item.id} to={`/problems?mode=${item.id}`}>
+                  {cardContent}
+                </Link>
+              );
+            })}
           </div>
         </section>
 
@@ -478,6 +505,13 @@ function ProblemModeView({ mode, user, navigate }) {
   useEffect(() => {
     loadData();
   }, [mode]);
+
+  useEffect(() => {
+    if (mode === 'random' && problems.length > 0) {
+      const idx = Math.floor(Math.random() * problems.length);
+      navigate(`/problem/${problems[idx].id}`, { replace: true });
+    }
+  }, [mode, problems]);
 
   const loadData = async () => {
     setLoading(true);
@@ -593,22 +627,7 @@ function ProblemModeView({ mode, user, navigate }) {
         ) : (
           <>
             {mode === 'random' && (
-              <div className="flex flex-col items-center gap-6 py-8">
-                <div className="w-24 h-24 bg-blue-50 rounded-full flex items-center justify-center">
-                  <Shuffle className="w-10 h-10 text-blue-500" />
-                </div>
-                <div className="text-center">
-                  <h2 className="text-xl font-bold">랜덤 문제</h2>
-                  <p className="text-muted-foreground mt-2">무작위로 문제를 골라볼게요!</p>
-                </div>
-                <Button size="lg" className="w-full max-w-xs" onClick={handleRandom} disabled={problems.length === 0}>
-                  <Shuffle className="w-5 h-5 mr-2" />
-                  랜덤으로 풀기
-                </Button>
-                {problems.length === 0 && (
-                  <p className="text-sm text-muted-foreground">문제가 없어요. 관리자에게 문의해 주세요.</p>
-                )}
-              </div>
+              <InlineLoader message="랜덤 문제로 이동하는 중..." />
             )}
 
             {mode === 'domain' && (
