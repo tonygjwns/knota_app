@@ -63,13 +63,8 @@ const AuthenticatedApp = () => {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
     } else if (authError.type === 'auth_required') {
-      // '/' 는 항상 Landing 렌더 (비로그인 상태여도)
-      if (window.location.pathname !== '/') {
-        // 다른 페이지면 랜딩으로 먼저 보내기
-        window.location.replace('/');
-        return null;
-      }
-      // fall through → Landing 렌더
+      // 비로그인 상태면 항상 Landing 렌더 (경로 무관)
+      return <Landing />;
     }
   }
 
