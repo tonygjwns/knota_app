@@ -87,24 +87,30 @@ Deno.serve(async (req) => {
 
     // ── check mode ──────────────────────────────────────────────────────────
     if (mode === 'check') {
-      const [toolsText, problemsText, solutionsText, knotsText] = await Promise.all([
+      const [toolsText, problemsText, solutionsText, knotsText, typesText, problemTypesText] = await Promise.all([
         fetchGithubFile('tools.json'),
         fetchGithubFile('problems.json'),
         fetchGithubFile('solutions.json'),
         fetchGithubFile('knots.jsonl'),
+        fetchGithubFile('types.json'),
+        fetchGithubFile('problem_types.json'),
       ]);
 
       const tools = JSON.parse(toolsText);
       const problems = JSON.parse(problemsText);
       const solutions = JSON.parse(solutionsText);
       const knots = parseJSONL(knotsText);
+      const types = JSON.parse(typesText);
+      const problemTypes = JSON.parse(problemTypesText);
 
-      const [dbProblems, dbSolutions, dbSteps, dbTools, dbDomains] = await Promise.all([
+      const [dbProblems, dbSolutions, dbSteps, dbTools, dbDomains, dbTypes, dbProblemTypes] = await Promise.all([
         db.entities.Problem.list('-created_date', 9999),
         db.entities.Solution.list('-created_date', 9999),
         db.entities.SolutionStep.list('-created_date', 9999),
         db.entities.MathTool.list('-created_date', 9999),
         db.entities.Domain.list('-created_date', 9999),
+        db.entities.Type.list('-created_date', 9999),
+        db.entities.ProblemType.list('-created_date', 9999),
       ]);
 
       return Response.json({
@@ -113,6 +119,8 @@ Deno.serve(async (req) => {
           solutions: solutions.length,
           knots: knots.length,
           tools: tools.length,
+          types: types.length,
+          problem_types: problemTypes.length,
         },
         db: {
           problems: dbProblems.length,
@@ -120,6 +128,8 @@ Deno.serve(async (req) => {
           solution_steps: dbSteps.length,
           tools: dbTools.length,
           domains: dbDomains.length,
+          types: dbTypes.length,
+          problem_types: dbProblemTypes.length,
         },
       });
     }
@@ -130,6 +140,7 @@ Deno.serve(async (req) => {
       const ENTITIES_TO_CLEAR = [
         'Problem', 'Solution', 'SolutionStep', 'MathTool', 'Domain',
         'StudentAttempt', 'BookmarkedProblem', 'BookmarkedTool', 'Assignment',
+        'Type', 'ProblemType',
       ];
 
       const deleted = {};
@@ -156,17 +167,21 @@ Deno.serve(async (req) => {
     }
 
     // ── Load GitHub data (shared by init + problems + all) ──────────────────
-    const [toolsText, problemsText, solutionsText, knotsText] = await Promise.all([
+    const [toolsText, problemsText, solutionsText, knotsText, typesText, problemTypesText] = await Promise.all([
       fetchGithubFile('tools.json'),
       fetchGithubFile('problems.json'),
       fetchGithubFile('solutions.json'),
       fetchGithubFile('knots.jsonl'),
+      fetchGithubFile('types.json'),
+      fetchGithubFile('problem_types.json'),
     ]);
 
     const tools = JSON.parse(toolsText);
     const problems = JSON.parse(problemsText);
     const solutions = JSON.parse(solutionsText);
     const knots = parseJSONL(knotsText);
+    const types = JSON.parse(typesText);
+    const problemTypes = JSON.parse(problemTypesText);
 
     // ── init mode ───────────────────────────────────────────────────────────
     if (mode === 'init') {
@@ -221,6 +236,20 @@ Deno.serve(async (req) => {
         await bulkCreateChunked(db, 'MathTool', newTools);
       }
 
+      // Create Types
+      const existingTypes = await db.entities.Type.list('-created_date', 9999);
+      const existingTypeIds = new Set(existingTypes.map(t => t.type_id));
+      const newTypes = types
+        .filter(t => !existingTypeIds.has(t.id))
+        .map(t => ({
+          type_id: t.id,
+          name: t.name,
+          description: t.description || null,
+          unit: t.unit || null,
+          version: t.version || null,
+        }));
+      if (newTypes.length > 0) await bulkCreateChunked(db, 'Type', newTypes);
+
       return Response.json({
         success: true,
         mode: 'init',
@@ -228,6 +257,8 @@ Deno.serve(async (req) => {
         domains_skipped: existingDomainIds.size,
         tools_created: newTools.length,
         tools_skipped: existingToolIds.size,
+        types_created: newTypes.length,
+        types_skipped: existingTypeIds.size,
       });
     }
 
@@ -342,12 +373,20 @@ Deno.serve(async (req) => {
       const solutionsCreated = await bulkCreateChunked(db, 'Solution', solutionRecords);
       const stepsCreated = await bulkCreateChunked(db, 'SolutionStep', stepRecords);
 
+      // Create ProblemTypes
+      const newPTs = problemTypes.map(pt => ({
+        problem_id: pt.problem_id,
+        type_id: pt.type_id,
+      }));
+      const ptCreated = newPTs.length > 0 ? await bulkCreateChunked(db, 'ProblemType', newPTs) : 0;
+
       return Response.json({
         success: true,
         mode: 'problems',
         problems_created: problemsCreated,
         solutions_created: solutionsCreated,
         solution_steps_created: stepsCreated,
+        problem_types_created: ptCreated,
       });
     }
 
@@ -481,15 +520,30 @@ Deno.serve(async (req) => {
       const solutionsCreated = await bulkCreateChunked(db, 'Solution', solutionRecords);
       const stepsCreated = await bulkCreateChunked(db, 'SolutionStep', stepRecords);
 
+      // Types
+      const allTypesToCreate = types.map(t => ({
+        type_id: t.id,
+        name: t.name,
+        description: t.description || null,
+        unit: t.unit || null,
+        version: t.version || null,
+      }));
+      if (allTypesToCreate.length > 0) await bulkCreateChunked(db, 'Type', allTypesToCreate);
+
+      // ProblemTypes
+      const allPTs = problemTypes.map(pt => ({ problem_id: pt.problem_id, type_id: pt.type_id }));
+      if (allPTs.length > 0) await bulkCreateChunked(db, 'ProblemType', allPTs);
+
       return Response.json({
         success: true,
         mode: 'all',
         note: 'reset은 별도로 먼저 완료해야 합니다 (mode=reset 반복 호출).',
-        init: { domains_created: newDomains.length, tools_created: newTools.length },
+        init: { domains_created: newDomains.length, tools_created: newTools.length, types_created: allTypesToCreate.length },
         problems: {
           problems_created: problemsCreated,
           solutions_created: solutionsCreated,
           solution_steps_created: stepsCreated,
+          problem_types_created: allPTs.length,
         },
       });
     }

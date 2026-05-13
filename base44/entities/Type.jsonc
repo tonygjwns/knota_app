@@ -1,0 +1,28 @@
+{
+  "name": "Type",
+  "type": "object",
+  "properties": {
+    "type_id": {
+      "type": "string",
+      "description": "\uc6d0\ubcf8 type id (\uc608: type_0001)"
+    },
+    "name": {
+      "type": "string",
+      "description": "\ub2e8\uc6d0 \uc774\ub984 (\uc608: \ub2e4\ud56d\uc2dd\uc758 \ub367\uc148\uacfc \ube84\uc148)"
+    },
+    "description": {
+      "type": "string"
+    },
+    "unit": {
+      "type": "number",
+      "description": "\ub2e8\uc6d0 \uadf8\ub8f9 \ubc88\ud638 (\ucc38\uace0\uc6a9)"
+    },
+    "version": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "type_id",
+    "name"
+  ]
+}

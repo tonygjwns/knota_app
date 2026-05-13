@@ -1,0 +1,18 @@
+{
+  "name": "ProblemType",
+  "type": "object",
+  "properties": {
+    "problem_id": {
+      "type": "string",
+      "description": "Problem.problem_id (varchar \uc6d0\ubcf8 id)"
+    },
+    "type_id": {
+      "type": "string",
+      "description": "Type.type_id"
+    }
+  },
+  "required": [
+    "problem_id",
+    "type_id"
+  ]
+}

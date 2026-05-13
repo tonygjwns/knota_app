@@ -23,6 +23,17 @@ export function gradeLabel(g) {
  * @param {Array<{grade_range?: string}>} domains
  * @returns {string[]}  예: ['1', '2', ..., '12']
  */
+export const GRADE_LABELS_SHORT = {
+  '1':'초1','2':'초2','3':'초3','4':'초4','5':'초5','6':'초6',
+  '7':'중1','8':'중2','9':'중3',
+  '10':'고1','11':'고2','12':'고3',
+};
+
+export function gradeLabelShort(g) {
+  if (g === null || g === undefined || g === '') return '';
+  return GRADE_LABELS_SHORT[String(g)] || `학년 ${g}`;
+}
+
 export function extractGradeOptions(domains) {
   return [...new Set((domains || []).map(d => d.grade_range).filter(Boolean))]
     .sort((a, b) => parseInt(a, 10) - parseInt(b, 10));

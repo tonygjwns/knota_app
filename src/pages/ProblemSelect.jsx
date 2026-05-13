@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import ScoreBadge from '@/components/ScoreBadge';
-import { gradeLabel, extractGradeOptions } from '@/lib/grade-labels.js';
+import { gradeLabel, gradeLabelShort, extractGradeOptions } from '@/lib/grade-labels.js';
 import {
   Shuffle, BookOpen, Wrench, AlertCircle, ChevronRight, ArrowLeft,
   Clock, ClipboardList, Star, Sparkles
@@ -188,7 +188,7 @@ function ProblemHub() {
   const FREE_PRACTICE_ITEMS = [
     { id: 'recommended', icon: Sparkles, label: '추천', desc: '내가 틀릴 확률이 높은 문제', color: 'text-primary bg-primary/10', action: 'navigate-mode' },
     { id: 'random', icon: Shuffle, label: '랜덤', desc: '무작위 문제', color: 'text-blue-500 bg-blue-50', action: 'go-random' },
-    { id: 'domain', icon: BookOpen, label: '단원별', desc: '학년/단원을 골라서 연습', color: 'text-purple-500 bg-purple-50', action: 'navigate-mode' },
+    { id: 'domain', icon: BookOpen, label: '단원별', desc: '영역/단원을 골라서 연습', color: 'text-purple-500 bg-purple-50', action: 'navigate-mode' },
     { id: 'tool', icon: Wrench, label: '도구별', desc: '약점 매듭부터 연습', color: 'text-amber-500 bg-amber-50', action: 'navigate-mode' },
     { id: 'wrong', icon: AlertCircle, label: '틀렸던 문제', desc: '틀렸던 문제만 골라서 연습', color: 'text-red-500 bg-red-50', action: 'navigate-mode' },
   ];
@@ -382,13 +382,14 @@ function ProblemModeView({ mode, user, navigate }) {
   const [domains, setDomains] = useState([]);
   const [tools, setTools] = useState([]);
   const [problems, setProblems] = useState([]);
+  const [types, setTypes] = useState([]);
+  const [problemTypes, setProblemTypes] = useState([]);
   const [wrongAttempts, setWrongAttempts] = useState([]);
   const [recommendedItems, setRecommendedItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // domain drill-down
-  const [subMode, setSubMode] = useState('grade');
-  const [selectedGrade, setSelectedGrade] = useState(null);
+  // domain drill-down: null = 영역 목록, Domain객체 = 그 영역의 단원 목록
+  const [selectedDomain, setSelectedDomain] = useState(null);
 
   // tool filters
   const [toolFilterGrade, setToolFilterGrade] = useState('');
@@ -401,8 +402,7 @@ function ProblemModeView({ mode, user, navigate }) {
 
   useEffect(() => {
     setLoading(true);
-    setSubMode('grade');
-    setSelectedGrade(null);
+    setSelectedDomain(null);
     loadData();
   }, [mode]);
 
@@ -490,14 +490,18 @@ function ProblemModeView({ mode, user, navigate }) {
         setProblems(allProblems);
 
       } else if (mode === 'domain') {
-        const [d, allP] = await Promise.all([
+        const [d, allP, allTypes, allPTs] = await Promise.all([
           base44.entities.Domain.list('name', 200),
           base44.entities.Problem.list('domain_id', 5000),
+          base44.entities.Type.list('name', 100),
+          base44.entities.ProblemType.list('-created_date', 500),
         ]);
         const countMap = {};
         allP.forEach(p => { if (p.domain_id) countMap[p.domain_id] = (countMap[p.domain_id] || 0) + 1; });
         setDomains(d.map(dom => ({ ...dom, problem_count: countMap[dom.domain_id] || 0 })));
         setProblems(allP);
+        setTypes(allTypes);
+        setProblemTypes(allPTs);
 
       } else if (mode === 'tool') {
         const [t, allP, allD, allAttempts] = await Promise.all([
@@ -551,15 +555,17 @@ function ProblemModeView({ mode, user, navigate }) {
     }
   };
 
-  const handleDomainSelect = async (domain) => {
-    setLoading(true);
-    try {
-      const all = await base44.entities.Problem.filter({ domain_id: domain.domain_id }, '-created_date', 1000, 0);
-      const pool = all.length > 0 ? all : problems;
+  const handleTypeSelect = (type, domainProblemIds) => {
+    const typePIds = problemTypes
+      .filter(pt => pt.type_id === type.type_id && domainProblemIds.has(pt.problem_id))
+      .map(pt => pt.problem_id);
+    const matchedProblems = problems.filter(p => typePIds.includes(p.problem_id));
+    if (matchedProblems.length === 0) {
+      const pool = problems.filter(p => domainProblemIds.has(p.problem_id));
       if (pool.length > 0) navigate(`/problem/${pool[Math.floor(Math.random() * pool.length)].id}`);
-    } finally {
-      setLoading(false);
+      return;
     }
+    navigate(`/problem/${matchedProblems[Math.floor(Math.random() * matchedProblems.length)].id}`);
   };
 
   const handleToolSelect = async (tool) => {
@@ -712,61 +718,87 @@ function ProblemModeView({ mode, user, navigate }) {
               </div>
             )}
 
-            {/* ── 단원별 (학년 → 단원 drill-down) ── */}
+            {/* ── 단원별 (영역 → 단원 drill-down) ── */}
             {mode === 'domain' && (
               <div>
-                {subMode === 'grade' && (
+                {selectedDomain === null ? (
                   <>
-                    <p className="text-muted-foreground mb-4 text-sm">어떤 학년으로 연습할까요?</p>
-                    {gradeOptions.length === 0 ? (
-                      <p className="text-center text-muted-foreground py-8">학년 정보가 없어요.</p>
-                    ) : (
-                      <div className="grid grid-cols-2 gap-2">
-                        {gradeOptions.map(g => (
-                          <Card key={g} className="p-4 card-hover cursor-pointer"
-                                onClick={() => { setSelectedGrade(g); setSubMode('domain'); }}>
-                            <div className="flex items-center justify-between">
-                              <p className="font-semibold text-foreground text-sm">{gradeLabel(g)}</p>
-                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                            </div>
-                          </Card>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {subMode === 'domain' && (
-                  <>
-                    <button
-                      className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4"
-                      onClick={() => setSubMode('grade')}
-                    >
-                      <ArrowLeft className="w-4 h-4" /> {gradeLabel(selectedGrade)}
-                    </button>
-                    <p className="text-muted-foreground mb-4 text-sm">어떤 단원으로 연습할까요?</p>
-                    {domainsForGrade(selectedGrade).length === 0 ? (
-                      <p className="text-center text-muted-foreground py-8">해당 학년의 단원이 없어요.</p>
+                    <p className="text-muted-foreground mb-4 text-sm">어떤 영역으로 연습할까요?</p>
+                    {domains.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-8">영역 정보가 없어요.</p>
                     ) : (
                       <div className="space-y-2">
-                        {domainsForGrade(selectedGrade).map(domain => (
+                        {[...domains].sort((a, b) => parseInt(a.grade_range || 0) - parseInt(b.grade_range || 0)).map(domain => (
                           <Card key={domain.id} className="p-4 card-hover cursor-pointer"
-                                onClick={() => handleDomainSelect(domain)}>
+                                onClick={() => setSelectedDomain(domain)}>
                             <div className="flex items-center justify-between">
-                              <div>
+                              <div className="flex items-center gap-2 min-w-0">
                                 <p className="font-semibold text-foreground">{domain.name}</p>
-                                {domain.problem_count > 0 && (
-                                  <p className="text-xs text-muted-foreground mt-0.5">{domain.problem_count}문제</p>
+                                {domain.grade_range && (
+                                  <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full flex-shrink-0">
+                                    {gradeLabelShort(domain.grade_range)}
+                                  </span>
                                 )}
                               </div>
-                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                {domain.problem_count > 0 && (
+                                  <span className="text-xs text-muted-foreground">{domain.problem_count}문제</span>
+                                )}
+                                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                              </div>
                             </div>
                           </Card>
                         ))}
                       </div>
                     )}
                   </>
-                )}
+                ) : (() => {
+                  const domainProblems = problems.filter(p => p.domain_id === selectedDomain.domain_id);
+                  const domainProblemIds = new Set(domainProblems.map(p => p.problem_id));
+                  const typeIdsInDomain = new Set(
+                    problemTypes.filter(pt => domainProblemIds.has(pt.problem_id)).map(pt => pt.type_id)
+                  );
+                  const typesInDomain = types
+                    .filter(t => typeIdsInDomain.has(t.type_id))
+                    .map(t => {
+                      const typePIds = new Set(
+                        problemTypes.filter(pt => pt.type_id === t.type_id && domainProblemIds.has(pt.problem_id))
+                                    .map(pt => pt.problem_id)
+                      );
+                      return { ...t, problem_count: typePIds.size };
+                    });
+                  return (
+                    <>
+                      <button
+                        className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4"
+                        onClick={() => setSelectedDomain(null)}
+                      >
+                        <ArrowLeft className="w-4 h-4" /> {selectedDomain.name}
+                      </button>
+                      <p className="text-muted-foreground mb-4 text-sm">어떤 단원으로 연습할까요?</p>
+                      {typesInDomain.length === 0 ? (
+                        <p className="text-center text-muted-foreground py-8">해당 영역의 단원 정보가 없어요.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {typesInDomain.map(t => (
+                            <Card key={t.id} className="p-4 card-hover cursor-pointer"
+                                  onClick={() => handleTypeSelect(t, domainProblemIds)}>
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold text-foreground">{t.name}</p>
+                                  {t.problem_count > 0 && (
+                                    <p className="text-xs text-muted-foreground mt-0.5">{t.problem_count}문제</p>
+                                  )}
+                                </div>
+                                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             )}
 
