@@ -169,6 +169,23 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
         } catch { /* silent */ }
       }
 
+      // preselectedToolId → 도메인/학년 자동 선택
+      if (preselectedToolId) {
+        const tool = toolsData.find(t => t.tool_id === preselectedToolId);
+        if (tool) {
+          try {
+            const domainIds = JSON.parse(tool.domain_ids || '[]');
+            if (domainIds.length > 0) {
+              const domain = domainsData.find(d => d.domain_id === domainIds[0]);
+              if (domain) {
+                setSelectedGrade(domain.grade_range);
+                setSelectedDomainId(domain.domain_id);
+              }
+            }
+          } catch { /* silent */ }
+        }
+      }
+
       // 즐겨찾기 로드
       try {
         const me = await base44.auth.me();
