@@ -125,6 +125,11 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
     preselectedToolId ? new Set([preselectedToolId]) : new Set()
   );
 
+  // 유형 필터
+  const [allTypes, setAllTypes] = useState([]);
+  const [allProblemTypes, setAllProblemTypes] = useState([]);
+  const [selectedTypeIds, setSelectedTypeIds] = useState(new Set());
+
   // 직접 선택
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -137,14 +142,18 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
   // 초기화
   useEffect(() => {
     const init = async () => {
-      const [toolsData, domainsData, problemsData] = await Promise.all([
+      const [toolsData, domainsData, problemsData, typesData, ptData] = await Promise.all([
         base44.entities.MathTool.list('name', 300),
         base44.entities.Domain.list('grade_range', 100),
         base44.entities.Problem.list('-created_date', 1000),
+        base44.entities.Type.list('name', 100),
+        base44.entities.ProblemType.list('-created_date', 5000),
       ]);
       setAllTools(toolsData);
       setAllDomains(domainsData);
       setAllProblems(problemsData);
+      setAllTypes(typesData);
+      setAllProblemTypes(ptData);
       setGrades(extractGradeOptions(domainsData));
       setDataLoading(false);
 
@@ -174,17 +183,19 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
     init();
   }, [classId, preselectedToolId]);
 
-  // 학년 선택 시 단원/도구 리셋
+  // 학년 선택 시 단원/도구/유형 리셋
   const handleGradeChange = (g) => {
     setSelectedGrade(g);
     setSelectedDomainId('');
     setSelectedToolIds(new Set());
+    setSelectedTypeIds(new Set());
   };
 
-  // 단원 선택 시 도구 리셋
+  // 단원 선택 시 도구/유형 리셋
   const handleDomainChange = (d) => {
     setSelectedDomainId(d);
     setSelectedToolIds(new Set());
+    setSelectedTypeIds(new Set());
   };
 
   const filteredDomains = useMemo(
@@ -194,15 +205,42 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
 
   const selectedDomainObj = allDomains.find(d => d.domain_id === selectedDomainId);
 
+  // 도메인의 유형 chip 목록
+  const domainTypeChips = useMemo(() => {
+    if (!selectedDomainId) return [];
+    const domainProblems = allProblems.filter(p => p.domain_id === selectedDomainId);
+    const domainProblemIds = new Set(domainProblems.map(p => p.problem_id));
+    const typeIdsInDomain = new Set(
+      allProblemTypes.filter(pt => domainProblemIds.has(pt.problem_id)).map(pt => pt.type_id)
+    );
+    return allTypes.filter(t => typeIdsInDomain.has(t.type_id));
+  }, [allTypes, allProblemTypes, allProblems, selectedDomainId]);
+
+  // 선택된 유형으로 문제 ID 집합
+  const typeFilteredProblemIds = useMemo(() => {
+    if (selectedTypeIds.size === 0) return null; // null = 필터 없음
+    return new Set(
+      allProblemTypes.filter(pt => selectedTypeIds.has(pt.type_id)).map(pt => pt.problem_id)
+    );
+  }, [allProblemTypes, selectedTypeIds]);
+
   const filteredTools = useMemo(() => {
     if (!selectedDomainId) return [];
-    return allTools.filter(t => {
+    const domainTools = allTools.filter(t => {
       try {
         const ids = JSON.parse(t.domain_ids || '[]');
         return ids.includes(selectedDomainId);
       } catch { return false; }
     });
-  }, [allTools, selectedDomainId]);
+    if (!typeFilteredProblemIds) return domainTools;
+    // 선택된 유형에 속하는 문제가 1개라도 있는 도구만
+    return domainTools.filter(tool =>
+      allProblems.some(p => {
+        if (!typeFilteredProblemIds.has(p.problem_id)) return false;
+        try { return JSON.parse(p.tool_ids || '[]').includes(tool.tool_id); } catch { return false; }
+      })
+    );
+  }, [allTools, allProblems, selectedDomainId, typeFilteredProblemIds]);
 
   const toggleToolId = (toolId) => {
     setSelectedToolIds(prev => {
@@ -212,7 +250,7 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
     });
   };
 
-  // 선택된 도구들의 문제 합집합 (미리보기)
+  // 선택된 도구들의 문제 합집합 (유형 필터 포함)
   const previewProblems = useMemo(() => {
     if (selectedToolIds.size === 0) return [];
     const seen = new Set();
@@ -220,14 +258,13 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
     for (const p of allProblems) {
       try {
         const tids = JSON.parse(p.tool_ids || '[]');
-        if (tids.some(t => selectedToolIds.has(t)) && !seen.has(p.id)) {
-          seen.add(p.id);
-          out.push(p);
-        }
+        if (!tids.some(t => selectedToolIds.has(t))) continue;
+        if (typeFilteredProblemIds && !typeFilteredProblemIds.has(p.problem_id)) continue;
+        if (!seen.has(p.id)) { seen.add(p.id); out.push(p); }
       } catch { /* skip */ }
     }
     return out;
-  }, [allProblems, selectedToolIds]);
+  }, [allProblems, selectedToolIds, typeFilteredProblemIds]);
 
   // previewProblems 변경 시 selectedProblems 동기화 (도구 선택 기반 자동 추가 — 단, 직접 제외한 것은 유지)
   const [manuallyExcluded, setManuallyExcluded] = useState(new Set());
@@ -375,6 +412,38 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* 유형 chip 행 */}
+                {selectedDomainId && domainTypeChips.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-semibold mb-2">유형 필터 <span className="text-xs font-normal text-muted-foreground">(선택 사항, 다중 선택)</span></label>
+                    <div className="flex flex-wrap gap-2">
+                      {domainTypeChips.map(t => (
+                        <button
+                          key={t.type_id}
+                          type="button"
+                          onClick={() => setSelectedTypeIds(prev => {
+                            const next = new Set(prev);
+                            next.has(t.type_id) ? next.delete(t.type_id) : next.add(t.type_id);
+                            return next;
+                          })}
+                          className={`rounded-full text-xs px-3 py-1.5 border transition-colors ${
+                            selectedTypeIds.has(t.type_id)
+                              ? 'bg-primary text-primary-foreground border-primary'
+                              : 'bg-card text-foreground border-border hover:bg-muted'
+                          }`}
+                        >{t.name}</button>
+                      ))}
+                      {selectedTypeIds.size > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTypeIds(new Set())}
+                          className="rounded-full text-xs px-3 py-1.5 border border-dashed border-muted-foreground text-muted-foreground hover:bg-muted transition-colors"
+                        >전체 해제</button>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* 도구 목록 */}
                 {selectedDomainId && (

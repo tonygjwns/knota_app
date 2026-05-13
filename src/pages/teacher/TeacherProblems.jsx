@@ -20,9 +20,12 @@ export default function TeacherProblems() {
   const [domains, setDomains] = useState([]);
   const [tools, setTools] = useState([]);
   const [problems, setProblems] = useState([]);
+  const [types, setTypes] = useState([]);
+  const [problemTypes, setProblemTypes] = useState([]);
   const [solutionCountMap, setSolutionCountMap] = useState(new Map()); // problem_id → count
   const [bookmarkedProblemIds, setBookmarkedProblemIds] = useState(new Set());
   const [bookmarkIdMap, setBookmarkIdMap] = useState(new Map());
+  const [selectedTypeId, setSelectedTypeId] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -32,12 +35,14 @@ export default function TeacherProblems() {
   const loadBase = async () => {
     setLoading(true);
     try {
-      const [allDomains, allTools, allProblems, allSolutions, myBookmarks] = await Promise.all([
+      const [allDomains, allTools, allProblems, allSolutions, myBookmarks, allTypes, allPTs] = await Promise.all([
         base44.entities.Domain.list('grade_range', 50),
         base44.entities.MathTool.list('name', 200),
         base44.entities.Problem.list('-created_date', 1000),
         base44.entities.Solution.list('-created_date', 2000),
         base44.entities.BookmarkedProblem.filter({ user_id: user.id }, '-created_date', 500),
+        base44.entities.Type.list('name', 100),
+        base44.entities.ProblemType.list('-created_date', 5000),
       ]);
 
       // Domain: grade_range 기준 정렬 (숫자 먼저, 그 다음 나머지)
@@ -59,6 +64,8 @@ export default function TeacherProblems() {
       setDomains(sortedDomains);
       setTools(allTools);
       setProblems(allProblems);
+      setTypes(allTypes);
+      setProblemTypes(allPTs);
       setSolutionCountMap(countMap);
       setBookmarkedProblemIds(new Set(myBookmarks.map(b => b.problem_id)));
       setBookmarkIdMap(new Map(myBookmarks.map(b => [b.problem_id, b.id])));
@@ -88,8 +95,45 @@ export default function TeacherProblems() {
   };
 
   const handleBack = () => {
-    if (step === 'tool') { setStep('domain'); setSelectedDomain(null); }
+    if (step === 'tool') { setStep('domain'); setSelectedDomain(null); setSelectedTypeId(null); }
     else if (step === 'problem') { setStep('tool'); setSelectedTool(null); }
+  };
+
+  // 해당 도메인 문제들의 type chip 계산
+  const getTypesForDomain = (domain) => {
+    const domainProblems = problems.filter(p => p.domain_id === domain.domain_id);
+    const domainProblemIds = new Set(domainProblems.map(p => p.problem_id));
+    const typeIdsInDomain = new Set(
+      problemTypes.filter(pt => domainProblemIds.has(pt.problem_id)).map(pt => pt.type_id)
+    );
+    return types.filter(t => typeIdsInDomain.has(t.type_id));
+  };
+
+  // 도구 필터링 (selectedTypeId 적용)
+  const getFilteredToolsForDomain = (domain) => {
+    const base = toolsForDomain(domain);
+    if (!selectedTypeId) return base;
+    const domainProblems = problems.filter(p => p.domain_id === domain.domain_id);
+    const domainProblemIds = new Set(domainProblems.map(p => p.problem_id));
+    const typeProblems = new Set(
+      problemTypes.filter(pt => pt.type_id === selectedTypeId && domainProblemIds.has(pt.problem_id)).map(pt => pt.problem_id)
+    );
+    return base.filter(tool => {
+      return problems.some(p => {
+        if (!typeProblems.has(p.problem_id)) return false;
+        try { return JSON.parse(p.tool_ids || '[]').includes(tool.tool_id); } catch { return false; }
+      });
+    });
+  };
+
+  // 문제 필터링 (selectedTypeId 적용)
+  const getFilteredProblemsForTool = (tool) => {
+    const base = problemsForTool(tool);
+    if (!selectedTypeId) return base;
+    const typeProblems = new Set(
+      problemTypes.filter(pt => pt.type_id === selectedTypeId).map(pt => pt.problem_id)
+    );
+    return base.filter(p => typeProblems.has(p.problem_id));
   };
 
   const toggleBookmark = async (problem) => {
@@ -166,7 +210,8 @@ export default function TeacherProblems() {
 
   // ── 도구 선택 ──
   if (step === 'tool') {
-    const domainTools = toolsForDomain(selectedDomain);
+    const domainTypesChips = getTypesForDomain(selectedDomain);
+    const domainTools = getFilteredToolsForDomain(selectedDomain);
     return (
       <div className="space-y-5 pb-8">
         <div className="flex items-center gap-3">
@@ -178,12 +223,38 @@ export default function TeacherProblems() {
             <p className="text-sm text-muted-foreground">도구를 선택하세요</p>
           </div>
         </div>
+
+        {/* 유형 chip 행 */}
+        {domainTypesChips.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setSelectedTypeId(null)}
+              className={`rounded-full text-xs px-3 py-1.5 border transition-colors ${
+                selectedTypeId === null
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-card text-foreground border-border hover:bg-muted'
+              }`}
+            >전체</button>
+            {domainTypesChips.map(t => (
+              <button
+                key={t.type_id}
+                onClick={() => setSelectedTypeId(selectedTypeId === t.type_id ? null : t.type_id)}
+                className={`rounded-full text-xs px-3 py-1.5 border transition-colors ${
+                  selectedTypeId === t.type_id
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-card text-foreground border-border hover:bg-muted'
+                }`}
+              >{t.name}</button>
+            ))}
+          </div>
+        )}
+
         {domainTools.length === 0 ? (
           <p className="text-muted-foreground text-sm">이 단원에 등록된 도구가 없어요.</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {domainTools.map(tool => {
-              const pCnt = problemsForTool(tool).length;
+              const pCnt = getFilteredProblemsForTool(tool).length;
               return (
                 <Card
                   key={tool.id}
@@ -211,7 +282,8 @@ export default function TeacherProblems() {
   }
 
   // ── 문제 목록 ──
-  const toolProblems = problemsForTool(selectedTool);
+  const toolProblems = getFilteredProblemsForTool(selectedTool);
+  const problemTypesChips = selectedDomain ? getTypesForDomain(selectedDomain) : [];
   return (
     <div className="space-y-5 pb-8">
       <div className="flex items-center gap-3">
@@ -228,6 +300,31 @@ export default function TeacherProblems() {
           )}
         </div>
       </div>
+
+      {/* 유형 chip 행 (문제 화면에서도 유지) */}
+      {problemTypesChips.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setSelectedTypeId(null)}
+            className={`rounded-full text-xs px-3 py-1.5 border transition-colors ${
+              selectedTypeId === null
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'bg-card text-foreground border-border hover:bg-muted'
+            }`}
+          >전체</button>
+          {problemTypesChips.map(t => (
+            <button
+              key={t.type_id}
+              onClick={() => setSelectedTypeId(selectedTypeId === t.type_id ? null : t.type_id)}
+              className={`rounded-full text-xs px-3 py-1.5 border transition-colors ${
+                selectedTypeId === t.type_id
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-card text-foreground border-border hover:bg-muted'
+              }`}
+            >{t.name}</button>
+          ))}
+        </div>
+      )}
 
       {toolProblems.length === 0 ? (
         <p className="text-muted-foreground text-sm">이 도구에 연결된 문제가 없어요.</p>
