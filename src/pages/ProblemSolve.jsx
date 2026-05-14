@@ -324,9 +324,9 @@ export default function ProblemSolve() {
       const ocrText = ocrResult?.markdown_text || '';
       if (!ocrText) throw new Error('OCR 결과가 없어요');
 
-      // ───── Stage 2: 인식 오류 체크 (match 아닌 모든 경우) ─────
+      // ───── Stage 2: 인식 오류 체크 (Stage 1 = no_match 인 경우만) ─────
       let stage2Result = null;
-      if (verifiedAnswer && imageSource && stage1Result?.result !== 'match') {
+      if (stage1Result?.result === 'no_match' && verifiedAnswer) {
         setStage('checking');
         stage2Result = await checkSolutionReachesAnswer(
           { problemText, ocrText, verifiedAnswer, studentAnswer: extractedAnswerText || '' },

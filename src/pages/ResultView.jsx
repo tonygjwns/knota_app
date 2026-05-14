@@ -138,17 +138,14 @@ export default function ResultView() {
   // isFastGrade: 빠른 채점으로 즉시 처리된 케이스
   const isFastGradeRef = useRef(false);
 
-  const summaryMode = searchParams.get('summary') === 'true';
-
-  // showDetail: Stage 3 오답은 처음부터 펼침, summaryMode면 항상 접힘
+  // showDetail: Stage 3 오답은 처음부터 펼침
   useEffect(() => {
     if (attempt) {
       const fast = attempt.answer_check_result === 'correct' || attempt.answer_check_result === 'correct_via_solution';
       isFastGradeRef.current = fast;
-      if (summaryMode) { setShowDetail(false); return; }
       if (!fast) setShowDetail(true);
     }
-  }, [attempt?.id, summaryMode]);
+  }, [attempt?.id]);
 
   // 5초 polling — 빠른 채점 + 백그라운드 완료 대기
   useEffect(() => {
@@ -574,14 +571,6 @@ JSON: {"markdown_text": "풀이 (LaTeX 포함)", "confidence": 0-100, "notes": "
 
   const isFastGrade = attempt.answer_check_result === 'correct' || attempt.answer_check_result === 'correct_via_solution';
 
-  const problemText = (() => {
-    if (!problem) return '';
-    try {
-      const arr = JSON.parse(problem.content || '[]');
-      return Array.isArray(arr) ? arr.map(b => b.text || '').join('\n\n') : String(problem.content || '');
-    } catch { return String(problem.content || ''); }
-  })();
-
   const score = attempt.score || 0;
   const scoreColor = score >= 80 ? 'from-emerald-50 to-emerald-100/50 border-emerald-200' :
                      score >= 40 ? 'from-amber-50 to-amber-100/50 border-amber-200' :
@@ -672,7 +661,7 @@ JSON: {"markdown_text": "풀이 (LaTeX 포함)", "confidence": 0-100, "notes": "
           )}
         </div>
 
-        {/* 점수 카드 — 항상 표시 */}
+        {/* Score card */}
         <Card className={`p-6 bg-gradient-to-br ${scoreColor} border text-center`}>
           <div className="text-6xl font-bold mb-2" style={{
             color: score >= 80 ? '#059669' : score >= 40 ? '#d97706' : '#dc2626'
@@ -682,106 +671,55 @@ JSON: {"markdown_text": "풀이 (LaTeX 포함)", "confidence": 0-100, "notes": "
           <div className="text-xl font-semibold mt-2">
             <ScoreSummaryText score={score} />
           </div>
+          {attempt?.answer_check_result === 'correct' && (
+            <p className="text-sm text-emerald-700 font-medium mt-2">정답을 맞췄어요!</p>
+          )}
+          {attempt?.answer_check_result === 'correct_via_solution' && (
+            <p className="text-sm text-amber-700 font-medium mt-2">풀이가 정답에 도달했어요! (답안 인식에 오타가 있었나봐요)</p>
+          )}
           {grading?.summary && (
             <p className="text-muted-foreground text-sm mt-3 leading-relaxed">{grading.summary}</p>
           )}
-          {/* 메타 정보 */}
-          <div className="flex gap-2 text-xs text-muted-foreground justify-center mt-3 flex-wrap">
-            {problem?.domain_name && <span>{problem.domain_name}</span>}
-            {attempt?.submitted_at && (
-              <>
-                <span>·</span>
-                <span>{new Date(attempt.submitted_at).toLocaleDateString('ko-KR', {
-                  month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                })}</span>
-              </>
-            )}
-            {attempt?.duration_sec > 0 && (
-              <>
-                <span>·</span>
-                <span>{Math.floor(attempt.duration_sec / 60)}분 {attempt.duration_sec % 60}초</span>
-              </>
-            )}
-          </div>
-          {/* 매칭 별해 뱃지 */}
-          {grading?.matched_solution_id && matchedSolution && (
-            <div className="mt-3">
-              <span className="inline-block text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
-                🎯 풀이 #{matchedSolution.priority} 방식{matchedSolution.priority === 1 ? ' (대표)' : ''}
-              </span>
-            </div>
-          )}
-          {/* 강사 검토 뱃지 */}
-          {attempt?.review_resolved_at && (
-            <div className="mt-2">
-              <span className="inline-block text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
-                📝 선생님 검토 완료
-              </span>
-            </div>
-          )}
         </Card>
 
-        {/* 문제 + 학생 답 / 정답 / 상세 버튼 */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* 좌측: 문제 본문 */}
-          <Card className="lg:col-span-2 p-4 bg-blue-50/50 border-blue-100">
-            <p className="text-xs text-muted-foreground mb-2 font-medium">문제</p>
-            {problem ? (
-              <MathRenderer content={problemText} className="text-sm" />
+        {/* 학생 답안 표시 */}
+        {attempt?.student_answer && (
+          <div className="bg-muted/40 rounded-lg p-3 space-y-2">
+            <p className="text-xs text-muted-foreground">학생이 적은 답</p>
+            <MathRenderer content={attempt.student_answer} className="text-base" />
+          </div>
+        )}
+
+        {/* AI 상세 채점 카드 — 빠른 채점 + 미펼침일 때만 */}
+        {isFastGrade && !showDetail && (
+          <Card className="p-4 border-primary/30 bg-primary/5">
+            {!grading ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <svg className="animate-spin w-4 h-4 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"/>
+                    <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" className="opacity-75"/>
+                  </svg>
+                  <p className="text-sm font-medium">AI가 상세하게 채점 중이에요</p>
+                </div>
+                <p className="text-xs text-muted-foreground">잠시 후 단계별 피드백과 사용된 도구를 확인할 수 있어요</p>
+                <Button size="sm" disabled className="w-full">상세 결과 보기 (분석 중...)</Button>
+              </div>
+            ) : attempt.tool_mapping_status === 'failed' ? (
+              <div>
+                <p className="text-sm font-medium text-red-600 mb-1">✗ 상세 채점에 실패했어요</p>
+                <p className="text-xs text-muted-foreground">채점 결과는 정상이지만 단계별 분석은 진행되지 못했어요</p>
+              </div>
             ) : (
-              <p className="text-sm text-muted-foreground">문제를 불러오는 중...</p>
+              <div className="space-y-2">
+                <p className="text-sm font-medium">✓ AI 채점이 완료됐어요</p>
+                <Button size="sm" className="w-full" onClick={() => setShowDetail(true)}>
+                  상세 결과 보기 <ChevronRight className="w-3 h-3 ml-1" />
+                </Button>
+              </div>
             )}
           </Card>
-
-          {/* 우측: 학생 답 / 실제 정답 / 상세 버튼 */}
-          <div className="space-y-2">
-            <Card className="p-3">
-              <p className="text-xs text-muted-foreground mb-1 font-medium">학생 정답</p>
-              {attempt?.student_answer ? (
-                <MathRenderer
-                  content={attempt.student_answer.includes('$') ? attempt.student_answer : `$${attempt.student_answer}$`}
-                  className="text-base"
-                />
-              ) : (
-                <p className="text-sm text-muted-foreground italic">(답을 적지 않음)</p>
-              )}
-            </Card>
-
-            {problem?.verified_answer && (
-              <Card className="p-3 bg-emerald-50 border-emerald-200">
-                <p className="text-xs text-emerald-700 mb-1 font-medium">실제 정답</p>
-                <MathRenderer
-                  content={problem.verified_answer.includes('$') ? problem.verified_answer : `$${problem.verified_answer}$`}
-                  className="text-base"
-                />
-              </Card>
-            )}
-
-            {/* "내 풀이 상세" 버튼 — !showDetail 일 때만 */}
-            {!showDetail && (
-              isFastGrade && !grading ? (
-                <Card className="p-3 border-primary/30 bg-primary/5 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <svg className="animate-spin w-4 h-4 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"/>
-                      <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" className="opacity-75"/>
-                    </svg>
-                    <p className="text-xs font-medium">AI 채점 중...</p>
-                  </div>
-                  <Button size="sm" disabled className="w-full">내 풀이 상세 (분석 중...)</Button>
-                </Card>
-              ) : isFastGrade && attempt.tool_mapping_status === 'failed' ? (
-                <Card className="p-3">
-                  <p className="text-xs text-muted-foreground">상세 채점 실패</p>
-                </Card>
-              ) : (
-                <Button className="w-full" onClick={() => setShowDetail(true)}>
-                  내 풀이 상세 <ChevronRight className="w-4 h-4 ml-1" />
-                </Button>
-              )
-            )}
-          </div>
-        </div>
+        )}
 
         {/* Tools used chips */}
         {showDetail && tools.length > 0 && grading && (
