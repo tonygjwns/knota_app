@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { redirectByRole } from '@/lib/auth-utils';
@@ -113,9 +113,10 @@ export default function ResultView() {
   const [loading, setLoading] = useState(true);
   const [grading, setGrading] = useState(null);
   const [showOCR, setShowOCR] = useState(false);
-  const [editingOCR, setEditingOCR] = useState(false);
-  const [correctedText, setCorrectedText] = useState('');
-  const [regrading, setRegrading] = useState(false);
+  const [showDetail, setShowDetail] = useState(false);
+  const [showOcrComplainModal, setShowOcrComplainModal] = useState(false);
+  const [ocrHint, setOcrHint] = useState('');
+  const [reRecognizing, setReRecognizing] = useState(false);
   const [showAlt, setShowAlt] = useState(false);
   const [tooltipTool, setTooltipTool] = useState(null); // tool entity for tooltip modal
   const [bookmarkedToolIds, setBookmarkedToolIds] = useState(new Set());
@@ -133,6 +134,46 @@ export default function ResultView() {
   useEffect(() => {
     loadAttempt();
   }, [id]);
+
+  // isFastGrade: 빠른 채점으로 즉시 처리된 케이스
+  const isFastGradeRef = useRef(false);
+
+  // showDetail: Stage 3 오답은 처음부터 펼침
+  useEffect(() => {
+    if (attempt) {
+      const fast = attempt.answer_check_result === 'correct' || attempt.answer_check_result === 'correct_via_solution';
+      isFastGradeRef.current = fast;
+      if (!fast) setShowDetail(true);
+    }
+  }, [attempt?.id]);
+
+  // 5초 polling — 빠른 채점 + 백그라운드 완료 대기
+  useEffect(() => {
+    if (!attempt) return;
+    const fast = attempt.answer_check_result === 'correct' || attempt.answer_check_result === 'correct_via_solution';
+    if (!fast || grading) return;
+    if (attempt.tool_mapping_status !== 'pending') return;
+
+    const interval = setInterval(async () => {
+      try {
+        const [updated] = await base44.entities.StudentAttempt.filter({ id: attempt.id }, '-created_date', 1);
+        if (!updated) return;
+        if (updated.claude_grade_json || updated.tool_mapping_status === 'done' || updated.tool_mapping_status === 'failed') {
+          setAttempt(updated);
+          if (updated.claude_grade_json) {
+            try {
+              const parsed = JSON.parse(updated.claude_grade_json);
+              setGrading(parsed?.response ?? parsed);
+            } catch {}
+          }
+          clearInterval(interval);
+        }
+      } catch {}
+    }, 5000);
+
+    const timeout = setTimeout(() => clearInterval(interval), 5 * 60 * 1000);
+    return () => { clearInterval(interval); clearTimeout(timeout); };
+  }, [attempt?.id, grading]);
 
   const loadAttempt = async () => {
     setLoading(true);
@@ -169,7 +210,7 @@ export default function ResultView() {
             setGrading(parsed?.response ?? parsed);
           } catch {}
         }
-        setCorrectedText(a.ocr_corrected_text || a.ocr_text || '');
+        // setCorrectedText removed (OCR edit replaced by re-recognize modal)
 
         // Fetch problem + tools
         if (a.problem_id) {
@@ -285,58 +326,105 @@ export default function ResultView() {
     if (entity) setTooltipTool(entity);
   };
 
-  const handleRegrade = async () => {
-    if (!attempt || !correctedText.trim()) return;
-    setRegrading(true);
+  const handleOCRReRecognize = async () => {
+    if (!attempt || !problem) return;
+    setReRecognizing(true);
+    setShowOcrComplainModal(false);
     try {
-      const toolsBlock = buildToolsBlock(tools);
-      const solutionsSlice = solutions.slice(0, 5);
+      const imageUrl = attempt.canvas_image_url || attempt.photo_url;
+      if (!imageUrl) { toast.error('원본 풀이 이미지가 없어요'); return; }
+
+      const reRecognizePrompt = `당신은 한국 K-12 수학 손글씨 풀이 OCR 전문가입니다.
+
+이 학생의 손글씨 풀이를 OCR 해주세요. JSON 으로 응답.
+
+이전 OCR 결과는 다음과 같았어요:
+"""
+${attempt.ocr_text || ''}
+"""
+
+학생이 이 OCR 결과가 잘못됐다고 신고했어요.
+${ocrHint.trim() ? `학생 힌트: "${ocrHint.trim()}"` : ''}
+좀 더 신중히 다시 인식해 주세요. LaTeX 표기 정확히, 학생이 안 쓴 내용 추가 금지.
+
+JSON: {"markdown_text": "풀이 (LaTeX 포함)", "confidence": 0-100, "notes": "특이사항"}`;
+
+      const ocrRaw = await base44.integrations.Core.InvokeLLM({
+        prompt: reRecognizePrompt,
+        file_urls: [imageUrl],
+        model: 'gemini_3_flash',
+        response_json_schema: {
+          type: 'object',
+          properties: {
+            markdown_text: { type: 'string' },
+            confidence: { type: 'number' },
+            notes: { type: 'string' },
+          },
+          required: ['markdown_text'],
+        },
+      });
+      const newOcrText = (ocrRaw?.response ?? ocrRaw)?.markdown_text || '';
+      if (!newOcrText) throw new Error('OCR 결과 없음');
+
+      const problemText = (() => {
+        try { return JSON.parse(problem.content || '[]').map(b => b.text || '').join('\n\n'); }
+        catch { return String(problem.content || ''); }
+      })();
+      const verifiedAnswer = problem.verified_answer || '';
+      const toolIds = (() => { try { return JSON.parse(problem.tool_ids || '[]'); } catch { return []; } })();
+      const [allTools, allSolutions] = await Promise.all([
+        toolIds.length > 0 ? base44.entities.MathTool.list('name', 100) : Promise.resolve([]),
+        base44.entities.Solution.filter({ problem_id: problem.problem_id }, 'priority', 20),
+      ]);
+      const relevantTools = allTools.filter(t => toolIds.includes(t.tool_id));
+      const toolsBlock = buildToolsBlock(relevantTools);
+      const solutionsSlice = allSolutions.slice(0, 5);
       const solutionIds = solutionsSlice.map(s => s.solution_id);
-
-      // stepsBySolutionId Map for buildSolutionsBlock + sanitize
-      const stepsBySolMap = new Map();
-      solutionsSlice.forEach(sol => {
-        stepsBySolMap.set(sol.solution_id, solutionSteps.filter(s => s.solution_id === sol.solution_id));
-      });
-
-      const solutionsBlock = buildSolutionsBlock(solutionsSlice, stepsBySolMap, tools);
+      const stepsBySol = new Map();
+      if (solutionIds.length > 0) {
+        const stepArrays = await Promise.all(
+          solutionIds.map(sid => base44.entities.SolutionStep.filter({ solution_id: sid }, 'sequence_order', 50))
+        );
+        solutionIds.forEach((sid, i) => stepsBySol.set(sid, stepArrays[i]));
+      }
+      const solutionsBlock = buildSolutionsBlock(solutionsSlice, stepsBySol, relevantTools);
       const gradingPrompt = buildGradingPrompt({
-        problemText: attempt.problem_content,
-        verifiedAnswer: problem?.verified_answer,
-        solutionsBlock,
-        toolsBlock,
-        studentOcrSolution: correctedText,
+        problemText, verifiedAnswer, solutionsBlock, toolsBlock,
+        studentOcrSolution: newOcrText,
+        studentAnswer: attempt.student_answer || '',
       });
-
-      const resultRaw = await base44.integrations.Core.InvokeLLM({
+      const gradeRaw = await base44.integrations.Core.InvokeLLM({
         prompt: gradingPrompt,
         model: 'claude_sonnet_4_6',
         response_json_schema: GRADING_SCHEMA,
       });
-
-      const resultRawData = resultRaw?.response ?? resultRaw;
-      const result = sanitizeGradingResult(resultRawData, {
-        validToolIds: new Set(tools.map(t => t.tool_id)),
+      const gradeResult = sanitizeGradingResult(gradeRaw?.response ?? gradeRaw, {
+        validToolIds: new Set(relevantTools.map(t => t.tool_id)),
         validSolutionIds: new Set(solutionIds),
-        stepsBySolutionId: stepsBySolMap,
+        stepsBySolutionId: stepsBySol,
       });
-
       await base44.entities.StudentAttempt.update(attempt.id, {
-        ocr_corrected_text: correctedText,
-        claude_grade_json: JSON.stringify(result),
-        score: result?.score || 0,
-        correctness: result?.correctness || 'wrong',
+        ocr_text: newOcrText,
+        claude_grade_json: JSON.stringify(gradeResult),
+        score: gradeResult.score || 0,
+        correctness: gradeResult.correctness || 'wrong',
       });
-
-      setGrading(result);
-      setAttempt(prev => ({ ...prev, score: result?.score || 0, correctness: result?.correctness }));
-      setEditingOCR(false);
-      toast.success('다시 채점됐어요!');
+      setGrading(gradeResult);
+      setAttempt(prev => ({
+        ...prev,
+        ocr_text: newOcrText,
+        score: gradeResult.score || 0,
+        correctness: gradeResult.correctness || 'wrong',
+        claude_grade_json: JSON.stringify(gradeResult),
+      }));
+      setOcrHint('');
+      setShowDetail(true);
+      toast.success('다시 인식해서 채점했어요!');
     } catch (err) {
       console.error(err);
-      toast.error('다시 채점 중 문제가 생겼어요. 다시 시도해 주세요');
+      toast.error('재인식 중 문제가 생겼어요. 다시 시도해 주세요');
     } finally {
-      setRegrading(false);
+      setReRecognizing(false);
     }
   };
 
@@ -481,6 +569,8 @@ export default function ResultView() {
   // Only the student who submitted can perform write actions (not teachers viewing student work)
   const viewerIsOwner = attempt?.student_id === user?.id;
 
+  const isFastGrade = attempt.answer_check_result === 'correct' || attempt.answer_check_result === 'correct_via_solution';
+
   const score = attempt.score || 0;
   const scoreColor = score >= 80 ? 'from-emerald-50 to-emerald-100/50 border-emerald-200' :
                      score >= 40 ? 'from-amber-50 to-amber-100/50 border-amber-200' :
@@ -528,7 +618,7 @@ export default function ResultView() {
 
   return (
     <AppLayout>
-      {regrading && <LoadingOverlay stage="grading" />}
+      {reRecognizing && <LoadingOverlay stage="grading" />}
 
       {/* Tool tooltip modal */}
       {tooltipTool && (
@@ -600,8 +690,39 @@ export default function ResultView() {
           </div>
         )}
 
+        {/* AI 상세 채점 카드 — 빠른 채점 + 미펼침일 때만 */}
+        {isFastGrade && !showDetail && (
+          <Card className="p-4 border-primary/30 bg-primary/5">
+            {!grading ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <svg className="animate-spin w-4 h-4 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"/>
+                    <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" className="opacity-75"/>
+                  </svg>
+                  <p className="text-sm font-medium">AI가 상세하게 채점 중이에요</p>
+                </div>
+                <p className="text-xs text-muted-foreground">잠시 후 단계별 피드백과 사용된 도구를 확인할 수 있어요</p>
+                <Button size="sm" disabled className="w-full">상세 결과 보기 (분석 중...)</Button>
+              </div>
+            ) : attempt.tool_mapping_status === 'failed' ? (
+              <div>
+                <p className="text-sm font-medium text-red-600 mb-1">✗ 상세 채점에 실패했어요</p>
+                <p className="text-xs text-muted-foreground">채점 결과는 정상이지만 단계별 분석은 진행되지 못했어요</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">✓ AI 채점이 완료됐어요</p>
+                <Button size="sm" className="w-full" onClick={() => setShowDetail(true)}>
+                  상세 결과 보기 <ChevronRight className="w-3 h-3 ml-1" />
+                </Button>
+              </div>
+            )}
+          </Card>
+        )}
+
         {/* Tools used chips */}
-        {tools.length > 0 && grading && (
+        {showDetail && tools.length > 0 && grading && (
           <div>
             <p className="text-xs text-muted-foreground mb-2 font-medium">
               {grading.matched_solution_id ? '당신의 풀이에 사용된 도구' : '이 문제의 풀이 도구'}
@@ -632,7 +753,7 @@ export default function ResultView() {
         )}
 
         {/* OCR quality warning */}
-        {grading?.ocr_quality_concern && (
+        {showDetail && grading?.ocr_quality_concern && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
             <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
             <div>
@@ -643,7 +764,7 @@ export default function ResultView() {
         )}
 
         {/* Low confidence warning */}
-        {grading?.confidence !== undefined && grading.confidence < 70 && (
+        {showDetail && grading?.confidence !== undefined && grading.confidence < 70 && (
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex gap-3">
             <AlertTriangle className="w-5 h-5 text-slate-400 flex-shrink-0 mt-0.5" />
             <p className="text-slate-600 text-sm">채점 자신감이 낮아요 ({grading.confidence}점). 관리자가 검토할 거예요.</p>
@@ -651,7 +772,7 @@ export default function ResultView() {
         )}
 
         {/* Step feedback with grouping by matched_solution_step_number */}
-        {steps.length > 0 && (
+        {showDetail && steps.length > 0 && (
           <div>
             <h2 className="text-lg font-semibold mb-3">단계별 피드백</h2>
             <div className="space-y-2">
@@ -703,7 +824,7 @@ export default function ResultView() {
         )}
 
         {/* Gap locations */}
-        {gaps.length > 0 && (
+        {showDetail && gaps.length > 0 && (
           <div>
             <h2 className="text-base font-semibold mb-2 text-amber-700">빠진 단계</h2>
             <div className="space-y-2">
@@ -750,7 +871,7 @@ export default function ResultView() {
         )}
 
         {/* Error locations */}
-        {errors.length > 0 && (
+        {showDetail && errors.length > 0 && (
           <div>
             <h2 className="text-base font-semibold mb-2 text-red-700">오류 위치</h2>
             <div className="space-y-2">
@@ -802,7 +923,7 @@ export default function ResultView() {
         )}
 
         {/* 매칭된 별해 배너 */}
-        {matchedSolution && (
+        {showDetail && matchedSolution && (
           <div className="rounded-xl border border-primary/30 bg-primary/5 overflow-hidden">
             <button
               className="w-full p-4 flex items-center justify-between text-left"
@@ -831,7 +952,7 @@ export default function ResultView() {
         )}
 
         {/* 다른 풀이도 있어요 */}
-        {otherSolutions.length > 0 && grading && (
+        {showDetail && otherSolutions.length > 0 && grading && (
           <div>
             <h2 className="text-base font-semibold mb-3 flex items-center gap-2">
               <BookOpen className="w-4 h-4 text-primary" />
@@ -852,60 +973,34 @@ export default function ResultView() {
           </div>
         )}
 
-        {/* OCR section — 소유자: 편집+재채점, 강사/관리자: 읽기 전용 조회 */}
-        <div>
-          <button
-            className="w-full flex items-center justify-between p-3 bg-muted rounded-xl"
-            onClick={() => setShowOCR(o => !o)}>
-            <span className="text-sm font-medium text-muted-foreground">OCR 인식 결과 보기</span>
-            {showOCR ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </button>
-          {showOCR && (
-            <Card className="mt-2 p-4 bg-slate-50">
-              {!editingOCR ? (
-                <>
-                  <p className="text-xs text-muted-foreground mb-2">Gemini가 인식한 풀이</p>
-                  <pre className="text-sm whitespace-pre-wrap font-mono bg-white rounded-lg p-3 border">
-                    {attempt.ocr_corrected_text || attempt.ocr_text || '(OCR 결과 없음)'}
-                  </pre>
-                  {viewerIsOwner && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-3"
-                      onClick={() => {
-                        setCorrectedText(attempt.ocr_corrected_text || attempt.ocr_text || '');
-                        setEditingOCR(true);
-                      }}>
-                      <RotateCcw className="w-4 h-4 mr-2" />
-                      OCR이 잘못됐어요
-                    </Button>
-                  )}
-                </>
-              ) : (
-                <>
-                  <p className="text-xs text-muted-foreground mb-2">OCR 결과를 수정해 주세요</p>
-                  <Textarea
-                    value={correctedText}
-                    onChange={e => setCorrectedText(e.target.value)}
-                    className="font-mono text-sm min-h-32"
-                    placeholder="수정할 풀이를 입력해 주세요..."
-                  />
-                  <div className="flex gap-2 mt-3">
-                    <Button variant="outline" size="sm" onClick={() => setEditingOCR(false)}>취소</Button>
-                    <Button size="sm" onClick={handleRegrade}>
-                      <RotateCcw className="w-4 h-4 mr-2" />
-                      수정해서 다시 채점
-                    </Button>
-                  </div>
-                </>
-              )}
-            </Card>
-          )}
-        </div>
+        {/* OCR section — showDetail + ocr_text 있을 때만 */}
+        {showDetail && (attempt.ocr_text || attempt.ocr_corrected_text) && (
+          <div>
+            <button
+              className="w-full flex items-center justify-between p-3 bg-muted rounded-xl"
+              onClick={() => setShowOCR(o => !o)}>
+              <span className="text-sm font-medium text-muted-foreground">OCR 인식 결과 보기</span>
+              {showOCR ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+            {showOCR && (
+              <Card className="mt-2 p-4 bg-slate-50">
+                <p className="text-xs text-muted-foreground mb-2">Gemini가 인식한 풀이</p>
+                <pre className="text-sm whitespace-pre-wrap font-mono bg-white rounded-lg p-3 border">
+                  {attempt.ocr_corrected_text || attempt.ocr_text}
+                </pre>
+                {viewerIsOwner && (
+                  <Button variant="outline" size="sm" className="mt-3" onClick={() => setShowOcrComplainModal(true)}>
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    OCR이 잘못됐어요
+                  </Button>
+                )}
+              </Card>
+            )}
+          </div>
+        )}
 
-        {/* 검토 요청 - 학생만 */}
-        {viewerIsOwner && !attempt.review_requested && (
+        {/* 검토 요청 - 학생만, 정답 케이스 제외 */}
+        {viewerIsOwner && !attempt.review_requested && !isFastGrade && (
           <Card className="p-3 border-dashed">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
@@ -1050,6 +1145,35 @@ export default function ResultView() {
             </div>
           </div>
         )}
+
+          {/* OCR 재인식 모달 */}
+          {showOcrComplainModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                 onClick={() => !reRecognizing && setShowOcrComplainModal(false)}>
+              <div className="absolute inset-0 bg-black/40" />
+              <Card className="relative z-10 p-5 max-w-md w-full" onClick={e => e.stopPropagation()}>
+                <h2 className="font-semibold mb-1">OCR 다시 인식 요청</h2>
+                <p className="text-xs text-muted-foreground mb-3">
+                  어떤 부분이 잘못됐나요? (선택 — AI에게 힌트로 전달)
+                </p>
+                <Textarea
+                  value={ocrHint}
+                  onChange={e => setOcrHint(e.target.value)}
+                  placeholder="예: x가 y로 인식됐어요"
+                  className="min-h-20"
+                  disabled={reRecognizing}
+                />
+                <div className="flex gap-2 mt-4 justify-end">
+                  <Button variant="outline" disabled={reRecognizing} onClick={() => setShowOcrComplainModal(false)}>
+                    취소
+                  </Button>
+                  <Button disabled={reRecognizing} onClick={handleOCRReRecognize}>
+                    {reRecognizing ? '재인식 중...' : '다시 인식 요청'}
+                  </Button>
+                </div>
+              </Card>
+            </div>
+          )}
 
           {/* 검토 요청 모달 */}
           {showReviewRequestModal && (
