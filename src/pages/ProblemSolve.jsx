@@ -300,7 +300,8 @@ export default function ProblemSolve() {
           target_tool_id: targetToolId || null,
         });
         setStage(null);
-        navigate(`/result/${attempt.id}`);
+        const noImageParams = new URLSearchParams(window.location.search);
+        navigate(`/result/${attempt.id}?${noImageParams.toString()}`);
         return;
       }
 

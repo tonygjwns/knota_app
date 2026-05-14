@@ -438,6 +438,7 @@ export default function ResultView() {
         if (!prev || new Date(a.submitted_at) > new Date(prev.submitted_at)) latestByProblem.set(a.problem_id, a);
       }
       const wrongPids = [...latestByProblem.values()].filter(a => (a.score || 0) < 60 || a.correctness === 'wrong').map(a => a.problem_id);
+      // StudentAttempt.problem_id is Problem.id (entity id)
       pool = allProblems.filter(p => wrongPids.includes(p.id));
       emptyMessage = '틀린 문제를 다 다시 풀었어요! 잘했어요 🎉';
       const p = new URLSearchParams({ mode: 'wrong' });
