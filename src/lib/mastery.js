@@ -1,5 +1,5 @@
 export const HALF_LIFE_MS = 180 * 24 * 60 * 60 * 1000; // 반감기 180일
-export const WEIGHT_THRESHOLD = 1; // 후보 채택 최소 weight
+export const WEIGHT_THRESHOLD = 0.3; // 후보 채택 최소 weight
 
 /**
  * Build a Map of tool_id -> { weightedScore, weight, wrongnessSum, lastAt }
@@ -99,13 +99,15 @@ export function summarizeMastery(attempts, problemMap, tools) {
   const masteryMap = buildMasteryMap(attempts, problemMap);
   const toolMap = new Map(tools.map(t => [t.tool_id, t]));
 
-  // Overall average
+  // A-2. Overall average — attempt 기반 시간 가중 평균
   let totalWeightedScore = 0, totalWeight = 0;
-  for (const m of masteryMap.values()) {
-    if (m.weight >= WEIGHT_THRESHOLD) {
-      totalWeightedScore += m.weightedScore;
-      totalWeight += m.weight;
-    }
+  const now = Date.now();
+  for (const a of attempts) {
+    if (a.score == null) continue;
+    const submittedAt = a.submitted_at ? new Date(a.submitted_at).getTime() : now;
+    const w = Math.pow(0.5, (now - submittedAt) / HALF_LIFE_MS);
+    totalWeightedScore += (a.score || 0) * w;
+    totalWeight += w;
   }
   const overallAvg = totalWeight > 0 ? Math.round(totalWeightedScore / totalWeight) : null;
 
@@ -117,7 +119,8 @@ export function summarizeMastery(attempts, problemMap, tools) {
   const older = sorted.slice(10, 20);
   const recentAvg = recent.length > 0 ? recent.reduce((s, a) => s + a.score, 0) / recent.length : 0;
   const olderAvg = older.length > 0 ? older.reduce((s, a) => s + a.score, 0) / older.length : recentAvg;
-  const recentTrend = recentAvg - olderAvg;
+  // A-5. null = 데이터 부족
+  const recentTrend = older.length > 0 ? recentAvg - olderAvg : null;
 
   // New tool ids (weight < 0.5)
   const newToolIds = new Set();
@@ -125,7 +128,7 @@ export function summarizeMastery(attempts, problemMap, tools) {
     if (m.weight < 0.5) newToolIds.add(tid);
   }
 
-  // Weak tools: weight >= WEIGHT_THRESHOLD, sorted by weakness desc, top 5
+  // A-3. Weak tools top 3
   const weakTools = [];
   for (const [tid, m] of masteryMap) {
     const weakness = computeWeakness(m);
@@ -136,22 +139,20 @@ export function summarizeMastery(attempts, problemMap, tools) {
     weakTools.push({ tool, avg, weakness });
   }
   weakTools.sort((a, b) => b.weakness - a.weakness);
-  const top5Weak = weakTools.slice(0, 5);
+  const top3Weak = weakTools.slice(0, 3);
 
-  // Domain map: tool.domain_ids[0] as group key
+  // A-4. Domain map — attempt.problem_domain 기반
   const domainMap = {};
-  for (const [tid, m] of masteryMap) {
-    if (m.weight < WEIGHT_THRESHOLD) continue;
-    const tool = toolMap.get(tid);
-    if (!tool) continue;
-    let domainIds = [];
-    try { domainIds = JSON.parse(tool.domain_ids || '[]'); } catch {}
-    const domainKey = domainIds[0] || '기타';
-    if (!domainMap[domainKey]) domainMap[domainKey] = { tools: [], totalScore: 0, totalWeight: 0 };
-    const avg = Math.round(m.weightedScore / m.weight);
-    domainMap[domainKey].tools.push({ toolId: tid, avg, tool });
-    domainMap[domainKey].totalScore += m.weightedScore;
-    domainMap[domainKey].totalWeight += m.weight;
+  const now2 = Date.now();
+  for (const a of attempts) {
+    if (a.score == null) continue;
+    const key = a.problem_domain || '미분류';
+    if (!domainMap[key]) domainMap[key] = { totalScore: 0, totalWeight: 0, count: 0 };
+    const submittedAt = a.submitted_at ? new Date(a.submitted_at).getTime() : now2;
+    const w = Math.pow(0.5, (now2 - submittedAt) / HALF_LIFE_MS);
+    domainMap[key].totalScore += (a.score || 0) * w;
+    domainMap[key].totalWeight += w;
+    domainMap[key].count += 1;
   }
   for (const d of Object.values(domainMap)) {
     d.avgScore = d.totalWeight > 0 ? Math.round(d.totalScore / d.totalWeight) : 0;
@@ -159,7 +160,7 @@ export function summarizeMastery(attempts, problemMap, tools) {
 
   return {
     masteryMap,
-    weakTools: top5Weak,
+    weakTools: top3Weak,
     newToolIds,
     totalAttempts: attempts.length,
     overallAvg,

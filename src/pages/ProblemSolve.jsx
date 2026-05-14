@@ -57,12 +57,12 @@ export default function ProblemSolve() {
   const [stage, setStage] = useState(null); // null | 'ocr' | 'grading'
   const [error, setError] = useState(null);
   const [canvasBlob, setCanvasBlob] = useState(null);
+  const [answerCanvasBlob, setAnswerCanvasBlob] = useState(null);
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const [activeTab, setActiveTab] = useState('canvas');
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [bookmarkId, setBookmarkId] = useState(null);
-  const [answerCanvasBlob, setAnswerCanvasBlob] = useState(null);
   const startedAt = useRef(new Date().toISOString());
   const fileInputRef = useRef(null);
 
@@ -273,10 +273,8 @@ export default function ProblemSolve() {
         }
 
         setStage(null);
-        const resultUrl = fromRecommend
-          ? `/result/${attempt.id}?from=recommend&reason=${recommendReason || ''}`
-          : `/result/${attempt.id}`;
-        navigate(resultUrl);
+        const currentParams1 = new URLSearchParams(window.location.search);
+        navigate(`/result/${attempt.id}?${currentParams1.toString()}`);
         return;
       }
 
@@ -357,7 +355,7 @@ ${OCR_SYSTEM_PROMPT}`;
           student_answer: extractedAnswerText,
           student_answer_image_url: answerImageUrl,
           answer_check_result: 'correct_via_solution',
-          score: 95,
+          score: 100,
           correctness: 'correct',
           tool_mapping_status: 'pending',
           started_at: startedAt.current,
@@ -370,7 +368,8 @@ ${OCR_SYSTEM_PROMPT}`;
         });
         runBackgroundGrading(attempt.id, imageUrl, problemText, verifiedAnswer, extractedAnswerText || '', ocrText);
         setStage(null);
-        navigate(`/result/${attempt.id}`);
+        const currentParams2 = new URLSearchParams(window.location.search);
+        navigate(`/result/${attempt.id}?${currentParams2.toString()}`);
         return;
       }
 
@@ -403,10 +402,8 @@ ${OCR_SYSTEM_PROMPT}`;
       });
 
       setStage(null);
-      const resultUrl = fromRecommend
-        ? `/result/${attempt.id}?from=recommend&reason=${recommendReason || ''}`
-        : `/result/${attempt.id}`;
-      navigate(resultUrl);
+      const currentParams3 = new URLSearchParams(window.location.search);
+      navigate(`/result/${attempt.id}?${currentParams3.toString()}`);
     } catch (err) {
       setStage(null);
       console.error(err);
@@ -517,7 +514,17 @@ ${OCR_SYSTEM_PROMPT}`;
           {/* 풀이 영역 — 스크롤 가능 */}
           <div className="flex-1 overflow-y-auto p-4">
             {activeTab === 'canvas' && (
-              <DrawingCanvas onImageReady={setCanvasBlob} height={600} />
+              <>
+                <p className="text-xs text-muted-foreground mb-2">답을 캔버스 아래 점선 박스 안에 적으면 채점이 빨라져요</p>
+                <DrawingCanvas
+                  onImageReady={({ fullBlob, answerRegionBlob }) => {
+                    setCanvasBlob(fullBlob);
+                    setAnswerCanvasBlob(answerRegionBlob);
+                  }}
+                  height={600}
+                  answerRegionHeight={100}
+                />
+              </>
             )}
             {activeTab === 'photo' && (
               <div className="space-y-3">
@@ -554,12 +561,7 @@ ${OCR_SYSTEM_PROMPT}`;
             )}
           </div>
 
-          {/* 답안 캔버스 */}
-          <div className="p-4 border-t border-border space-y-2">
-            <label className="text-sm font-semibold text-foreground">답 (선택)</label>
-            <p className="text-xs text-muted-foreground">답을 따로 적어두면 채점이 빨라져요</p>
-            <DrawingCanvas onImageReady={setAnswerCanvasBlob} height={120} />
-          </div>
+
 
           {/* 제출 버튼 — 풀이 영역 하단 고정 */}
           <div className="p-4 border-t border-border">

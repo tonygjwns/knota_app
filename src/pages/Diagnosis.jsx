@@ -13,19 +13,16 @@ export default function Diagnosis() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState(null);
-  const [domains, setDomains] = useState([]);
 
   useEffect(() => {
     (async () => {
       const me = await base44.auth.me();
-      const [attempts, tools, domainsData, allProblems] = await Promise.all([
+      const [attempts, tools, allProblems] = await Promise.all([
         base44.entities.StudentAttempt.filter({ student_id: me.id }, '-submitted_at', 200),
         base44.entities.MathTool.list('name', 500),
-        base44.entities.Domain.list('name', 100),
         base44.entities.Problem.list('-created_date', 1000),
       ]);
       const problemMap = new Map(allProblems.map(p => [p.id, p]));
-      setDomains(domainsData);
       setSummary(summarizeMastery(attempts, problemMap, tools));
       setLoading(false);
     })();
@@ -72,14 +69,11 @@ export default function Diagnosis() {
 
   const { overallAvg, recentTrend, weakTools, domainMap, totalAttempts } = summary;
 
-  const TrendIcon = recentTrend > 3 ? TrendingUp : recentTrend < -3 ? TrendingDown : Minus;
-  const trendColor = recentTrend > 3 ? 'text-emerald-600' : recentTrend < -3 ? 'text-red-500' : 'text-muted-foreground';
-  const trendLabel = recentTrend > 3 ? `+${Math.round(recentTrend)}점 향상 중` : recentTrend < -3 ? `${Math.round(recentTrend)}점 하락 중` : '유지 중';
+  const TrendIcon = recentTrend === null ? Minus : recentTrend > 3 ? TrendingUp : recentTrend < -3 ? TrendingDown : Minus;
+  const trendColor = recentTrend === null ? 'text-muted-foreground' : recentTrend > 3 ? 'text-emerald-600' : recentTrend < -3 ? 'text-red-500' : 'text-muted-foreground';
+  const trendLabel = recentTrend === null ? '데이터 더 필요' : recentTrend > 3 ? `+${Math.round(recentTrend)}점 향상 중` : recentTrend < -3 ? `${Math.round(recentTrend)}점 하락 중` : '유지 중';
 
   const overallColorClass = overallAvg != null ? getMasteryColor(overallAvg, false) : 'text-muted-foreground';
-
-  const domainNameMap = {};
-  for (const d of domains) domainNameMap[d.domain_id] = d.name;
 
   return (
     <AppLayout>
@@ -148,12 +142,11 @@ export default function Diagnosis() {
             <div className="space-y-3">
               {Object.entries(domainMap)
                 .sort(([, a], [, b]) => a.avgScore - b.avgScore)
-                .map(([domainId, data]) => {
+                .map(([name, data]) => {
                   const barColor = data.avgScore >= 90 ? 'bg-emerald-500' : data.avgScore >= 70 ? 'bg-amber-400' : 'bg-red-400';
                   const textColor = getMasteryColor(data.avgScore, false);
-                  const name = domainNameMap[domainId] || domainId;
                   return (
-                    <Card key={domainId} className="p-4 space-y-2">
+                    <Card key={name} className="p-4 space-y-2">
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-medium">{name}</p>
                         <span className={`text-sm font-bold ${textColor}`}>{data.avgScore}점</span>

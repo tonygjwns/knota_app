@@ -166,9 +166,7 @@ export default function RemediationPractice() {
         <Card className="p-4">
           <p className="text-sm font-medium mb-3">풀이</p>
           <DrawingCanvas
-            value={canvasBlob}
-            onChange={setCanvasBlob}
-            className="border rounded-lg"
+            onImageReady={({ fullBlob }) => setCanvasBlob(fullBlob)}
           />
         </Card>
 

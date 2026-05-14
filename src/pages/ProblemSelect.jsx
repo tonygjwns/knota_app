@@ -304,6 +304,7 @@ export default function ProblemSelect() {
 // ProblemModeView
 // ──────────────────────────────────────────────
 function ProblemModeView({ mode, user, navigate }) {
+  const [searchParams] = useSearchParams();
   const [domains, setDomains] = useState([]);
   const [tools, setTools] = useState([]);
   const [problems, setProblems] = useState([]);
@@ -333,6 +334,29 @@ function ProblemModeView({ mode, user, navigate }) {
   const [expandedWrongDates, setExpandedWrongDates] = useState({
     today: true, yesterday: true, thisWeek: true, thisMonth: false, older: false,
   });
+
+  // G-1. URL 파라미터로 state 초기화
+  useEffect(() => {
+    if (mode === 'domain' && domains.length > 0) {
+      const sd = searchParams.get('selected_domain');
+      if (sd) {
+        const found = domains.find(d => d.domain_id === sd);
+        if (found) setSelectedDomain(found);
+      }
+    } else if (mode === 'tool') {
+      const g = searchParams.get('grade');
+      const d = searchParams.get('domain_id');
+      const t = searchParams.get('type_id');
+      if (g) setToolFilterGrade(g);
+      if (d) setToolFilterDomain(d);
+      if (t) setToolFilterType(t);
+    } else if (mode === 'wrong') {
+      const g = searchParams.get('grade');
+      const d = searchParams.get('domain_id');
+      if (g) setWrongFilterGrade(g);
+      if (d) setWrongFilterDomain(d);
+    }
+  }, [mode, searchParams, domains]);
 
   useEffect(() => {
     setLoading(true);
@@ -463,11 +487,17 @@ function ProblemModeView({ mode, user, navigate }) {
 
       } else if (mode === 'wrong') {
         const [attempts, allD, allP] = await Promise.all([
-          user ? base44.entities.StudentAttempt.filter({ student_id: user.id }, '-submitted_at', 100) : Promise.resolve([]),
+          user ? base44.entities.StudentAttempt.filter({ student_id: user.id }, '-submitted_at', 200) : Promise.resolve([]),
           base44.entities.Domain.list('grade_range', 100),
           base44.entities.Problem.list('domain_id', 5000),
         ]);
-        const wrong = attempts.filter(a => (a.score || 0) < 60 || a.correctness === 'wrong');
+        // G-3: 최신 attempt 기반 wrong 판정
+        const latestByProblem = new Map();
+        for (const a of attempts) {
+          const prev = latestByProblem.get(a.problem_id);
+          if (!prev || new Date(a.submitted_at) > new Date(prev.submitted_at)) latestByProblem.set(a.problem_id, a);
+        }
+        const wrong = [...latestByProblem.values()].filter(a => (a.score || 0) < 60 || a.correctness === 'wrong');
         setWrongAttempts(wrong);
         setDomains(allD);
         setProblems(allP);
@@ -488,12 +518,12 @@ function ProblemModeView({ mode, user, navigate }) {
       .filter(pt => pt.type_id === type.type_id && domainProblemIds.has(pt.problem_id))
       .map(pt => pt.problem_id);
     const matchedProblems = problems.filter(p => typePIds.includes(p.problem_id));
-    if (matchedProblems.length === 0) {
-      const pool = problems.filter(p => domainProblemIds.has(p.problem_id));
-      if (pool.length > 0) navigate(`/problem/${pool[Math.floor(Math.random() * pool.length)].id}`);
-      return;
-    }
-    navigate(`/problem/${matchedProblems[Math.floor(Math.random() * matchedProblems.length)].id}`);
+    const pool = matchedProblems.length > 0 ? matchedProblems : problems.filter(p => domainProblemIds.has(p.problem_id));
+    if (pool.length === 0) return;
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    const params = new URLSearchParams({ from: 'type', type_id: type.type_id });
+    if (selectedDomain?.domain_id) params.set('domain_id', selectedDomain.domain_id);
+    navigate(`/problem/${pick.id}?${params}`);
   };
 
   const handleToolSelect = async (tool) => {
@@ -503,7 +533,14 @@ function ProblemModeView({ mode, user, navigate }) {
         try { return JSON.parse(p.tool_ids || '[]').includes(tool.tool_id); } catch { return false; }
       });
       const pool = filtered.length > 0 ? filtered : problems;
-      if (pool.length > 0) navigate(`/problem/${pool[Math.floor(Math.random() * pool.length)].id}`);
+      if (pool.length > 0) {
+        const pick = pool[Math.floor(Math.random() * pool.length)];
+        const params = new URLSearchParams({ from: 'tool', tool_id: tool.tool_id });
+        if (toolFilterGrade) params.set('grade', toolFilterGrade);
+        if (toolFilterDomain) params.set('domain_id', toolFilterDomain);
+        if (toolFilterType) params.set('type_id', toolFilterType);
+        navigate(`/problem/${pick.id}?${params}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -903,7 +940,12 @@ function ProblemModeView({ mode, user, navigate }) {
                                 {items.map(attempt => (
                                   <Card key={attempt.id}
                                         className="p-4 card-hover cursor-pointer border-l-4 border-l-red-300"
-                                        onClick={() => navigate(`/problem/${attempt.problem_id}`)}>
+                                        onClick={() => {
+                                          const params = new URLSearchParams({ from: 'wrong' });
+                                          if (wrongFilterGrade) params.set('grade', wrongFilterGrade);
+                                          if (wrongFilterDomain) params.set('domain_id', wrongFilterDomain);
+                                          navigate(`/problem/${attempt.problem_id}?${params}`);
+                                        }}>
                                     <div className="flex items-center justify-between">
                                       <div className="flex-1 min-w-0">
                                         <p className="text-sm font-medium text-foreground truncate">

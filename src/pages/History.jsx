@@ -367,10 +367,20 @@ export default function History() {
                                     </span>
                                   )}
                                   <span className="text-xs text-muted-foreground">
-                                    {attempt.submitted_at
-                                      ? new Date(attempt.submitted_at).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-                                      : ''}
+                                   {attempt.submitted_at
+                                     ? new Date(attempt.submitted_at).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                                     : ''}
                                   </span>
+                                  {attempt.tool_mapping_status === 'pending' && (
+                                   <span className="inline-flex items-center gap-1 text-xs text-muted-foreground bg-muted/40 px-2 py-0.5 rounded">
+                                     ⟳ 분석 중
+                                   </span>
+                                  )}
+                                  {attempt.tool_mapping_status === 'failed' && (
+                                   <span className="inline-flex items-center gap-1 text-xs text-muted-foreground bg-muted/40 px-2 py-0.5 rounded">
+                                     ✗ 분석 실패
+                                   </span>
+                                  )}
                                 </div>
                               </div>
                               <div className="flex items-center gap-2 flex-shrink-0">

@@ -5,16 +5,18 @@ import { Pencil, Eraser, Undo2, Trash2, Plus } from 'lucide-react';
 
 const PAGE_HEIGHT = 400;
 
-export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penSize = 1.5 }) {
+export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penSize = 1.5, height, answerRegionHeight = 0 }) {
   const canvasRef = useRef(null);
   const wrapperRef = useRef(null);
   const padRef = useRef(null);
   const onImageReadyRef = useRef(onImageReady);
+  const answerRegionHeightRef = useRef(answerRegionHeight);
   const [tool, setTool] = useState('pen');
-  const [canvasHeight, setCanvasHeight] = useState(PAGE_HEIGHT);
+  const [canvasHeight, setCanvasHeight] = useState(height || PAGE_HEIGHT);
   const [isEmpty, setIsEmpty] = useState(true);
 
   useEffect(() => { onImageReadyRef.current = onImageReady; }, [onImageReady]);
+  useEffect(() => { answerRegionHeightRef.current = answerRegionHeight; }, [answerRegionHeight]);
 
   // body canvas-active 클래스 (selection 차단)
   useEffect(() => {
@@ -69,7 +71,30 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
     pad.addEventListener('endStroke', () => {
       setIsEmpty(pad.isEmpty());
       if (onImageReadyRef.current && canvas) {
-        canvas.toBlob(blob => { if (blob) onImageReadyRef.current(blob); }, 'image/jpeg', 0.7);
+        canvas.toBlob(async (fullBlob) => {
+          if (!fullBlob) return;
+          let answerRegionBlob = null;
+          const arh = answerRegionHeightRef.current;
+          if (arh > 0) {
+            const ratio = Math.max(window.devicePixelRatio || 1, 1);
+            const ctx = canvas.getContext('2d');
+            const imgData = ctx.getImageData(0, (canvas.height - arh * ratio), canvas.width, arh * ratio);
+            let hasStroke = false;
+            for (let i = 3; i < imgData.data.length; i += 4) {
+              if (imgData.data[i] > 0) { hasStroke = true; break; }
+            }
+            if (hasStroke) {
+              const region = document.createElement('canvas');
+              region.width = canvas.width;
+              region.height = arh * ratio;
+              region.getContext('2d').drawImage(canvas, 0, canvas.height - arh * ratio, canvas.width, arh * ratio, 0, 0, canvas.width, arh * ratio);
+              await new Promise(resolve => {
+                region.toBlob(b => { answerRegionBlob = b; resolve(); }, 'image/jpeg', 0.7);
+              });
+            }
+          }
+          onImageReadyRef.current({ fullBlob, answerRegionBlob });
+        }, 'image/jpeg', 0.7);
       }
     });
 
@@ -115,9 +140,9 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
     const canvas = canvasRef.current;
     if (canvas) {
       if (empty) {
-        onImageReadyRef.current?.(null);
+        onImageReadyRef.current?.({ fullBlob: null, answerRegionBlob: null });
       } else {
-        canvas.toBlob(blob => { if (blob) onImageReadyRef.current?.(blob); }, 'image/jpeg', 0.7);
+        canvas.toBlob(blob => { if (blob) onImageReadyRef.current?.({ fullBlob: blob, answerRegionBlob: null }); }, 'image/jpeg', 0.7);
       }
     }
   };
@@ -135,7 +160,7 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.restore();
     setIsEmpty(true);
-    onImageReadyRef.current?.(null);
+    onImageReadyRef.current?.({ fullBlob: null, answerRegionBlob: null });
   };
 
   const expandCanvas = () => {
@@ -175,6 +200,18 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
           <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground pointer-events-none select-none">
             <Pencil className="w-8 h-8 mb-2 opacity-30" />
             <p className="text-sm">여기에 풀이를 적어 주세요</p>
+          </div>
+        )}
+        {answerRegionHeight > 0 && (
+          <div
+            className="absolute left-0 right-0 pointer-events-none"
+            style={{ bottom: 0, height: answerRegionHeight }}
+          >
+            <div className="absolute top-0 left-0 right-0 border-t-2 border-dashed border-blue-300" />
+            <div className="absolute top-1 left-2 text-xs font-medium text-blue-500 bg-white/80 px-1.5 py-0.5 rounded">
+              답
+            </div>
+            <div className="absolute inset-0 bg-blue-50/20" />
           </div>
         )}
         <canvas

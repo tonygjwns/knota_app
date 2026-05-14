@@ -99,8 +99,13 @@ export default function ResultView() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const fromRecommend = searchParams.get('from') === 'recommend';
+  const fromParam = searchParams.get('from');
+  const fromRecommend = fromParam === 'recommend';
   const recommendReason = searchParams.get('reason');
+  const typeId = searchParams.get('type_id');
+  const toolId = searchParams.get('tool_id');
+  const domainId = searchParams.get('domain_id');
+  const gradeId = searchParams.get('grade');
   const { user } = useAuth();
   const [attempt, setAttempt] = useState(null);
   const [problem, setProblem] = useState(null);
@@ -335,31 +340,138 @@ export default function ResultView() {
     }
   };
 
+  const effectiveFrom = attempt?.assignment_id ? 'assignment' : (fromParam || null);
+
+  const BACK_LABELS = {
+    assignment: '숙제로 돌아가기',
+    type: '단원으로 돌아가기',
+    domain: '영역으로 돌아가기',
+    tool: '도구로 돌아가기',
+    wrong: '틀린 문제 목록으로',
+    recommend: '추천 목록으로',
+  };
+  const backLabel = BACK_LABELS[effectiveFrom] || '문제 탭으로';
+
+  const handleBack = () => {
+    if (effectiveFrom === 'assignment') {
+      navigate(`/assignment/${attempt.assignment_id}`);
+      return;
+    }
+    const params = new URLSearchParams();
+    if (effectiveFrom === 'type' || effectiveFrom === 'domain') {
+      params.set('mode', 'domain');
+      if (domainId) params.set('selected_domain', domainId);
+    } else if (effectiveFrom === 'tool') {
+      params.set('mode', 'tool');
+      if (gradeId) params.set('grade', gradeId);
+      if (domainId) params.set('domain_id', domainId);
+      if (typeId) params.set('type_id', typeId);
+    } else if (effectiveFrom === 'wrong') {
+      params.set('mode', 'wrong');
+      if (gradeId) params.set('grade', gradeId);
+      if (domainId) params.set('domain_id', domainId);
+    } else if (effectiveFrom === 'recommend') {
+      params.set('mode', 'recommended');
+    } else {
+      navigate('/problems');
+      return;
+    }
+    navigate(`/problems?${params}`);
+  };
+
+  const NEXT_LABELS = {
+    assignment: '다음 문제 (숙제)',
+    type: '같은 단원 다음 문제',
+    domain: '같은 영역 다음 문제',
+    tool: '같은 도구 다음 문제',
+    wrong: '다음 틀린 문제',
+    recommend: '다음 추천 문제',
+  };
+  const nextLabel = NEXT_LABELS[effectiveFrom] || '다음 문제';
+
   const handleNextProblem = async () => {
-    // 숙제 안에서는 다음 안 푼 문제로 이동
-    if (attempt.assignment_id) {
-      const assignment = await base44.entities.Assignment.filter({ id: attempt.assignment_id }).then(r => r[0]);
+    if (effectiveFrom === 'assignment') {
+      const assignment = (await base44.entities.Assignment.filter({ id: attempt.assignment_id })).pop();
       if (assignment) {
         const problemIds = JSON.parse(assignment.problem_ids || '[]');
         const myAttempts = await base44.entities.StudentAttempt.filter(
-          { student_id: user.id, assignment_id: attempt.assignment_id },
-          '-submitted_at',
-          100
+          { student_id: user.id, assignment_id: attempt.assignment_id }, '-submitted_at', 100
         );
         const doneIds = new Set(myAttempts.map(a => a.problem_id));
-        const nextId = problemIds.find(id => !doneIds.has(id));
-        if (nextId) {
-          navigate(`/problem/${nextId}?assignment_id=${attempt.assignment_id}`);
+        const remaining = problemIds.filter(id => !doneIds.has(id));
+        if (remaining.length === 0) {
+          toast.success('이 숙제를 다 풀었어요! 🎉');
+          navigate(`/assignment/${attempt.assignment_id}`);
           return;
         }
+        navigate(`/problem/${remaining[0]}?assignment_id=${attempt.assignment_id}`);
       }
+      return;
     }
-    // 일반 자유 풀이
-    const problems = await base44.entities.Problem.list('-created_date', 1000);
-    if (problems.length > 0) {
-      const idx = Math.floor(Math.random() * problems.length);
-      navigate(`/problem/${problems[idx].id}`);
+
+    const allProblems = await base44.entities.Problem.list('-created_date', 1000);
+    let pool = [];
+    let emptyMessage = '';
+    let hubUrl = '/problems';
+
+    if (fromParam === 'type' && typeId) {
+      const pts = await base44.entities.ProblemType.filter({ type_id: typeId }, '-created_date', 500);
+      const pidSet = new Set(pts.map(p => p.problem_id));
+      pool = allProblems.filter(p => pidSet.has(p.problem_id));
+      emptyMessage = '이 단원의 모든 문제를 다 풀었어요!';
+      const p = new URLSearchParams({ mode: 'domain' });
+      if (domainId) p.set('selected_domain', domainId);
+      hubUrl = `/problems?${p}`;
+    } else if (fromParam === 'tool' && toolId) {
+      pool = allProblems.filter(p => { try { return JSON.parse(p.tool_ids || '[]').includes(toolId); } catch { return false; } });
+      emptyMessage = '이 도구의 모든 문제를 다 풀었어요!';
+      const p = new URLSearchParams({ mode: 'tool' });
+      if (gradeId) p.set('grade', gradeId);
+      if (domainId) p.set('domain_id', domainId);
+      if (typeId) p.set('type_id', typeId);
+      hubUrl = `/problems?${p}`;
+    } else if (fromParam === 'wrong') {
+      const myAttempts = await base44.entities.StudentAttempt.filter({ student_id: user.id }, '-submitted_at', 200);
+      const latestByProblem = new Map();
+      for (const a of myAttempts) {
+        const prev = latestByProblem.get(a.problem_id);
+        if (!prev || new Date(a.submitted_at) > new Date(prev.submitted_at)) latestByProblem.set(a.problem_id, a);
+      }
+      const wrongPids = [...latestByProblem.values()].filter(a => (a.score || 0) < 60 || a.correctness === 'wrong').map(a => a.problem_id);
+      pool = allProblems.filter(p => wrongPids.includes(p.id));
+      emptyMessage = '틀린 문제를 다 다시 풀었어요! 잘했어요 🎉';
+      const p = new URLSearchParams({ mode: 'wrong' });
+      if (gradeId) p.set('grade', gradeId);
+      if (domainId) p.set('domain_id', domainId);
+      hubUrl = `/problems?${p}`;
+    } else if (fromParam === 'recommend') {
+      pool = allProblems;
+      emptyMessage = '추천 문제를 다 풀었어요!';
+      hubUrl = '/problems?mode=recommended';
+    } else {
+      pool = allProblems;
+      emptyMessage = '푼 적 없는 문제를 다 풀었어요!';
+      hubUrl = '/problems';
     }
+
+    const myAttempts = await base44.entities.StudentAttempt.filter({ student_id: user.id }, '-submitted_at', 200);
+    const donePids = new Set(myAttempts.map(a => a.problem_id));
+    const unsolved = fromParam === 'wrong' ? pool : pool.filter(p => !donePids.has(p.id));
+
+    if (unsolved.length === 0) {
+      toast.success(emptyMessage);
+      navigate(hubUrl);
+      return;
+    }
+
+    const pick = unsolved[Math.floor(Math.random() * unsolved.length)];
+    const np = new URLSearchParams();
+    if (fromParam) np.set('from', fromParam);
+    if (typeId) np.set('type_id', typeId);
+    if (toolId) np.set('tool_id', toolId);
+    if (domainId) np.set('domain_id', domainId);
+    if (gradeId) np.set('grade', gradeId);
+    navigate(`/problem/${pick.id}?${np}`);
   };
 
   if (loading) return <AppLayout><InlineLoader message="결과 불러오는 중..." /></AppLayout>;
@@ -444,8 +556,8 @@ export default function ResultView() {
       <div className="space-y-5 pb-8">
         {/* Back + Problem bookmark */}
         <div className="flex items-center justify-between">
-          <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="gap-2">
-            <ArrowLeft className="w-4 h-4" /> 뒤로
+          <Button variant="ghost" size="sm" onClick={() => navigate('/problems')} className="gap-2">
+            <ArrowLeft className="w-4 h-4" /> 문제 탭
           </Button>
           {user && attempt && viewerIsOwner && (
             <button
@@ -472,40 +584,18 @@ export default function ResultView() {
             <p className="text-sm text-emerald-700 font-medium mt-2">정답을 맞췄어요!</p>
           )}
           {attempt?.answer_check_result === 'correct_via_solution' && (
-            <p className="text-sm text-amber-700 font-medium mt-2">풀이가 정답에 도달했어요! (답안 입력에 오타가 있었나봐요)</p>
+            <p className="text-sm text-amber-700 font-medium mt-2">풀이가 정답에 도달했어요! (답안 인식에 오타가 있었나봐요)</p>
           )}
           {grading?.summary && (
             <p className="text-muted-foreground text-sm mt-3 leading-relaxed">{grading.summary}</p>
           )}
         </Card>
 
-        {/* tool_mapping_status 표시 */}
-        {attempt?.tool_mapping_status === 'pending' && (
-          <div className="text-center">
-            <span className="inline-flex items-center gap-2 text-xs text-muted-foreground bg-muted/40 px-3 py-1.5 rounded-full">
-              <div className="w-3 h-3 rounded-full border-2 border-transparent border-t-primary animate-spin" />
-              풀이 분석 중... (잠시 후 새로고침)
-            </span>
-          </div>
-        )}
-        {attempt?.tool_mapping_status === 'failed' && (
-          <p className="text-xs text-muted-foreground text-center">풀이 분석을 완료하지 못했어요</p>
-        )}
-
         {/* 학생 답안 표시 */}
-        {(attempt?.student_answer || attempt?.student_answer_image_url) && (
+        {attempt?.student_answer && (
           <div className="bg-muted/40 rounded-lg p-3 space-y-2">
             <p className="text-xs text-muted-foreground">학생이 적은 답</p>
-            {attempt.student_answer_image_url && (
-              <img
-                src={attempt.student_answer_image_url}
-                alt="학생 답안"
-                className="max-h-32 rounded border border-border bg-white"
-              />
-            )}
-            {attempt.student_answer && (
-              <MathRenderer content={attempt.student_answer} className="text-sm" />
-            )}
+            <MathRenderer content={attempt.student_answer} className="text-base" />
           </div>
         )}
 
@@ -817,10 +907,10 @@ export default function ResultView() {
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-medium">채점이 이상한가요?</p>
-                <p className="text-xs text-muted-foreground mt-0.5">선생님께 다시 봐달라고 요청할 수 있어요</p>
+                <p className="text-xs text-muted-foreground mt-0.5">선생님께 검토를 요청할 수 있어요</p>
               </div>
               <Button size="sm" variant="outline" onClick={() => setShowReviewRequestModal(true)}>
-                다시 봐달라기
+                검토 요청하기
               </Button>
             </div>
           </Card>
@@ -940,37 +1030,23 @@ export default function ResultView() {
           </Card>
         )}
 
-        {/* Regular action buttons */}
+        {/* Action buttons */}
         {viewerIsOwner && attempt.attempt_type !== 'remediation_retry' && attempt.attempt_type !== 'remediation_practice' && (
-          <div className="grid grid-cols-2 gap-2 pt-2">
-            <Button variant="outline" size="sm" className="btn-touch" onClick={() => navigate(-1)}>
-              뒤로
+          <div className="space-y-2 pt-2">
+            <Button variant="outline" className="w-full" onClick={handleBack}>
+              <ArrowLeft className="w-4 h-4 mr-1" /> {backLabel}
             </Button>
-            {attempt.assignment_id ? (
-              <Button size="sm" className="btn-touch" onClick={() => navigate(`/assignment/${attempt.assignment_id}`)}>
-                <ArrowLeft className="w-4 h-4 mr-1" /> 숙제로 돌아가기
-              </Button>
-            ) : (
-              <Button variant="outline" size="sm" className="btn-touch"
-                      onClick={() => navigate(`/problem/${attempt.problem_id}`)}>
-                <RotateCcw className="w-4 h-4 mr-1" /> 다시 풀기
-              </Button>
-            )}
-          </div>
-        )}
-        {viewerIsOwner && attempt.attempt_type !== 'remediation_retry' && attempt.attempt_type !== 'remediation_practice' && (
-          <>
-            <div className="text-center mt-3">
+            <Button className="w-full" onClick={handleNextProblem}>
+              {nextLabel} <ChevronRight className="w-4 h-4 ml-1" />
+            </Button>
+            <div className="text-center">
               <Link to="/diagnosis" className="text-xs text-muted-foreground hover:text-primary inline-flex items-center gap-1">
                 <BarChart3 className="w-3 h-3" />
                 내 진단 보기
               </Link>
             </div>
-            <Button size="sm" className="btn-touch w-full mt-2" onClick={handleNextProblem}>
-              {attempt.assignment_id ? '다음 문제 (숙제)' : '다음 문제'} <ChevronRight className="w-4 h-4 ml-1" />
-            </Button>
-          </>
-          )}
+          </div>
+        )}
 
           {/* 검토 요청 모달 */}
           {showReviewRequestModal && (
