@@ -3,8 +3,8 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import AppLayout from '@/components/AppLayout';
-import MathRenderer from '@/components/MathRenderer';
 import DrawingCanvas from '@/components/DrawingCanvas';
+import MathRenderer from '@/components/MathRenderer';
 import LoadingOverlay, { InlineLoader } from '@/components/LoadingOverlay';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -62,7 +62,7 @@ export default function ProblemSolve() {
   const [activeTab, setActiveTab] = useState('canvas');
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [bookmarkId, setBookmarkId] = useState(null);
-  const [studentAnswer, setStudentAnswer] = useState('');
+  const [answerCanvasBlob, setAnswerCanvasBlob] = useState(null);
   const startedAt = useRef(new Date().toISOString());
   const fileInputRef = useRef(null);
 
@@ -171,7 +171,7 @@ export default function ProblemSolve() {
     });
   };
 
-  const doDeepGrading = async (problemText, verifiedAnswer, ocrText) => {
+  const doDeepGrading = async (problemText, verifiedAnswer, studentAnswerText, ocrText) => {
     const toolIds = (() => { try { return JSON.parse(problem.tool_ids || '[]'); } catch { return []; } })();
     const [allTools, allSolutions] = await Promise.all([
       toolIds.length > 0 ? base44.entities.MathTool.list('name', 100) : Promise.resolve([]),
@@ -191,7 +191,7 @@ export default function ProblemSolve() {
     const solutionsBlock = buildSolutionsBlock(solutions, stepsBySol, relevantTools);
     const gradingPrompt = buildGradingPrompt({
       problemText, verifiedAnswer, solutionsBlock, toolsBlock,
-      studentOcrSolution: ocrText, studentAnswer: studentAnswer.trim()
+      studentOcrSolution: ocrText, studentAnswer: studentAnswerText || ''
     });
     const gradeRaw = await base44.integrations.Core.InvokeLLM({
       prompt: gradingPrompt,
@@ -208,7 +208,7 @@ export default function ProblemSolve() {
 
   const handleSubmit = async () => {
     const imageSource = activeTab === 'canvas' ? canvasBlob : photoFile;
-    if (!imageSource && !studentAnswer.trim()) {
+    if (!imageSource && !answerCanvasBlob) {
       toast.error('풀이 또는 답을 작성해 주세요');
       return;
     }
@@ -221,31 +221,40 @@ export default function ProblemSolve() {
     const verifiedAnswer = problem.verified_answer || '';
 
     try {
-      // ───── Stage 1: Fast Check (답안 input 있을 때만) ─────
+      // ───── Stage 1: Fast Check (답안 캔버스 있을 때만) ─────
       let stage1Result = null;
-      if (studentAnswer.trim() && verifiedAnswer) {
+      let answerImageUrl = null;
+      let extractedAnswerText = null;
+
+      if (answerCanvasBlob && verifiedAnswer) {
         setStage('checking');
-        stage1Result = await checkAnswerFast(studentAnswer.trim(), verifiedAnswer, base44.integrations.Core.InvokeLLM);
+        const compressed = await compressImage(answerCanvasBlob);
+        const upload = await base44.integrations.Core.UploadFile({ file: compressed });
+        answerImageUrl = upload.file_url;
+        stage1Result = await checkAnswerFast(answerImageUrl, verifiedAnswer, base44.integrations.Core.InvokeLLM);
+        extractedAnswerText = stage1Result?.student_answer_text || null;
       }
 
       // ───── Stage 1 정답 → 즉시 처리 ─────
       if (stage1Result?.result === 'match') {
-        let imageUrl = null;
+        let solutionImageUrl = null;
         if (imageSource) {
           setStage('ocr');
           const compressed = await compressImage(imageSource);
           const upload = await base44.integrations.Core.UploadFile({ file: compressed });
-          imageUrl = upload.file_url;
+          solutionImageUrl = upload.file_url;
         }
-        
+
         const attempt = await base44.entities.StudentAttempt.create({
           student_id: user.id,
           student_email: user.email,
           problem_id: problem.id,
           problem_content: problemText.slice(0, 500),
           problem_domain: problem.domain_name || '',
-          [imageSource && activeTab === 'canvas' ? 'canvas_image_url' : imageSource ? 'photo_url' : null]: imageUrl,
-          student_answer: studentAnswer.trim(),
+          ...(imageSource && activeTab === 'canvas' ? { canvas_image_url: solutionImageUrl } : {}),
+          ...(imageSource && activeTab === 'photo' ? { photo_url: solutionImageUrl } : {}),
+          student_answer: extractedAnswerText,
+          student_answer_image_url: answerImageUrl,
           answer_check_result: 'correct',
           score: 100,
           correctness: 'correct',
@@ -258,12 +267,11 @@ export default function ProblemSolve() {
           parent_attempt_id: remediationFor || null,
           target_tool_id: targetToolId || null,
         });
-        
-        // 백그라운드 Stage 3 (이미지 있을 때만)
-        if (imageSource && imageUrl) {
-          runBackgroundGrading(attempt.id, imageUrl, problemText, verifiedAnswer, studentAnswer.trim());
+
+        if (imageSource && solutionImageUrl) {
+          runBackgroundGrading(attempt.id, solutionImageUrl, problemText, verifiedAnswer, extractedAnswerText || '');
         }
-        
+
         setStage(null);
         const resultUrl = fromRecommend
           ? `/result/${attempt.id}?from=recommend&reason=${recommendReason || ''}`
@@ -280,7 +288,8 @@ export default function ProblemSolve() {
           problem_id: problem.id,
           problem_content: problemText.slice(0, 500),
           problem_domain: problem.domain_name || '',
-          student_answer: studentAnswer.trim(),
+          student_answer: extractedAnswerText,
+          student_answer_image_url: answerImageUrl,
           answer_check_result: 'wrong',
           score: 0,
           correctness: 'wrong',
@@ -301,7 +310,7 @@ export default function ProblemSolve() {
       setStage('ocr');
       const compressed = await compressImage(imageSource);
       const { file_url: imageUrl } = await base44.integrations.Core.UploadFile({ file: compressed });
-      
+
       const ocrPrompt = `다음 이미지는 학생의 손글씨 수학 풀이입니다. OCR해서 JSON으로 응답해 주세요.
       
 형식: {"markdown_text": "풀이 텍스트 (LaTeX 포함)", "confidence": 85, "notes": null}
@@ -330,7 +339,7 @@ ${OCR_SYSTEM_PROMPT}`;
       if (stage1Result?.result === 'no_match' && verifiedAnswer) {
         setStage('checking');
         stage2Result = await checkSolutionReachesAnswer(
-          { problemText, ocrText, verifiedAnswer, studentAnswer: studentAnswer.trim() },
+          { problemText, ocrText, verifiedAnswer, studentAnswer: extractedAnswerText || '' },
           base44.integrations.Core.InvokeLLM
         );
       }
@@ -345,7 +354,8 @@ ${OCR_SYSTEM_PROMPT}`;
           problem_domain: problem.domain_name || '',
           [activeTab === 'canvas' ? 'canvas_image_url' : 'photo_url']: imageUrl,
           ocr_text: ocrText,
-          student_answer: studentAnswer.trim(),
+          student_answer: extractedAnswerText,
+          student_answer_image_url: answerImageUrl,
           answer_check_result: 'correct_via_solution',
           score: 95,
           correctness: 'correct',
@@ -358,7 +368,7 @@ ${OCR_SYSTEM_PROMPT}`;
           parent_attempt_id: remediationFor || null,
           target_tool_id: targetToolId || null,
         });
-        runBackgroundGrading(attempt.id, imageUrl, problemText, verifiedAnswer, studentAnswer.trim(), ocrText);
+        runBackgroundGrading(attempt.id, imageUrl, problemText, verifiedAnswer, extractedAnswerText || '', ocrText);
         setStage(null);
         navigate(`/result/${attempt.id}`);
         return;
@@ -366,8 +376,8 @@ ${OCR_SYSTEM_PROMPT}`;
 
       // ───── Stage 3: 깊이 채점 (동기) ─────
       setStage('grading');
-      const gradeResult = await doDeepGrading(problemText, verifiedAnswer, ocrText);
-      
+      const gradeResult = await doDeepGrading(problemText, verifiedAnswer, extractedAnswerText || '', ocrText);
+
       const attempt = await base44.entities.StudentAttempt.create({
         student_id: user.id,
         student_email: user.email,
@@ -376,7 +386,8 @@ ${OCR_SYSTEM_PROMPT}`;
         problem_domain: problem.domain_name || '',
         [activeTab === 'canvas' ? 'canvas_image_url' : 'photo_url']: imageUrl,
         ocr_text: ocrText,
-        student_answer: studentAnswer.trim() || null,
+        student_answer: extractedAnswerText || null,
+        student_answer_image_url: answerImageUrl,
         answer_check_result: 'wrong',
         claude_grade_json: JSON.stringify(gradeResult),
         score: gradeResult?.score || 0,
@@ -390,7 +401,7 @@ ${OCR_SYSTEM_PROMPT}`;
         parent_attempt_id: remediationFor || null,
         target_tool_id: targetToolId || null,
       });
-      
+
       setStage(null);
       const resultUrl = fromRecommend
         ? `/result/${attempt.id}?from=recommend&reason=${recommendReason || ''}`
@@ -428,13 +439,9 @@ ${OCR_SYSTEM_PROMPT}`;
         ocrText = (ocrRaw?.response ?? ocrRaw)?.markdown_text || '';
       }
       if (!ocrText) throw new Error('OCR 실패');
-      
-      // 일시적으로 studentAnswer를 변경해서 채점
-      const originalAnswer = studentAnswer;
-      setStudentAnswer(studentAnswerText);
-      const gradeResult = await doDeepGrading(problemText, verifiedAnswer, ocrText);
-      setStudentAnswer(originalAnswer);
-      
+
+      const gradeResult = await doDeepGrading(problemText, verifiedAnswer, studentAnswerText, ocrText);
+
       await base44.entities.StudentAttempt.update(attemptId, {
         ocr_text: ocrText,
         claude_grade_json: JSON.stringify(gradeResult),
@@ -547,25 +554,11 @@ ${OCR_SYSTEM_PROMPT}`;
             )}
           </div>
 
-          {/* 답안 input */}
+          {/* 답안 캔버스 */}
           <div className="p-4 border-t border-border space-y-2">
             <label className="text-sm font-semibold text-foreground">답 (선택)</label>
-            <input
-              type="text"
-              value={studentAnswer}
-              onChange={e => setStudentAnswer(e.target.value)}
-              placeholder="예: 2, x=3, 1/2, \frac{1}{2}"
-              className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-            />
-            {studentAnswer && (
-              <div className="px-3 py-2 bg-muted/40 rounded-lg">
-                <p className="text-xs text-muted-foreground mb-1">미리보기</p>
-                <MathRenderer content={studentAnswer} className="text-sm" />
-              </div>
-            )}
-            <p className="text-xs text-muted-foreground">
-              답을 입력하면 채점이 빨라져요 (LaTeX 표기 가능: \frac{}{}, ^{}, \sqrt{})
-            </p>
+            <p className="text-xs text-muted-foreground">답을 따로 적어두면 채점이 빨라져요</p>
+            <DrawingCanvas onImageReady={setAnswerCanvasBlob} height={120} />
           </div>
 
           {/* 제출 버튼 — 풀이 영역 하단 고정 */}

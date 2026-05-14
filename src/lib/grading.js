@@ -113,30 +113,39 @@ ${pathText}
 }
 
 /**
- * Stage 1: Fast Check — 학생 답안 vs verified_answer 매칭
+ * Stage 1: Fast Check — 학생 답안 이미지 vision → verified_answer 매칭
+ * @param {string} answerImageUrl - 업로드된 답안 캔버스 이미지 URL
+ * @param {string} verifiedAnswer - 검증된 정답 텍스트
+ * @param {Function} llmInvoke - base44.integrations.Core.InvokeLLM
+ * @returns {{ result: 'match'|'no_match'|'unclear', student_answer_text?: string, reason?: string }}
  */
-export async function checkAnswerFast(studentAnswer, verifiedAnswer, llmInvoke) {
-  if (!studentAnswer?.trim() || !verifiedAnswer?.trim()) return { result: 'unclear' };
-  
-  const prompt = `다음 두 수학 표현이 수학적으로 동등한지 판정해 주세요.
+export async function checkAnswerFast(answerImageUrl, verifiedAnswer, llmInvoke) {
+  if (!answerImageUrl || !verifiedAnswer?.trim()) return { result: 'unclear' };
 
-학생 답: ${studentAnswer.trim()}
+  const prompt = `이 학생이 손으로 쓴 답이 정답과 수학적으로 동등한지 판정해 주세요.
+
 정답: ${verifiedAnswer.trim()}
 
-규칙:
-- 동등한 표현 (0.5 = 1/2, x=2 = 2 = "x=2", 등) → "match"
-- 다른 값 → "no_match"
-- 정규화해도 판단 어려움 → "unclear"
+학생이 손글씨로 쓴 답은 이미지로 첨부되어 있어요.
 
-JSON 으로만 응답하세요.`;
+규칙:
+- 동등한 표현 (0.5 = 1/2, x=2 = 2 = "x=2") → "match"
+- 다른 값 → "no_match"
+- 손글씨 인식 어려움 또는 불확실 → "unclear"
+
+student_answer_text 에 학생이 쓴 답을 텍스트로 추출해 주세요 (LaTeX 표기 가능).
+
+JSON 으로만 응답.`;
 
   const raw = await llmInvoke({
     prompt,
+    file_urls: [answerImageUrl],
     model: 'gemini_3_flash',
     response_json_schema: {
       type: 'object',
       properties: {
         result: { type: 'string', enum: ['match', 'no_match', 'unclear'] },
+        student_answer_text: { type: 'string', description: '학생이 쓴 답을 텍스트(LaTeX 가능)로 추출' },
         reason: { type: 'string' },
       },
       required: ['result'],

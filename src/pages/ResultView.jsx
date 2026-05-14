@@ -493,10 +493,19 @@ export default function ResultView() {
         )}
 
         {/* 학생 답안 표시 */}
-        {attempt?.student_answer && (
-          <div className="bg-muted/40 rounded-lg p-3">
-            <p className="text-xs text-muted-foreground mb-1">학생이 적은 답</p>
-            <MathRenderer content={attempt.student_answer} className="text-sm" />
+        {(attempt?.student_answer || attempt?.student_answer_image_url) && (
+          <div className="bg-muted/40 rounded-lg p-3 space-y-2">
+            <p className="text-xs text-muted-foreground">학생이 적은 답</p>
+            {attempt.student_answer_image_url && (
+              <img
+                src={attempt.student_answer_image_url}
+                alt="학생 답안"
+                className="max-h-32 rounded border border-border bg-white"
+              />
+            )}
+            {attempt.student_answer && (
+              <MathRenderer content={attempt.student_answer} className="text-sm" />
+            )}
           </div>
         )}
 
