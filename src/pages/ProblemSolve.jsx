@@ -15,24 +15,18 @@ import { GRADING_SCHEMA, buildToolsBlock, buildSolutionsBlock, buildGradingPromp
 
 const OCR_SYSTEM_PROMPT = `당신은 한국 K-12 수학 손글씨 풀이 OCR 전문가입니다.
 
-학생의 손글씨 수학 풀이 이미지를 받아, 구조화된 markdown + LaTeX 양식으로 추출합니다.
+이미지에 학생의 손글씨 풀이가 있어요. 풀이를 텍스트로 추출해 주세요.
 
-## 추출 원칙
-1. 양식 보존 — 학생이 쓴 그대로. 임의로 추가/변경하지 않음
-2. 수식은 LaTeX — $...$ (inline) 또는 $$...$$ (block)
-3. 행/단계 양식 보존 — \n으로 구분. enum marker (①②③) 그대로 보존
-4. 할루시 방지 — 학생이 쓰지 않은 내용 추측 X. 명확하지 않으면 unclear_regions에 기록 + confidence 낮춤
+OCR 원칙:
+1. 양식 보존 — 학생이 쓴 그대로
+2. 학생이 안 쓴 내용 추측·추가 금지
+3. 인식 명확하지 않으면 confidence 낮춤
+4. 수식은 LaTeX — 분수 \\frac{a}{b}, 거듭제곱 a^{}, 제곱근 \\sqrt{x}
 
-## 수식 표기
-정확한 표기: 분수 \frac{a}{b}, 제곱 a^{2}, 제곱근 \sqrt{x}, 등호/부등호 =, \neq, \leq, \geq
-
-## 출력 양식
-다음 JSON 형식으로 응답해 주세요:
-{
-  "markdown_text": "학생의 풀이 전체 (markdown + LaTeX)",
-  "confidence": 85,
-  "notes": "특이사항 (있을 경우)"
-}`;
+JSON:
+- markdown_text: 풀이 전체 텍스트를 LaTeX 표기로
+- confidence: 0-100
+- notes: 특이사항`;
 
 const parseContents = (c) => {
   try {
@@ -232,7 +226,8 @@ export default function ProblemSolve() {
         const upload = await base44.integrations.Core.UploadFile({ file: compressed });
         answerImageUrl = upload.file_url;
         stage1Result = await checkAnswerFast(answerImageUrl, verifiedAnswer, base44.integrations.Core.InvokeLLM);
-        extractedAnswerText = stage1Result?.student_answer_text || null;
+        // unclear 포함 — student_answer_text 가 있으면 보존 (정보 손실 X)
+        extractedAnswerText = stage1Result?.student_answer_text?.trim() || null;
       }
 
       // ───── Stage 1 정답 → 즉시 처리 ─────
@@ -310,11 +305,7 @@ export default function ProblemSolve() {
       const compressed = await compressImage(imageSource);
       const { file_url: imageUrl } = await base44.integrations.Core.UploadFile({ file: compressed });
 
-      const ocrPrompt = `다음 이미지는 학생의 손글씨 수학 풀이입니다. OCR해서 JSON으로 응답해 주세요.
-      
-형식: {"markdown_text": "풀이 텍스트 (LaTeX 포함)", "confidence": 85, "notes": null}
-
-${OCR_SYSTEM_PROMPT}`;
+      const ocrPrompt = OCR_SYSTEM_PROMPT;
 
       const ocrRaw = await base44.integrations.Core.InvokeLLM({
         prompt: ocrPrompt,
@@ -416,11 +407,7 @@ ${OCR_SYSTEM_PROMPT}`;
     try {
       let ocrText = prefetchedOcrText;
       if (!ocrText) {
-        const ocrPrompt = `다음 이미지는 학생의 손글씨 수학 풀이입니다. OCR해서 JSON으로 응답해 주세요.
-      
-형식: {"markdown_text": "풀이 텍스트 (LaTeX 포함)", "confidence": 85, "notes": null}
-
-${OCR_SYSTEM_PROMPT}`;
+        const ocrPrompt = OCR_SYSTEM_PROMPT;
         const ocrRaw = await base44.integrations.Core.InvokeLLM({
           prompt: ocrPrompt,
           file_urls: [imageUrl],

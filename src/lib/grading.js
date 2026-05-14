@@ -122,18 +122,33 @@ ${pathText}
 export async function checkAnswerFast(answerImageUrl, verifiedAnswer, llmInvoke) {
   if (!answerImageUrl || !verifiedAnswer?.trim()) return { result: 'unclear' };
 
-  const prompt = `이 학생이 손으로 쓴 답이 정답과 수학적으로 동등한지 판정해 주세요.
+  const prompt = `당신은 학생 손글씨 답안을 정답과 비교하는 vision 매칭 전문가입니다.
+
+## 매칭 판정 (매우 엄격)
+1. **먼저 이미지를 보고 학생이 실제로 쓴 답을 인식**하세요. student_answer_text 에 정확히 출력.
+2. **인식 못 하거나 불확실하면 반드시 "unclear"**. 정답을 보고 추측하지 마세요.
+3. 이미지가 비어 있거나 빈 종이 같으면 "unclear".
+4. 학생 답이 인식된 후에만 정답과 비교해 match / no_match 판정.
+
+## 절대 금지
+- 정답을 보고 학생 답을 추측하기
+- 학생이 안 쓴 내용을 student_answer_text 에 적기
+- 학생 답과 정답이 다른데 match 반환 (편향 금지)
 
 정답: ${verifiedAnswer.trim()}
+(주의: 위 정답은 매칭 비교용. 학생 답을 추측하는 데 사용 금지.)
 
 학생이 손글씨로 쓴 답은 이미지로 첨부되어 있어요.
 
-규칙:
-- 동등한 표현 (0.5 = 1/2, x=2 = 2 = "x=2") → "match"
-- 다른 값 → "no_match"
-- 손글씨 인식 어려움 또는 불확실 → "unclear"
+응답 규칙:
+- 학생 답이 정답과 수학적으로 동등 (0.5 = 1/2) → "match"
+- 학생 답이 정답과 다름 → "no_match"
+- 인식 어려움·이미지 비어있음·불확실 → "unclear"
 
-student_answer_text 에 학생이 쓴 답을 텍스트로 추출해 주세요 (LaTeX 표기 가능).
+## student_answer_text 형식
+- 반드시 KaTeX/LaTeX 표기 (x^{3}, \\frac{1}{2}, \\sqrt{x})
+- $...$ wrapper 없이 식 자체만
+- 이미지에서 실제로 읽은 것만. 정답 복사 금지. 인식 못 하면 빈 문자열.
 
 JSON 으로만 응답.`;
 
@@ -145,13 +160,21 @@ JSON 으로만 응답.`;
       type: 'object',
       properties: {
         result: { type: 'string', enum: ['match', 'no_match', 'unclear'] },
-        student_answer_text: { type: 'string', description: '학생이 쓴 답을 텍스트(LaTeX 가능)로 추출' },
+        student_answer_text: { type: 'string' },
         reason: { type: 'string' },
       },
       required: ['result'],
     },
   });
-  return raw?.response ?? raw;
+
+  const r = raw?.response ?? raw;
+
+  // sanitize — student_answer_text 비어있는데 match 면 unclear 강제
+  if (r?.result === 'match' && (!r.student_answer_text || !r.student_answer_text.trim())) {
+    return { ...r, result: 'unclear', reason: 'student_answer_text empty — forced unclear' };
+  }
+
+  return r;
 }
 
 /**
