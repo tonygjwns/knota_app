@@ -347,7 +347,7 @@ export default function History() {
                         const colorMap = { correct: 'border-l-emerald-400', partial: 'border-l-amber-400', wrong: 'border-l-red-400' };
                         const text = parseProblemText(attempt.problem_content || '');
                         return (
-                          <Link key={attempt.id} to={`/result/${attempt.id}`}>
+                          <Link key={attempt.id} to={`/record/${attempt.id}`}>
                             <Card className={`p-4 card-hover border-l-4 ${colorMap[color]} flex items-center gap-3`}>
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-foreground line-clamp-2">

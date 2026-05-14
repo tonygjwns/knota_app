@@ -44,6 +44,7 @@ import RemediationComplete from './pages/remediation/RemediationComplete';
 import Bookmarks from './pages/Bookmarks';
 import Withdraw from './pages/Withdraw';
 import Diagnosis from './pages/Diagnosis.jsx';
+import RecordDetail from './pages/RecordDetail';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user } = useAuth();
@@ -95,6 +96,7 @@ const AuthenticatedApp = () => {
       <Route path="/bookmarks" element={<Bookmarks />} />
       <Route path="/withdraw" element={<Withdraw />} />
       <Route path="/diagnosis" element={<Diagnosis />} />
+      <Route path="/record/:attemptId" element={<RecordDetail />} />
 
       {/* Admin routes */}
       <Route path="/admin" element={<AdminLayout />}>
