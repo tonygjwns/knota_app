@@ -171,14 +171,14 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
 
   return (
     <div className="flex flex-col gap-3">
-      {/* 도구 선택 */}
-      <div className="flex gap-2">
+      {/* 도구 선택 — sticky 상단 */}
+      <div className="sticky top-0 z-10 bg-card grid grid-cols-2 gap-2 py-2 mb-2">
         <Button type="button" variant={tool === 'pen' ? 'default' : 'outline'} size="sm"
-          onClick={() => setTool('pen')} className="flex-1 btn-touch">
+          onClick={() => setTool('pen')} className="btn-touch">
           <Pencil className="w-4 h-4 mr-1" /> 펜
         </Button>
         <Button type="button" variant={tool === 'eraser' ? 'default' : 'outline'} size="sm"
-          onClick={() => setTool('eraser')} className="flex-1 btn-touch">
+          onClick={() => setTool('eraser')} className="btn-touch">
           <Eraser className="w-4 h-4 mr-1" /> 지우개
         </Button>
       </div>
@@ -230,18 +230,18 @@ export default function DrawingCanvas({ onImageReady, penColor = '#1e293b', penS
         />
       </div>
 
-      {/* 하단 버튼 */}
-      <div className="flex gap-2">
+      {/* 하단 버튼 — sticky 하단 */}
+      <div className="sticky bottom-0 z-10 bg-card grid grid-cols-3 gap-2 py-2 mt-2 border-t border-border">
         <Button type="button" variant="outline" size="sm" onClick={undo}
-                disabled={isEmpty} className="btn-touch flex-1">
+                disabled={isEmpty} className="btn-touch">
           <Undo2 className="w-4 h-4 mr-1" /> 되돌리기
         </Button>
         <Button type="button" variant="outline" size="sm" onClick={clear}
-                className="btn-touch flex-1 text-destructive hover:text-destructive">
+                className="btn-touch text-destructive hover:text-destructive">
           <Trash2 className="w-4 h-4 mr-1" /> 초기화
         </Button>
         <Button type="button" variant="outline" size="sm" onClick={expandCanvas}
-                className="btn-touch flex-1">
+                className="btn-touch">
           <Plus className="w-4 h-4 mr-1" /> 칸 늘리기
         </Button>
       </div>

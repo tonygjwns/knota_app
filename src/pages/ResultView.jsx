@@ -601,9 +601,11 @@ export default function ResultView() {
         )}
 
         {/* Tools used chips */}
-        {tools.length > 0 && (
+        {tools.length > 0 && grading && (
           <div>
-            <p className="text-xs text-muted-foreground mb-2 font-medium">이 문제에 사용된 도구</p>
+            <p className="text-xs text-muted-foreground mb-2 font-medium">
+              {grading.matched_solution_id ? '당신의 풀이에 사용된 도구' : '이 문제의 풀이 도구'}
+            </p>
             <div className="flex flex-wrap gap-2">
               {tools.map(tool => (
                 <div key={tool.tool_id} className="inline-flex items-center gap-0 bg-primary/10 text-primary rounded-full text-xs font-medium">
@@ -829,11 +831,11 @@ export default function ResultView() {
         )}
 
         {/* 다른 풀이도 있어요 */}
-        {otherSolutions.length > 0 && (
+        {otherSolutions.length > 0 && grading && (
           <div>
             <h2 className="text-base font-semibold mb-3 flex items-center gap-2">
               <BookOpen className="w-4 h-4 text-primary" />
-              다른 풀이도 있어요
+              {grading.matched_solution_id ? '다른 풀이도 있어요' : '이 문제의 풀이 방법들'}
               <span className="text-xs text-muted-foreground font-normal">({otherSolutions.length}개)</span>
             </h2>
             <div className="space-y-2">

@@ -491,7 +491,7 @@ ${OCR_SYSTEM_PROMPT}`;
           </div>
 
           {/* Problem text — 스크롤 가능 */}
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-scroll p-4 custom-scrollbar">
             {problem && (
               <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-5">
                 <MathRenderer content={problemText} className="text-base" />
@@ -513,7 +513,7 @@ ${OCR_SYSTEM_PROMPT}`;
           </div>
 
           {/* 풀이 영역 — 스크롤 가능 */}
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-scroll p-4 custom-scrollbar">
             {activeTab === 'canvas' && (
               <>
                 <p className="text-xs text-muted-foreground mb-2">답을 캔버스 아래 점선 박스 안에 적으면 채점이 빨라져요</p>
