@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Star } from 'lucide-react';
 
 const parseGrading = (a) => {
   try {
@@ -20,7 +20,7 @@ const parseProblemText = (content) => {
   } catch { return String(content || ''); }
 };
 
-export default function AssignmentProblemStats({ problem, attempts, solutions, stepsBySol, toolMap }) {
+export default function AssignmentProblemStats({ problem, attempts, solutions, stepsBySol, toolMap, bookmarkedToolIds = new Set(), onToggleBookmark }) {
   const validAttempts = attempts.filter(a => a.claude_grade_json);
 
   // ── 별해 분포 집계
@@ -81,6 +81,7 @@ export default function AssignmentProblemStats({ problem, attempts, solutions, s
       });
       return {
         step_number: step.sequence_order,
+        tool_id: step.tool_id,
         tool_name: toolMap?.get(step.tool_id)?.name || step.tool_id || `Step ${step.sequence_order}`,
         ...counts,
         total: matchedAttempts.length,
@@ -169,9 +170,17 @@ export default function AssignmentProblemStats({ problem, attempts, solutions, s
           <div className="space-y-1">
             {stepStats.map(s => (
               <div key={s.step_number} className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground w-32 shrink-0 truncate">
-                  Step {s.step_number} — {s.tool_name}
-                </span>
+                <div className="text-xs text-muted-foreground w-32 shrink-0 flex items-center gap-1">
+                  <span className="truncate">Step {s.step_number} — {s.tool_name}</span>
+                  {s.tool_id && onToggleBookmark && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); const t = toolMap?.get(s.tool_id); if (t) onToggleBookmark(t); }}
+                      className="flex-shrink-0 p-0.5 hover:bg-muted rounded"
+                    >
+                      <Star className={`w-3 h-3 ${bookmarkedToolIds.has(s.tool_id) ? 'fill-amber-500 text-amber-500' : 'text-muted-foreground'}`} />
+                    </button>
+                  )}
+                </div>
                 <div className="flex-1 h-5 rounded overflow-hidden flex">
                   {[['correct','#10b981'],['partial','#f59e0b'],['wrong','#ef4444'],['missing','#94a3b8']].map(([key, color]) => {
                     const pct = s.total > 0 ? (s[key] / s.total) * 100 : 0;

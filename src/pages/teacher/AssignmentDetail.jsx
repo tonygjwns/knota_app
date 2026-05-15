@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '@/lib/AuthContext';
 import { useParams, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useTeacher } from '@/lib/TeacherContext';
@@ -39,6 +40,7 @@ export default function AssignmentDetail() {
   const { assignmentId } = useParams();
   const navigate = useNavigate();
   const { data: teacherData } = useTeacher();
+  const { user } = useAuth();
 
   const [assignment, setAssignment] = useState(null);
   const [problems, setProblems] = useState([]);
@@ -51,6 +53,8 @@ export default function AssignmentDetail() {
   const [stepsBySol, setStepsBySol] = useState(new Map());
   const [toolMap, setToolMap] = useState(new Map());
   const [expandedProblemId, setExpandedProblemId] = useState(null);
+  const [bookmarkedToolIds, setBookmarkedToolIds] = useState(new Set());
+  const [toolBookmarkIdMap, setToolBookmarkIdMap] = useState(new Map());
 
   useEffect(() => {
     const load = async () => {
@@ -72,12 +76,15 @@ export default function AssignmentDetail() {
           // Solution + SolutionStep fetch
           const problemVarchars = filteredProblems.map(p => p.problem_id).filter(Boolean);
           if (problemVarchars.length > 0) {
-            const [allTools, solArrays] = await Promise.all([
+            const [allTools, solArrays, myToolBookmarks] = await Promise.all([
               base44.entities.MathTool.list('name', 100),
               Promise.all(problemVarchars.map(pv =>
                 base44.entities.Solution.filter({ problem_id: pv }, 'priority', 20)
               )),
+              user ? base44.entities.BookmarkedTool.filter({ user_id: user.id }) : Promise.resolve([]),
             ]);
+            setBookmarkedToolIds(new Set(myToolBookmarks.map(b => b.tool_id)));
+            setToolBookmarkIdMap(new Map(myToolBookmarks.map(b => [b.tool_id, b.id])));
 
             const newToolMap = new Map(allTools.map(t => [t.tool_id, t]));
             setToolMap(newToolMap);
@@ -141,6 +148,26 @@ export default function AssignmentDetail() {
     };
     load();
   }, [assignmentId, teacherData]);
+
+  const handleToggleToolBookmark = async (tool) => {
+    if (!user) return;
+    try {
+      if (bookmarkedToolIds.has(tool.tool_id)) {
+        const id = toolBookmarkIdMap.get(tool.tool_id);
+        if (!id) return;
+        await base44.entities.BookmarkedTool.delete(id);
+        setBookmarkedToolIds(prev => { const s = new Set(prev); s.delete(tool.tool_id); return s; });
+        toast.success('즐겨찾기 해제');
+      } else {
+        const created = await base44.entities.BookmarkedTool.create({ user_id: user.id, tool_id: tool.tool_id });
+        setBookmarkedToolIds(prev => new Set([...prev, tool.tool_id]));
+        setToolBookmarkIdMap(prev => new Map(prev).set(tool.tool_id, created.id));
+        toast.success('즐겨찾기에 추가');
+      }
+    } catch {
+      toast.error('즐겨찾기 처리 중 오류가 발생했어요');
+    }
+  };
 
   const handleSave = async (assignmentData) => {
     try {
@@ -284,6 +311,8 @@ export default function AssignmentDetail() {
                       solutions={solutions}
                       stepsBySol={stepsBySol}
                       toolMap={toolMap}
+                      bookmarkedToolIds={bookmarkedToolIds}
+                      onToggleBookmark={handleToggleToolBookmark}
                     />
                   </div>
                 )}

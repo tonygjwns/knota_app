@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { useTeacher } from '@/lib/TeacherContext';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
@@ -19,6 +20,7 @@ const parseProblemText = (content) => {
 export default function AssignmentStudentDetail() {
   const { assignmentId, studentId } = useParams();
   const navigate = useNavigate();
+  const { data: teacherData, loading: teacherLoading } = useTeacher();
 
   const [loading, setLoading] = useState(true);
   const [student, setStudent] = useState(null);
@@ -27,16 +29,21 @@ export default function AssignmentStudentDetail() {
   const [attemptsByProblem, setAttemptsByProblem] = useState(new Map());
 
   useEffect(() => {
+    if (teacherLoading) return;
+    if (!teacherData) { setLoading(false); return; }
     (async () => {
       setLoading(true);
       try {
-        const [assignments, allUsers] = await Promise.all([
-          base44.entities.Assignment.filter({ id: assignmentId }),
-          base44.entities.User.filter({ id: studentId }),
-        ]);
+        const stu = teacherData.my_students?.find(s => s.id === studentId);
+        if (!stu) {
+          toast.error('이 학생을 볼 권한이 없어요');
+          navigate(-1);
+          return;
+        }
+
+        const assignments = await base44.entities.Assignment.filter({ id: assignmentId });
         const asgn = assignments[0];
-        const stu = allUsers[0];
-        if (!asgn || !stu) { navigate(-1); return; }
+        if (!asgn) { navigate(-1); return; }
         setAssignment(asgn);
         setStudent(stu);
 
@@ -68,9 +75,9 @@ export default function AssignmentStudentDetail() {
         setLoading(false);
       }
     })();
-  }, [assignmentId, studentId]);
+  }, [assignmentId, studentId, teacherData, teacherLoading]);
 
-  if (loading) return <InlineLoader message="불러오는 중..." />;
+  if (loading || teacherLoading) return <InlineLoader message="불러오는 중..." />;
   if (!assignment || !student) return null;
 
   const submittedCount = [...attemptsByProblem.values()].length;

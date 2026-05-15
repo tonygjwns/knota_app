@@ -38,9 +38,13 @@ export default function ProblemDetail({ mode = 'admin' }) {
   const [pageIdx, setPageIdx] = useState(0);
 
 
-  // 즐겨찾기 상태 (teacher mode)
+  // 문제 즐겨찾기 상태 (teacher mode)
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [bookmarkRecordId, setBookmarkRecordId] = useState(null);
+
+  // 도구 즐겨찾기 상태 (teacher mode)
+  const [bookmarkedToolIds, setBookmarkedToolIds] = useState(new Set());
+  const [bookmarkIdMap, setBookmarkIdMap] = useState(new Map());
 
   const PAGE_SIZE = 20;
 
@@ -71,10 +75,17 @@ export default function ProblemDetail({ mode = 'admin' }) {
         const results = await Promise.all(fetchPromises);
         const [allAttempts, toolsData, sols, bmData] = results;
 
-        // 강사 즐겨찾기 초기화
+        // 강사 문제 즐겨찾기 초기화
         if (mode === 'teacher' && bmData && bmData.length > 0) {
           setIsBookmarked(true);
           setBookmarkRecordId(bmData[0].id);
+        }
+
+        // 강사 도구 즐겨찾기 초기화
+        if (mode === 'teacher' && user) {
+          const myToolBookmarks = await base44.entities.BookmarkedTool.filter({ user_id: user.id });
+          setBookmarkedToolIds(new Set(myToolBookmarks.map(b => b.tool_id)));
+          setBookmarkIdMap(new Map(myToolBookmarks.map(b => [b.tool_id, b.id])));
         }
 
         // 별해 steps fetch
@@ -115,6 +126,26 @@ export default function ProblemDetail({ mode = 'admin' }) {
     };
     load();
   }, [problemId, mode, teacherData]);
+
+  const toggleToolBookmark = async (tool) => {
+    if (!user) return;
+    try {
+      if (bookmarkedToolIds.has(tool.tool_id)) {
+        const id = bookmarkIdMap.get(tool.tool_id);
+        if (!id) return;
+        await base44.entities.BookmarkedTool.delete(id);
+        setBookmarkedToolIds(prev => { const s = new Set(prev); s.delete(tool.tool_id); return s; });
+        toast.success('즐겨찾기 해제');
+      } else {
+        const created = await base44.entities.BookmarkedTool.create({ user_id: user.id, tool_id: tool.tool_id });
+        setBookmarkedToolIds(prev => new Set([...prev, tool.tool_id]));
+        setBookmarkIdMap(prev => new Map(prev).set(tool.tool_id, created.id));
+        toast.success('즐겨찾기에 추가');
+      }
+    } catch {
+      toast.error('즐겨찾기 처리 중 오류가 발생했어요');
+    }
+  };
 
   const toggleBookmark = async () => {
     if (!user || !problem) return;
@@ -166,8 +197,8 @@ export default function ProblemDetail({ mode = 'admin' }) {
   };
 
   const toolIds = problem.tool_ids ? JSON.parse(problem.tool_ids) : [];
-  const toolNames = toolIds.map(id => tools.find(t => t.tool_id === id)?.name || id).filter(Boolean);
   const toolMap = new Map(tools.map(t => [t.tool_id, t]));
+  const problemTools = toolIds.map(id => toolMap.get(id)).filter(Boolean);
 
   return (
     <div className="space-y-6 pb-10">
@@ -178,12 +209,18 @@ export default function ProblemDetail({ mode = 'admin' }) {
         </button>
         <div className="flex-1 min-w-0">
           <h1 className="text-xl font-bold">{problem.domain_name || '(도메인 없음)'}</h1>
-          {toolNames.length > 0 && (
+          {problemTools.length > 0 && (
             <div className="flex gap-1 mt-1 flex-wrap">
-              {toolNames.map(name => (
-                <span key={name} className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded">
-                  {name}
-                </span>
+              {problemTools.map(t => (
+                <div key={t.tool_id} className="inline-flex items-center gap-0 bg-violet-100 text-violet-700 rounded-full text-xs">
+                  <span className="px-2 py-0.5">{t.name}</span>
+                  {mode === 'teacher' && user && (
+                    <button onClick={() => toggleToolBookmark(t)}
+                      className="px-1.5 py-0.5 hover:bg-violet-200 rounded-r-full transition-colors">
+                      <Star className={`w-3 h-3 ${bookmarkedToolIds.has(t.tool_id) ? 'fill-amber-500 text-amber-500' : ''}`} />
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           )}
