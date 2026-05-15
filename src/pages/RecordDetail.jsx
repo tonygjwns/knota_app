@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
+import { redirectByRole } from '@/lib/auth-utils';
 import AppLayout from '@/components/AppLayout';
 import MathRenderer from '@/components/MathRenderer';
 import { InlineLoader } from '@/components/LoadingOverlay';
@@ -33,6 +34,34 @@ export default function RecordDetail() {
       try {
         const [a] = await base44.entities.StudentAttempt.filter({ id: attemptId }, '-created_date', 1);
         if (!a) { navigate('/history'); return; }
+
+        // 권한 체크
+        if (user) {
+          const isOwn = a.student_id === user.id;
+          const isAdmin = user.role === 'admin';
+          let isAuthorized = isOwn || isAdmin;
+          if (!isAuthorized && user.role === 'teacher') {
+            try {
+              const allClasses = await base44.entities.Class.filter({ main_teacher_id: user.id }, 'name', 100);
+              const classIds = new Set(allClasses.map(c => c.id));
+              if (classIds.size > 0) {
+                const allStudents = await base44.entities.User.list('full_name', 500);
+                isAuthorized = allStudents.some(s => s.id === a.student_id && classIds.has(s.class_id));
+              }
+            } catch {}
+          }
+          if (!isAuthorized && user.role === 'owner') {
+            try {
+              const [studentUser] = await base44.entities.User.filter({ id: a.student_id }, '-created_date', 1);
+              isAuthorized = studentUser?.academy_id === user.academy_id;
+            } catch {}
+          }
+          if (!isAuthorized) {
+            navigate(redirectByRole(user));
+            return;
+          }
+        }
+
         setAttempt(a);
 
         if (a.problem_id) {

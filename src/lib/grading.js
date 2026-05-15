@@ -59,7 +59,8 @@ export const GRADING_SCHEMA = {
     matched_solution_id: { type: 'string', description: '학생 풀이와 가장 가까운 별해 solution_id. 매칭 안 되면 null. 별해 0개면 null.' },
     matched_solution_priority: { type: 'integer', description: '매칭 별해의 priority (UI 표시용). 없으면 null.' },
     confidence: { type: 'integer', minimum: 0, maximum: 100 },
-    ocr_quality_concern: { type: 'string' }
+    ocr_quality_concern: { type: 'string' },
+    student_final_answer: { type: 'string', description: '풀이 OCR에서 추출한 학생 최종 답. LaTeX, $ wrapper 없이. 못 찾으면 빈 문자열.' }
   },
   required: ['schema_version', 'score', 'correctness', 'summary', 'step_feedback', 'gap_locations', 'error_locations', 'confidence']
 };
@@ -205,6 +206,7 @@ ${ocrText}
 - 판단 불확실 → "unclear"
 
 학생이 답안 input 에 오타를 적었더라도 풀이 자체가 정답에 도달했다면 reached.
+- extracted_answer: 풀이 OCR에서 학생 최종 답을 LaTeX로 추출. $ 없이. 못 찾으면 "".
 
 JSON 만 응답.`;
 
@@ -216,6 +218,7 @@ JSON 만 응답.`;
       properties: {
         result: { type: 'string', enum: ['reached', 'not_reached', 'unclear'] },
         reason: { type: 'string' },
+        extracted_answer: { type: 'string', description: '풀이 OCR에서 학생이 최종적으로 도달한 답. LaTeX, $ wrapper 없이. 못 찾으면 빈 문자열.' },
       },
       required: ['result'],
     },
@@ -239,7 +242,8 @@ export function buildGradingPrompt({ problemText, verifiedAnswer, solutionsBlock
 3. 별해 매칭 — 학생 풀이가 <solutions> 안의 어느 별해와 가장 비슷한지 판정해
    matched_solution_id에 그 별해의 solution_id를 채워주세요. 어느 것과도 비슷하지 않으면 null.
    별해가 0개면 항상 null.
-4. 정답 처리 — 학생이 매칭 별해의 path와 일치하면서 verified_answer에 도달하면 score 80+ (correct).
+4. student_final_answer — 풀이 OCR에서 학생 최종 답을 LaTeX로 추출. $ 없이. 못 찾으면 "".
+5. 정답 처리 — 학생이 매칭 별해의 path와 일치하면서 verified_answer에 도달하면 score 80+ (correct).
    사소한 계산/표기 오류는 허용. 개념적 오류만 score 크게 차감.
 5. 오류 분류:
    - calculation = 산수/부호 오류 (소소)

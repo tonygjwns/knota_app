@@ -85,7 +85,11 @@ Deno.serve(async (req) => {
       attempts: e.attempts, correct_count: e.correct_count, avg_score: e.avg_score
     }));
     const masteryArr = [...masteryMap.entries()].filter(([_, e]) => e.attempts >= 3);
-    const weak_tools = buildList([...masteryArr].sort((a,b) => a[1].avg_score - b[1].avg_score)).slice(0, 5);
+    const weak_tools = buildList(
+      [...masteryArr]
+        .filter(([_, e]) => e.avg_score < 70)
+        .sort((a, b) => a[1].avg_score - b[1].avg_score)
+    ).slice(0, 5);
     const strong_tools = buildList([...masteryArr].filter(([_,e]) => e.avg_score >= 70)
       .sort((a,b) => b[1].avg_score - a[1].avg_score)).slice(0, 5);
 

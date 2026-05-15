@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { useTeacher } from '@/lib/TeacherContext';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
-import { ArrowLeft, ChevronDown, Star } from 'lucide-react';
+import { ArrowLeft, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import MathRenderer from '@/components/MathRenderer';
 import SolutionCard from '@/components/SolutionCard';
@@ -36,7 +36,7 @@ export default function ProblemDetail({ mode = 'admin' }) {
   const [error, setError] = useState(null);
   const [sortKey, setSortKey] = useState('submitted_at');
   const [pageIdx, setPageIdx] = useState(0);
-  const [showAnswer, setShowAnswer] = useState(false);
+
 
   // 즐겨찾기 상태 (teacher mode)
   const [isBookmarked, setIsBookmarked] = useState(false);
@@ -215,18 +215,10 @@ export default function ProblemDetail({ mode = 'admin' }) {
       {/* 검증 정답 */}
       {problem.verified_answer && (
         <Card className="p-4">
-          <button
-            onClick={() => setShowAnswer(!showAnswer)}
-            className="flex items-center gap-2 font-semibold w-full"
-          >
-            <ChevronDown className={`w-4 h-4 transition-transform ${showAnswer ? 'rotate-180' : ''}`} />
-            검증 정답
-          </button>
-          {showAnswer && (
-            <div className="mt-3 pt-3 border-t prose prose-sm max-w-none">
-              <MathRenderer content={parseProblemText(problem.verified_answer)} />
-            </div>
-          )}
+          <p className="font-semibold mb-3">검증 정답</p>
+          <div className="pt-3 border-t prose prose-sm max-w-none">
+            <MathRenderer content={parseProblemText(problem.verified_answer)} />
+          </div>
         </Card>
       )}
 
@@ -294,7 +286,7 @@ export default function ProblemDetail({ mode = 'admin' }) {
             return (
               <button
                 key={attempt.id}
-                onClick={() => navigate(`/result/${attempt.id}`)}
+                onClick={() => navigate(`/record/${attempt.id}`)}
                 className={`w-full p-3 rounded-lg border transition-colors text-left ${
                   attempt.correctness === 'correct'
                     ? 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100'

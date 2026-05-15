@@ -304,7 +304,7 @@ export default function AssignmentDetail() {
               <Card
                 key={submission.student.id}
                 className="p-4 cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => navigate(`/teacher/students/${submission.student.id}`)}
+                onClick={() => navigate(`/teacher/assignments/${assignmentId}/student/${submission.student.id}`)}
               >
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div className="flex-1">

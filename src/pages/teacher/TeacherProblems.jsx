@@ -179,7 +179,7 @@ export default function TeacherProblems() {
             <BookOpen className="w-6 h-6 text-primary" />
             문제 열람
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">단원을 선택하세요</p>
+          <p className="text-sm text-muted-foreground mt-0.5">영역을 선택하세요</p>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {domains.map(domain => {
@@ -348,7 +348,6 @@ export default function TeacherProblems() {
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="text-xs text-muted-foreground font-mono">{problem.problem_id}</p>
                       {solCount > 0 && (
                         <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">
                           풀이 {solCount}개

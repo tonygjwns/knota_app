@@ -184,20 +184,24 @@ export default function ResultView() {
         if (user) {
           const isOwn = a.student_id === user.id;
           const isAdmin = user.role === 'admin';
-          let isMyStudent = false;
-          if (user.role === 'teacher' && !isOwn) {
-            // Teacher can view their students' attempts
-            // Fetch students who belong to classes the teacher manages
+          let isAuthorized = isOwn || isAdmin;
+          if (!isAuthorized && user.role === 'teacher') {
             try {
               const allClasses = await base44.entities.Class.filter({ main_teacher_id: user.id }, 'name', 100);
               const classIds = new Set(allClasses.map(c => c.id));
               if (classIds.size > 0) {
                 const allStudents = await base44.entities.User.list('full_name', 500);
-                isMyStudent = allStudents.some(s => s.id === a.student_id && classIds.has(s.class_id));
+                isAuthorized = allStudents.some(s => s.id === a.student_id && classIds.has(s.class_id));
               }
-            } catch { isMyStudent = false; }
+            } catch {}
           }
-          if (!isOwn && !isAdmin && !isMyStudent) {
+          if (!isAuthorized && user.role === 'owner') {
+            try {
+              const [studentUser] = await base44.entities.User.filter({ id: a.student_id }, '-created_date', 1);
+              isAuthorized = studentUser?.academy_id === user.academy_id;
+            } catch {}
+          }
+          if (!isAuthorized) {
             toast.error('이 결과를 볼 권한이 없어요');
             navigate(redirectByRole(user));
             return;
@@ -675,7 +679,11 @@ JSON: {"markdown_text": "풀이 (LaTeX 포함)", "confidence": 0-100, "notes": "
             <p className="text-sm text-emerald-700 font-medium mt-2">정답을 맞췄어요!</p>
           )}
           {attempt?.answer_check_result === 'correct_via_solution' && (
-            <p className="text-sm text-amber-700 font-medium mt-2">풀이가 정답에 도달했어요! (답안 인식에 오타가 있었나봐요)</p>
+            <p className="text-sm text-amber-700 font-medium mt-2">
+              {attempt.student_answer
+                ? '풀이가 정답에 도달했어요! (답안 인식에 오타가 있었나봐요)'
+                : '풀이가 정답에 도달했어요! (답란을 비우고 제출했나봐요)'}
+            </p>
           )}
           {grading?.summary && (
             <p className="text-muted-foreground text-sm mt-3 leading-relaxed">{grading.summary}</p>
@@ -686,7 +694,10 @@ JSON: {"markdown_text": "풀이 (LaTeX 포함)", "confidence": 0-100, "notes": "
         {attempt?.student_answer && (
           <div className="bg-muted/40 rounded-lg p-3 space-y-2">
             <p className="text-xs text-muted-foreground">학생이 적은 답</p>
-            <MathRenderer content={attempt.student_answer} className="text-base" />
+            <MathRenderer
+              content={attempt.student_answer.includes('$') ? attempt.student_answer : `$${attempt.student_answer}$`}
+              className="text-base"
+            />
           </div>
         )}
 
@@ -748,17 +759,6 @@ JSON: {"markdown_text": "풀이 (LaTeX 포함)", "confidence": 0-100, "notes": "
                   )}
                 </div>
               ))}
-            </div>
-          </div>
-        )}
-
-        {/* OCR quality warning */}
-        {showDetail && grading?.ocr_quality_concern && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-amber-800 text-sm font-medium">필기 인식에 의문이 있어요</p>
-              <p className="text-amber-700 text-sm mt-0.5">{grading.ocr_quality_concern}</p>
             </div>
           </div>
         )}
@@ -863,58 +863,6 @@ JSON: {"markdown_text": "풀이 (LaTeX 포함)", "confidence": 0-100, "notes": "
                         <MathRenderer content={gap.expected_step} className="text-sm" />
                       </div>
                     )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Error locations */}
-        {showDetail && errors.length > 0 && (
-          <div>
-            <h2 className="text-base font-semibold mb-2 text-red-700">오류 위치</h2>
-            <div className="space-y-2">
-              {errors.map((err, i) => {
-                const toolName = getToolName(err.tool_id);
-                const toolEntity = getToolEntity(err.tool_id);
-                const errTypeLabel = err.error_type === 'calculation' ? '계산 오류' :
-                                     err.error_type === 'conceptual' ? '개념 오류' : '표기 오류';
-                return (
-                  <div key={i} className="bg-red-50 border border-red-200 rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-1">
-                      {toolName && toolEntity ? (
-                        <div className="inline-flex items-center gap-0">
-                          <button
-                            onClick={() => setTooltipTool(toolEntity)}
-                            className="text-xs bg-red-200/60 text-red-800 px-2 py-0.5 rounded-l-full inline-flex items-center gap-1 hover:bg-red-200 transition-colors"
-                          >
-                            <Wrench className="w-3 h-3" />
-                            {toolName}
-                          </button>
-                          {user && viewerIsOwner && (
-                            <button
-                              onClick={() => toggleBookmark(toolEntity)}
-                              className="text-xs bg-red-200/60 text-red-800 px-1.5 py-0.5 rounded-r-full hover:bg-red-200 transition-colors"
-                            >
-                              <Star className={`w-3 h-3 ${bookmarkedToolIds.has(err.tool_id) ? 'fill-amber-500 text-amber-500' : ''}`} />
-                            </button>
-                          )}
-                        </div>
-                      ) : null}
-                      <p className="text-xs text-red-600 font-medium">{toolName ? `— ${errTypeLabel}` : errTypeLabel}</p>
-                    </div>
-                    <p className="text-sm text-red-800 mb-2">{err.description}</p>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div className="bg-red-100 rounded p-2">
-                        <p className="text-red-500 mb-1">학생 풀이</p>
-                        <MathRenderer content={err.student_wrote} />
-                      </div>
-                      <div className="bg-emerald-100 rounded p-2">
-                        <p className="text-emerald-600 mb-1">올바른 풀이</p>
-                        <MathRenderer content={err.correct_form} />
-                      </div>
-                    </div>
                   </div>
                 );
               })}
@@ -1083,8 +1031,7 @@ JSON: {"markdown_text": "풀이 (LaTeX 포함)", "confidence": 0-100, "notes": "
 
         {/* UX-3: 도구별 보강 카드 */}
         {viewerIsOwner && (attempt.correctness === 'partial' || attempt.correctness === 'wrong') && 
-         remediationToolIds.length > 0 && 
-         attempt.attempt_type !== 'remediation_retry' && (
+         remediationToolIds.length > 0 && (
           <div className="space-y-2">
             <h2 className="text-base font-semibold flex items-center gap-2">
               <Wrench className="w-4 h-4 text-primary" />
@@ -1093,7 +1040,10 @@ JSON: {"markdown_text": "풀이 (LaTeX 포함)", "confidence": 0-100, "notes": "
             <p className="text-xs text-muted-foreground">
               이 문제에서 부족했던 도구를 그 도구의 다른 문제로 연습할 수 있어요
             </p>
-            {remediationToolIds.map(toolId => {
+            {(attempt.attempt_type === 'remediation_retry' && attempt.target_tool_id
+              ? remediationToolIds.filter(id => id === attempt.target_tool_id)
+              : remediationToolIds
+            ).map(toolId => {
               const toolName = getToolName(toolId) || toolId;
               return (
                 <Card key={toolId} className="p-3 flex items-center justify-between border-primary/30 bg-primary/5">
