@@ -130,6 +130,7 @@ export default function ResultView() {
   const [showReviewRequestModal, setShowReviewRequestModal] = useState(false);
   const [reviewNote, setReviewNote] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [studentInfo, setStudentInfo] = useState(null);
 
   useEffect(() => {
     loadAttempt();
@@ -193,6 +194,7 @@ export default function ResultView() {
                 navigate(redirectByRole(user));
                 return;
               }
+              if (res?.data?.student) setStudentInfo(res.data.student);
             } catch (e) {
               console.error('[checkAttemptAccess] failed:', e);
               toast.error('권한 확인 실패: ' + (e.message || ''));
@@ -644,9 +646,32 @@ JSON: {"markdown_text": "풀이 (LaTeX 포함)", "confidence": 0-100, "notes": "
       <div className="space-y-5 pb-8">
         {/* Back + Problem bookmark */}
         <div className="flex items-center justify-between">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/problems')} className="gap-2">
-            <ArrowLeft className="w-4 h-4" /> 문제 탭
-          </Button>
+          {viewerIsOwner ? (
+            <Button variant="ghost" size="sm" onClick={() => navigate('/problems')} className="gap-2">
+              <ArrowLeft className="w-4 h-4" /> 문제 탭
+            </Button>
+          ) : (
+            <Button variant="ghost" size="sm" onClick={() => {
+              const from = searchParams.get('from');
+              if (from === 'student_detail' && searchParams.get('studentId')) {
+                navigate(`/teacher/students/${searchParams.get('studentId')}`);
+              } else if (from === 'assignment_student' && searchParams.get('assignmentId') && searchParams.get('studentId')) {
+                navigate(`/teacher/assignments/${searchParams.get('assignmentId')}/student/${searchParams.get('studentId')}`);
+              } else if (from === 'problem_attempts' && searchParams.get('problemId')) {
+                navigate(`/teacher/problems/${searchParams.get('problemId')}`);
+              } else {
+                navigate(-1);
+              }
+            }} className="gap-2">
+              <ArrowLeft className="w-4 h-4" /> 뒤로
+            </Button>
+          )}
+          {!viewerIsOwner && studentInfo && (
+            <div className="text-right">
+              <p className="text-sm font-medium">{studentInfo.name || studentInfo.email}</p>
+              {studentInfo.name && <p className="text-xs text-muted-foreground">{studentInfo.email}</p>}
+            </div>
+          )}
           {user && attempt && viewerIsOwner && (
             <button
               onClick={toggleProblemBookmark}
@@ -729,7 +754,9 @@ JSON: {"markdown_text": "풀이 (LaTeX 포함)", "confidence": 0-100, "notes": "
         {showDetail && tools.length > 0 && grading && (
           <div>
             <p className="text-xs text-muted-foreground mb-2 font-medium">
-              {grading.matched_solution_id ? '당신의 풀이에 사용된 도구' : '이 문제의 풀이 도구'}
+              {grading.matched_solution_id
+                ? (viewerIsOwner ? '당신의 풀이에 사용된 도구' : '학생 풀이에 사용된 도구')
+                : '이 문제의 풀이 도구'}
             </p>
             <div className="flex flex-wrap gap-2">
               {tools.map(tool => (
@@ -872,7 +899,11 @@ JSON: {"markdown_text": "풀이 (LaTeX 포함)", "confidence": 0-100, "notes": "
             >
               <div className="flex items-center gap-2">
                 <span className="text-lg">🎯</span>
-                <span className="font-medium text-foreground">풀이 #{matchedSolution.priority} 방식으로 푸셨네요!</span>
+                <span className="font-medium text-foreground">
+                  {viewerIsOwner
+                    ? `풀이 #${matchedSolution.priority} 방식으로 푸셨네요!`
+                    : `학생이 풀이 #${matchedSolution.priority} 방식으로 풀었어요`}
+                </span>
                 {matchedSolution.priority === 1 && (
                   <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">대표</span>
                 )}

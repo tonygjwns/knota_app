@@ -185,7 +185,9 @@ export default function AttemptResultBody({
       {showDetail && tools.length > 0 && grading && (
         <div>
           <p className="text-xs text-muted-foreground mb-2 font-medium">
-            {grading.matched_solution_id ? '당신의 풀이에 사용된 도구' : '이 문제의 풀이 도구'}
+            {grading.matched_solution_id
+              ? (viewerIsOwner ? '당신의 풀이에 사용된 도구' : '학생 풀이에 사용된 도구')
+              : '이 문제의 풀이 도구'}
           </p>
           <div className="flex flex-wrap gap-2">
             {tools.map(tool => (
@@ -304,7 +306,11 @@ export default function AttemptResultBody({
             onClick={() => setShowMatchedSolution(o => !o)}>
             <div className="flex items-center gap-2">
               <span className="text-lg">🎯</span>
-              <span className="font-medium text-foreground">풀이 #{matchedSolution.priority} 방식으로 푸셨네요!</span>
+              <span className="font-medium text-foreground">
+                {viewerIsOwner
+                  ? `풀이 #${matchedSolution.priority} 방식으로 푸셨네요!`
+                  : `학생이 풀이 #${matchedSolution.priority} 방식으로 풀었어요`}
+              </span>
               {matchedSolution.priority === 1 && (
                 <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">대표</span>
               )}

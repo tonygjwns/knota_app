@@ -13,17 +13,24 @@ Deno.serve(async (req) => {
     if (attempts.length === 0) return Response.json({ authorized: false, reason: 'attempt not found' }, { status: 404 });
     const a = attempts[0];
 
+    const users = await base44.asServiceRole.entities.User.filter({ id: a.student_id }, '-created_date', 1);
+    const studentEntity = users[0];
+    const student = studentEntity ? {
+      name: studentEntity.full_name || null,
+      email: studentEntity.email || null,
+      class_id: studentEntity.class_id || null,
+      academy_id: studentEntity.academy_id || null,
+    } : null;
+
     // 본인
-    if (a.student_id === caller.id) return Response.json({ authorized: true });
+    if (a.student_id === caller.id) return Response.json({ authorized: true, student });
 
     // admin
-    if (caller.role === 'admin') return Response.json({ authorized: true });
+    if (caller.role === 'admin') return Response.json({ authorized: true, student });
 
     // owner: 같은 학원 학생
     if (caller.role === 'owner') {
-      const users = await base44.asServiceRole.entities.User.filter({ id: a.student_id }, '-created_date', 1);
-      const student = users[0];
-      if (student?.academy_id === caller.academy_id) return Response.json({ authorized: true });
+      if (student?.academy_id === caller.academy_id) return Response.json({ authorized: true, student });
       return Response.json({ authorized: false, reason: 'different academy' });
     }
 
@@ -37,10 +44,7 @@ Deno.serve(async (req) => {
         ).map(c => c.id)
       );
       if (myClassIds.size === 0) return Response.json({ authorized: false, reason: 'no classes' });
-
-      const users = await base44.asServiceRole.entities.User.filter({ id: a.student_id }, '-created_date', 1);
-      const student = users[0];
-      if (student && myClassIds.has(student.class_id)) return Response.json({ authorized: true });
+      if (student && myClassIds.has(student.class_id)) return Response.json({ authorized: true, student });
       return Response.json({ authorized: false, reason: 'student not in my classes' });
     }
 

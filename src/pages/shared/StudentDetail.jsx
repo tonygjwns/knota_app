@@ -238,7 +238,7 @@ export default function StudentDetail({ mode }) {
           </div>
           <div className="space-y-2">
             {paged.map(attempt => (
-              <button key={attempt.id} onClick={() => navigate(`/record/${attempt.id}`)}
+              <button key={attempt.id} onClick={() => navigate(`/record/${attempt.id}?from=student_detail&studentId=${userId}`)}
                 className={`w-full p-3 rounded-lg border transition-colors text-left ${
                   attempt.correctness === 'correct' ? 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100'
                   : attempt.correctness === 'partial' ? 'border-amber-200 bg-amber-50 hover:bg-amber-100'

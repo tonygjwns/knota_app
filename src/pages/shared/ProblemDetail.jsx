@@ -326,7 +326,7 @@ export default function ProblemDetail({ mode = 'admin' }) {
             return (
               <button
                 key={attempt.id}
-                onClick={() => navigate(`/record/${attempt.id}`)}
+                onClick={() => navigate(`/record/${attempt.id}?from=problem_attempts&problemId=${problem.id}`)}
                 className={`w-full p-3 rounded-lg border transition-colors text-left ${
                   attempt.correctness === 'correct'
                     ? 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100'

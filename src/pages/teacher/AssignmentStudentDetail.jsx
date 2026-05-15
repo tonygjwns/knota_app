@@ -118,7 +118,7 @@ export default function AssignmentStudentDetail() {
             <Card
               key={p.id}
               className={`p-4 ${attempt ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
-              onClick={() => attempt && navigate(`/record/${attempt.id}`)}
+              onClick={() => attempt && navigate(`/record/${attempt.id}?from=assignment_student&assignmentId=${assignmentId}&studentId=${studentId}`)}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">

@@ -93,7 +93,6 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
   const [title, setTitle] = useState(assignment?.title || '');
   const [description, setDescription] = useState(assignment?.description || '');
   const [deadline, setDeadline] = useState(assignment?.deadline || '');
-  const [tempDeadline, setTempDeadline] = useState(assignment?.deadline || '');
   const [selectedProblems, setSelectedProblems] = useState([]);
   const [saving, setSaving] = useState(false);
   const [previewProblem, setPreviewProblem] = useState(null);
@@ -123,8 +122,6 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
   // direct 모드
   const [directSearchQuery, setDirectSearchQuery] = useState('');
   const [directSelectedIds, setDirectSelectedIds] = useState(new Set());
-
-  useEffect(() => setTempDeadline(deadline), [deadline]);
 
   // 초기 데이터 로드
   useEffect(() => {
@@ -413,14 +410,15 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
             <div>
               <label className="block text-sm font-semibold mb-2">마감일 (선택)</label>
               <div className="flex gap-2">
-                <Input type="datetime-local" value={tempDeadline}
-                  onChange={e => setTempDeadline(e.target.value)} className="flex-1" />
-                <Button type="button" variant="outline" size="sm"
-                  disabled={!tempDeadline || tempDeadline === deadline}
-                  onClick={() => setDeadline(tempDeadline)}>확인</Button>
+                <Input
+                  type="datetime-local"
+                  value={deadline}
+                  onChange={e => setDeadline(e.target.value)}
+                  className="flex-1"
+                />
                 {deadline && (
                   <Button type="button" variant="ghost" size="sm"
-                    onClick={() => { setDeadline(''); setTempDeadline(''); }}>지우기</Button>
+                    onClick={() => setDeadline('')}>지우기</Button>
                 )}
               </div>
               {deadline && (
