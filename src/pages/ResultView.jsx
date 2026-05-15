@@ -613,7 +613,7 @@ JSON: {"markdown_text": "풀이 (LaTeX 포함)", "confidence": 0-100, "notes": "
         return;
       }
       const pick = pool[Math.floor(Math.random() * pool.length)];
-      navigate(`/problem/${pick.id}?remediation_for=${attempt.id}&target_tool=${toolId}`);
+      navigate(`/remediation/solve/${pick.id}?target_tool=${toolId}&parent_attempt=${attempt.id}&original_attempt=${attempt.id}`);
     } catch {
       toast.error('문제를 불러오지 못했어요');
     }
@@ -1039,10 +1039,7 @@ JSON: {"markdown_text": "풀이 (LaTeX 포함)", "confidence": 0-100, "notes": "
             <p className="text-xs text-muted-foreground">
               이 문제에서 부족했던 도구를 그 도구의 다른 문제로 연습할 수 있어요
             </p>
-            {(attempt.attempt_type === 'remediation_retry' && attempt.target_tool_id
-              ? remediationToolIds.filter(id => id === attempt.target_tool_id)
-              : remediationToolIds
-            ).map(toolId => {
+            {remediationToolIds.map(toolId => {
               const toolName = getToolName(toolId) || toolId;
               return (
                 <Card key={toolId} className="p-3 flex items-center justify-between border-primary/30 bg-primary/5">
@@ -1059,30 +1056,17 @@ JSON: {"markdown_text": "풀이 (LaTeX 포함)", "confidence": 0-100, "notes": "
           </div>
         )}
 
-        {/* 보강 풀이 결과 - 원래 문제로 돌아가기 */}
-        {viewerIsOwner && attempt.attempt_type === 'remediation_retry' && attempt.parent_attempt_id && (
-          <Card className="p-4 bg-primary/5 border-primary/30">
-            <p className="text-sm font-medium mb-2">📚 보강 풀이 완료!</p>
-            <p className="text-xs text-muted-foreground mb-3">원래 문제로 돌아가 다시 풀어볼까요?</p>
-            <Button size="sm" className="w-full" onClick={async () => {
-              const parents = await base44.entities.StudentAttempt.filter({ id: attempt.parent_attempt_id }, '-created_date', 1);
-              if (parents.length > 0) {
-                navigate(`/problem/${parents[0].problem_id}`);
-              } else {
-                toast.error('원래 문제를 찾지 못했어요');
-              }
-            }}>
-              원래 문제 다시 풀기 <ChevronRight className="w-4 h-4 ml-1" />
-            </Button>
-          </Card>
-        )}
-
         {/* Action buttons */}
-        {viewerIsOwner && attempt.attempt_type !== 'remediation_retry' && attempt.attempt_type !== 'remediation_practice' && (
+        {viewerIsOwner && (
           <div className="space-y-2 pt-2">
             <Button variant="outline" className="w-full" onClick={handleBack}>
               <ArrowLeft className="w-4 h-4 mr-1" /> {backLabel}
             </Button>
+            {(attempt.correctness === 'wrong' || attempt.correctness === 'partial') && (
+              <Button variant="outline" className="w-full" onClick={() => navigate(`/problem/${attempt.problem_id}`)}>
+                <RotateCcw className="w-4 h-4 mr-1" /> 문제 다시 풀기
+              </Button>
+            )}
             <Button className="w-full" onClick={handleNextProblem}>
               {nextLabel} <ChevronRight className="w-4 h-4 ml-1" />
             </Button>

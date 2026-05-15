@@ -95,11 +95,15 @@
     },
     "parent_attempt_id": {
       "type": "string",
-      "description": "\ubcf4\uac15\uc758 \ubd80\ubaa8 \uc2dc\ub3c4 (1 \ucc28 \ud480\uc774) ID"
+      "description": "\ubcf4\uac15\uc758 \ubd80\ubaa8 \uc2dc\ub3c4 (\uc9c1\uc804) ID"
+    },
+    "original_attempt_id": {
+      "type": "string",
+      "description": "\ubcf4\uac15 \uccb4\uc778\uc758 \ucd5c\ucd08 attempt ID. \ubcf4\uac15\uc774 \uc544\ub2cc \uc77c\ubc18 \ud480\uc774\ub294 null. \ubcf4\uac15 \u2192 \ubcf4\uac15 \u2192 \ubcf4\uac15 \uc2dc \ubaa8\ub4e0 \uc790\uc190 attempt\uac00 \ub3d9\uc77c\ud55c root\ub97c \uac00\ub9ac\ud0b4."
     },
     "target_tool_id": {
       "type": "string",
-      "description": "\ubcf4\uac15 \uc911\uc778 \ub9e4\ub2c9 tool_id"
+      "description": "\ubcf4\uac15 \uc911\uc778 \ub9e4\uce6d tool_id"
     },
     "student_answer": {
       "type": "string",
@@ -129,7 +133,7 @@
     },
     "review_requested": {
       "type": "boolean",
-      "description": "\ud559\uc0dd\uc774 \uacb0\uacfc \ud654\uba74\uc5d0\uc11c '\uc774 \ucc44\uc810 \ub2e4\uc2dc \ubd10\uc8fc\uc138\uc694'\ub97c \ub204\ub978 \uacbd\uc6b0 true. \uac80\ud1a0 v2 \ud68c\ucc28\uc5d0 ResultView\uc5d0\uc11c \ucc44\uc6cc\uc9d0."
+      "description": "\ud559\uc0dd\uc774 \uacb0\uacfc \ud654\uba74\uc5d0\uc11c '\uc774 \ucc44\uc810 \ub2e4\uc2dc \ubd10\uc8fc\uc138\uc694'\ub97c \ub204\ub978 \uacbd\uc6b0 true. \uac80\ud1a0 v2 \ud68c\ucc28\uc5d0\uc11c \ucc44\uc6cc\uc9d0."
     },
     "review_request_note": {
       "type": "string",
@@ -142,7 +146,7 @@
     },
     "teacher_review_json": {
       "type": "string",
-      "description": "\uac15\uc0ac\uac00 \ub9e4\ub2c9\ubcc4\ub85c \ubcf4\uc815\ud55c \ucc44\uc810 \uacb0\uacfc JSON. claude_grade_json \uc6d0\ubcf8\uc740 \uc720\uc9c0, \uc774 \ud544\ub4dc\uc5d0 \ubcf4\uc815 \uacb0\uacfc \uc800\uc7a5. mastery \uacc4\uc0b0\uc740 \uc788\uc73c\uba74 \uc774 \ud544\ub4dc \uc6b0\uc120. \uac80\ud1a0 v2 \ud68c\ucc28\uc5d0\uc11c \ucc44\uc6cc\uc9d0."
+      "description": "\uac15\uc0ac\uac00 \ub9e4\ub2dd\ubcc4\ub85c \ubcf4\uc815\ud55c \ucc44\uc810 \uacb0\uacfc JSON. claude_grade_json \uc6d0\ubcf8\uc740 \uc720\uc9c0, \uc774 \ud544\ub4dc\uc5d0 \ubcf4\uc815 \uacb0\uacfc \uc800\uc7a5. mastery \uacc4\uc0b0\uc740 \uc788\uc73c\uba74 \uc774 \ud544\ub4dc \uc6b0\uc120. \uac80\ud1a0 v2 \ud68c\ucc28\uc5d0\uc11c \ucc44\uc6cc\uc9d0."
     }
   },
   "required": [

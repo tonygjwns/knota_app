@@ -43,6 +43,8 @@ import RemediationRetry from './pages/remediation/RemediationRetry';
 import RemediationLesson from './pages/remediation/RemediationLesson';
 import RemediationPractice from './pages/remediation/RemediationPractice';
 import RemediationComplete from './pages/remediation/RemediationComplete';
+import RemediationSolve from './pages/remediation/RemediationSolve';
+import RemediationResult from './pages/remediation/RemediationResult';
 import Bookmarks from './pages/Bookmarks';
 import Withdraw from './pages/Withdraw';
 import Diagnosis from './pages/Diagnosis.jsx';
@@ -95,6 +97,8 @@ const AuthenticatedApp = () => {
       <Route path="/remediation/:attemptId/lesson" element={<RemediationLesson />} />
       <Route path="/remediation/:attemptId/practice/:practiceIdx" element={<RemediationPractice />} />
       <Route path="/remediation/:attemptId/complete" element={<RemediationComplete />} />
+      <Route path="/remediation/solve/:problemId" element={<RemediationSolve />} />
+      <Route path="/remediation/result/:attemptId" element={<RemediationResult />} />
       <Route path="/bookmarks" element={<Bookmarks />} />
       <Route path="/withdraw" element={<Withdraw />} />
       <Route path="/diagnosis" element={<Diagnosis />} />
