@@ -275,8 +275,11 @@ Deno.serve(async (req) => {
     });
 
     // Step 8: my_students — risk_flags 포함
+    const myStudentIds = new Set(allStudents.map(u => u.id));
     const review_request_count = allAttempts.filter(a =>
-      a.admin_review_status === 'needs_correction'
+      a.review_requested === true &&
+      !a.review_resolved_at &&
+      myStudentIds.has(a.student_id)
     ).length;
 
     const my_students = allStudents.map(u => {
@@ -423,7 +426,7 @@ Deno.serve(async (req) => {
     typeSumMapByClass.forEach((tcm, classId) => {
       const arr = [];
       tcm.forEach((entry, tid) => {
-        arr.push({ type_id: tid, name: typeNameMap.get(tid) || tid, avg: Math.round(entry.sum / entry.count), count: entry.count, type_id: tid });
+        arr.push({ type_id: tid, name: typeNameMap.get(tid) || tid, avg: Math.round(entry.sum / entry.count), count: entry.count });
       });
       arr.sort((a, b) => b.count - a.count);
       type_summary_by_class[classId] = arr;

@@ -9,6 +9,68 @@ import UserMenuDropdown from '@/components/UserMenuDropdown';
 
 
 
+function NavItem({ item, active, count }) {
+  return (
+    <Link to={item.path}
+      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm ${
+        active ? 'bg-violet-500 text-white' : 'hover:bg-white/10'
+      }`}>
+      <item.icon className="w-4 h-4" />
+      <span className="flex-1">{item.label}</span>
+      {count > 0 && (
+        <span className="bg-amber-500 text-white text-xs px-1.5 py-0.5 rounded-full font-semibold min-w-[20px] text-center">
+          {count}
+        </span>
+      )}
+    </Link>
+  );
+}
+
+function SidebarNav({ navItems, location }) {
+  const { data } = useTeacher();
+  const reviewCount = data?.review_request_count || 0;
+  return (
+    <nav className="flex flex-col gap-1 flex-1">
+      {navItems.map(item => {
+        const active = item.exact
+          ? location.pathname === item.path
+          : location.pathname.startsWith(item.path) && location.pathname !== '/teacher';
+        const count = item.path === '/teacher/review' ? reviewCount : 0;
+        return <NavItem key={item.path} item={item} active={active} count={count} />;
+      })}
+    </nav>
+  );
+}
+
+function MobileNav({ navItems, location }) {
+  const { data } = useTeacher();
+  const reviewCount = data?.review_request_count || 0;
+  return (
+    <div className="flex items-center justify-around px-2 py-2">
+      {navItems.map(item => {
+        const active = item.exact
+          ? location.pathname === item.path
+          : location.pathname.startsWith(item.path);
+        const count = item.path === '/teacher/review' ? reviewCount : 0;
+        return (
+          <Link key={item.path} to={item.path}
+            className={`relative flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg text-xs ${
+              active ? 'text-violet-200' : 'text-violet-400'
+            }`}>
+            <item.icon className="w-4 h-4" />
+            {item.label}
+            {count > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 bg-amber-500 text-white text-[10px] px-1 py-0 rounded-full min-w-[14px] text-center font-semibold">
+                {count}
+              </span>
+            )}
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
 function RefreshButton() {
   const { refresh, loading } = useTeacher();
   return (
@@ -70,43 +132,13 @@ export default function TeacherLayout() {
         <div className="flex flex-1">
           {sidebarOpen && (
             <aside className="w-52 bg-violet-800 text-violet-100 flex flex-col py-4 px-3 hidden md:flex flex-shrink-0">
-              <nav className="flex flex-col gap-1 flex-1">
-                {TEACHER_NAV.map(item => {
-                  const active = item.exact
-                    ? location.pathname === item.path
-                    : location.pathname.startsWith(item.path) && location.pathname !== '/teacher';
-                  return (
-                    <Link key={item.path} to={item.path}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm ${
-                        active ? 'bg-violet-500 text-white' : 'hover:bg-white/10'
-                      }`}>
-                      <item.icon className="w-4 h-4" />
-                      {item.label}
-                    </Link>
-                  );
-                })}
-              </nav>
+              <SidebarNav navItems={TEACHER_NAV} location={location} />
             </aside>
           )}
 
           {/* Mobile nav */}
           <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-violet-800 border-t border-violet-700">
-            <div className="flex items-center justify-around px-2 py-2">
-              {TEACHER_NAV.map(item => {
-                const active = item.exact
-                  ? location.pathname === item.path
-                  : location.pathname.startsWith(item.path);
-                return (
-                  <Link key={item.path} to={item.path}
-                    className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg text-xs ${
-                      active ? 'text-violet-200' : 'text-violet-400'
-                    }`}>
-                    <item.icon className="w-4 h-4" />
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </div>
+            <MobileNav navItems={TEACHER_NAV} location={location} />
           </div>
 
           <main className="flex-1 overflow-auto p-6 pb-20 md:pb-6">

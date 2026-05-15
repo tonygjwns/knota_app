@@ -10,6 +10,7 @@ import ScoreBadge, { ScoreSummaryText } from '@/components/ScoreBadge';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
+import { toast } from 'sonner';
 
 const parseProblemText = (content) => {
   try {
@@ -39,31 +40,19 @@ export default function RecordDetail() {
         if (user) {
           const isOwn = a.student_id === user.id;
           const isAdmin = user.role === 'admin';
-          let isAuthorized = isOwn || isAdmin;
-          if (!isAuthorized && user.role === 'teacher') {
+          if (!isOwn && !isAdmin) {
             try {
-              const allClasses = await base44.entities.Class.list('name', 500);
-              const myClassIds = new Set(
-                allClasses.filter(c =>
-                  c.main_teacher_id === user.id ||
-                  (c.assistant_teacher_ids || []).includes(user.id)
-                ).map(c => c.id)
-              );
-              if (myClassIds.size > 0) {
-                const allStudents = await base44.entities.User.list('full_name', 500);
-                isAuthorized = allStudents.some(s => s.id === a.student_id && myClassIds.has(s.class_id));
+              const res = await base44.functions.invoke('checkAttemptAccess', { attemptId: a.id });
+              if (!res?.data?.authorized) {
+                toast.error('이 결과를 볼 권한이 없어요');
+                navigate(redirectByRole(user));
+                return;
               }
-            } catch {}
-          }
-          if (!isAuthorized && user.role === 'owner') {
-            try {
-              const [studentUser] = await base44.entities.User.filter({ id: a.student_id }, '-created_date', 1);
-              isAuthorized = studentUser?.academy_id === user.academy_id;
-            } catch {}
-          }
-          if (!isAuthorized) {
-            navigate(redirectByRole(user));
-            return;
+            } catch (e) {
+              toast.error('권한 확인 실패: ' + (e.message || ''));
+              navigate(redirectByRole(user));
+              return;
+            }
           }
         }
 

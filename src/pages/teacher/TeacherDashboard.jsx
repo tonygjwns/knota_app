@@ -119,7 +119,7 @@ export default function TeacherDashboard() {
         </Select>
         {!selectedClassId && (
           <p className="text-xs text-muted-foreground mt-2">
-            학급을 선택하면 약점 도구 / 검토 요청 / 단원별 차트가 표시돼요
+            학급을 선택하면 약점 도구 / 단원별 차트가 표시돼요
           </p>
         )}
       </div>
@@ -159,20 +159,6 @@ export default function TeacherDashboard() {
               );
             })()}
           </Card>
-
-          {/* Section 4: 검토 요청 카운트 */}
-          {(data.review_request_count || 0) > 0 && (
-            <Card className="p-4 cursor-pointer hover:bg-muted/30 transition-colors"
-                  onClick={() => navigate('/teacher/review')}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <CheckSquare className="w-4 h-4 text-emerald-500" />
-                  <span className="text-sm font-medium">검토 요청 {data.review_request_count}건</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-              </div>
-            </Card>
-          )}
 
           {/* Section 5: 단원별 차트 */}
           {(data.type_summary_by_class?.[selectedClassId] || []).length > 0 && (
