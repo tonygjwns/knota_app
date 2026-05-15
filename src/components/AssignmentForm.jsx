@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { gradeLabel, extractGradeOptions } from '@/lib/grade-labels.js';
 import { toast } from 'sonner';
@@ -18,6 +18,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Search, X, Eye } from 'lucide-react';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import MathRenderer from '@/components/MathRenderer';
+import RandomPicker from '@/components/RandomPicker';
 
 const parseProblemText = (content) => {
   try {
@@ -27,7 +28,6 @@ const parseProblemText = (content) => {
   } catch { return String(content || ''); }
 };
 
-// 문제 상세 미리보기 모달
 function ProblemPreviewModal({ problem, onClose }) {
   if (!problem) return null;
   const text = parseProblemText(problem.content);
@@ -63,7 +63,6 @@ function ProblemPreviewModal({ problem, onClose }) {
   );
 }
 
-// 공통 문제 카드
 function ProblemCard({ problem, checked, onToggle, onPreview }) {
   const text = parseProblemText(problem.content);
   return (
@@ -73,7 +72,7 @@ function ProblemCard({ problem, checked, onToggle, onPreview }) {
     >
       <div className="flex items-start gap-2">
         <Checkbox checked={checked} onChange={() => onToggle(problem.id)} onClick={e => e.stopPropagation()} />
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 overflow-hidden">
           <p className="text-xs font-mono text-muted-foreground">{problem.id?.slice(0, 8)}...</p>
           {problem.domain_name && <p className="text-xs text-primary/80 mb-0.5">{problem.domain_name}</p>}
           <p className="text-sm line-clamp-2">{text.substring(0, 80)}...</p>
@@ -89,16 +88,56 @@ function ProblemCard({ problem, checked, onToggle, onPreview }) {
   );
 }
 
+// 유형 chip 공통 컴포넌트
+function TypeChips({ chips, selectedTypeIds, setSelectedTypeIds }) {
+  if (chips.length === 0) return null;
+  return (
+    <div>
+      <label className="block text-sm font-semibold mb-2">유형 필터 <span className="text-xs font-normal text-muted-foreground">(선택 사항)</span></label>
+      <div className="flex flex-wrap gap-2">
+        {chips.map(t => (
+          <button key={t.type_id} type="button"
+            title={t.name}
+            onClick={() => setSelectedTypeIds(prev => {
+              const next = new Set(prev);
+              next.has(t.type_id) ? next.delete(t.type_id) : next.add(t.type_id);
+              return next;
+            })}
+            className={`rounded-full text-xs px-3 py-1.5 border transition-colors max-w-[160px] truncate ${
+              selectedTypeIds.has(t.type_id)
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'bg-card text-foreground border-border hover:bg-muted'
+            }`}
+          >{t.name}</button>
+        ))}
+        {selectedTypeIds.size > 0 && (
+          <button type="button" onClick={() => setSelectedTypeIds(new Set())}
+            className="rounded-full text-xs px-3 py-1.5 border border-dashed border-muted-foreground text-muted-foreground hover:bg-muted transition-colors">
+            전체 해제
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function AssignmentForm({ classId, onSave, onClose, assignment, preselectedToolId, initialTypeId }) {
   const [title, setTitle] = useState(assignment?.title || '');
   const [description, setDescription] = useState(assignment?.description || '');
   const [deadline, setDeadline] = useState(assignment?.deadline || '');
-  const [selectedProblems, setSelectedProblems] = useState([]);
   const [saving, setSaving] = useState(false);
   const [previewProblem, setPreviewProblem] = useState(null);
 
-  // 모드 (tool | direct)
-  const [mode, setMode] = useState('tool');
+  // 누적 출제 문제 (Set<id>)
+  const [selectedProblems, setSelectedProblems] = useState(new Set());
+
+  // 각 탭 임시 선택
+  const [toolPickedIds, setToolPickedIds] = useState(new Set());
+  const [directPickedIds, setDirectPickedIds] = useState(new Set());
+  const [bookmarkPickedIds, setBookmarkPickedIds] = useState(new Set());
+
+  // 탭
+  const [activeTab, setActiveTab] = useState('tool');
 
   // 학년 / 단원 필터
   const [selectedGrade, setSelectedGrade] = useState('');
@@ -112,16 +151,17 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
   const [dataLoading, setDataLoading] = useState(true);
   const [classGradeNotice, setClassGradeNotice] = useState(false);
 
-  // tool 모드
+  // 도구 탭 필터
   const [selectedToolIds, setSelectedToolIds] = useState(
     preselectedToolId ? new Set([preselectedToolId]) : new Set()
   );
   const [selectedTypeIds, setSelectedTypeIds] = useState(new Set());
-  const [manuallyExcluded, setManuallyExcluded] = useState(new Set());
 
-  // direct 모드
+  // 단원 탭 검색
   const [directSearchQuery, setDirectSearchQuery] = useState('');
-  const [directSelectedIds, setDirectSelectedIds] = useState(new Set());
+
+  // 즐겨찾기 풀
+  const [bookmarkedProblemPool, setBookmarkedProblemPool] = useState([]);
 
   // 초기 데이터 로드
   useEffect(() => {
@@ -164,12 +204,10 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
           const types = await base44.entities.Type.filter({ type_id: initialTypeId }, '-created_date', 1);
           const t = types[0];
           if (t) {
-            // Type에 grade_range/domain_id가 없으면 ProblemType → Problem 역조회
             if (t.grade_range && t.domain_id) {
               setSelectedGrade(t.grade_range);
               setSelectedDomainId(t.domain_id);
             } else {
-              // ProblemType에서 이 type_id를 사용하는 problem_id 찾기
               const pts = ptData.filter(pt => pt.type_id === initialTypeId);
               if (pts.length > 0) {
                 const pid = pts[0].problem_id;
@@ -204,32 +242,20 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
       try {
         const me = await base44.auth.me();
         const bookmarks = await base44.entities.BookmarkedProblem.filter({ user_id: me.id }, '-created_date', 200);
-        const bmProblemIds = bookmarks.map(b => b.problem_id);
-        const bmProblems = problemsData.filter(p =>
-          bmProblemIds.includes(p.id) || bmProblemIds.includes(p.problem_id)
-        );
-        // bookmarkedProblems not used in this simplified version
+        const bmProblemIds = new Set(bookmarks.map(b => b.problem_id));
+        const bmProblems = problemsData.filter(p => bmProblemIds.has(p.id));
+        setBookmarkedProblemPool(bmProblems);
       } catch {}
     };
     init();
   }, [classId, preselectedToolId, initialTypeId]);
 
-  // 수정 진입 시 mode / 학년 / 단원 / 선택 문제 복원
+  // 수정 진입 시 문제 복원
   useEffect(() => {
     if (!assignment) return;
-    const ids = JSON.parse(assignment.problem_ids || '[]');
-    setSelectedProblems(ids);
     try {
-      const criteria = JSON.parse(assignment.selection_criteria || '{}');
-      if (criteria.mode === 'direct') {
-        setMode('direct');
-        setDirectSelectedIds(new Set(ids));
-      }
-      if (criteria.grade) setSelectedGrade(criteria.grade);
-      if (criteria.domain) setSelectedDomainId(criteria.domain);
-      if (criteria.tools && Array.isArray(criteria.tools)) {
-        setSelectedToolIds(new Set(criteria.tools));
-      }
+      const ids = JSON.parse(assignment.problem_ids || '[]');
+      setSelectedProblems(new Set(ids));
     } catch {}
   }, [assignment]);
 
@@ -248,18 +274,11 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
     setSelectedTypeIds(new Set());
   };
 
-  // mode 전환 시 상대 모드 초기화
-  useEffect(() => {
-    if (mode === 'tool') setDirectSelectedIds(new Set());
-    else if (mode === 'direct') { setSelectedToolIds(new Set()); setManuallyExcluded(new Set()); }
-  }, [mode]);
-
   const filteredDomains = useMemo(
     () => allDomains.filter(d => d.grade_range === selectedGrade),
     [allDomains, selectedGrade]
   );
 
-  // 도메인의 유형 chip 목록
   const domainTypeChips = useMemo(() => {
     if (!selectedDomainId) return [];
     const domainProblems = allProblems.filter(p => p.domain_id === selectedDomainId);
@@ -270,7 +289,6 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
     return allTypes.filter(t => typeIdsInDomain.has(t.type_id));
   }, [allTypes, allProblemTypes, allProblems, selectedDomainId]);
 
-  // 선택된 유형으로 문제 ID 집합
   const typeFilteredProblemIds = useMemo(() => {
     if (selectedTypeIds.size === 0) return null;
     return new Set(
@@ -303,8 +321,8 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
     });
   };
 
-  // 도구 기반 문제 목록
-  const previewProblems = useMemo(() => {
+  // 도구 탭 문제 풀
+  const toolPool = useMemo(() => {
     if (selectedToolIds.size === 0) return [];
     const seen = new Set();
     const out = [];
@@ -319,63 +337,51 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
     return out;
   }, [allProblems, selectedToolIds, typeFilteredProblemIds]);
 
-  // tool 모드: previewProblems 변경 시 selectedProblems 동기화
-  useEffect(() => {
-    if (mode !== 'tool') return;
-    const autoIds = previewProblems.map(p => p.id).filter(id => !manuallyExcluded.has(id));
-    setSelectedProblems(autoIds);
-  }, [previewProblems, mode]);
+  // 즐겨찾기 풀 필터 (학년/단원/유형)
+  const filteredBookmarks = useMemo(() => {
+    let pool = bookmarkedProblemPool;
+    if (selectedDomainId) pool = pool.filter(p => p.domain_id === selectedDomainId);
+    if (typeFilteredProblemIds) pool = pool.filter(p => typeFilteredProblemIds.has(p.problem_id));
+    return pool;
+  }, [bookmarkedProblemPool, selectedDomainId, typeFilteredProblemIds]);
 
-  // direct 모드: directSelectedIds 변경 시 selectedProblems 동기화
-  useEffect(() => {
-    if (mode !== 'direct') return;
-    setSelectedProblems([...directSelectedIds]);
-  }, [mode, directSelectedIds]);
-
-  const excludeProblem = (id) => {
-    setManuallyExcluded(prev => new Set([...prev, id]));
-    setSelectedProblems(prev => prev.filter(x => x !== id));
+  // 추가 / 제거 핸들러
+  const handleAddPicked = (pickedIds, clearFn) => {
+    if (pickedIds.size === 0) return;
+    setSelectedProblems(prev => {
+      const next = new Set(prev);
+      pickedIds.forEach(id => next.add(id));
+      return next;
+    });
+    clearFn(new Set());
+    toast.success(`${pickedIds.size}개 문제를 추가했어요`);
   };
 
-  const selectedProblemObjects = useMemo(
-    () => allProblems.filter(p => selectedProblems.includes(p.id)),
-    [allProblems, selectedProblems]
-  );
+  const handleRemoveProblem = (id) => {
+    setSelectedProblems(prev => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  };
 
   const handleSave = async () => {
     if (!title.trim()) { toast.error('제목을 입력해 주세요'); return; }
-
-    if (!assignment) {
-      if (!selectedGrade) { toast.error('학년을 선택해 주세요'); return; }
-      if (!selectedDomainId) { toast.error('단원을 선택해 주세요'); return; }
-    }
-
-    if (mode === 'tool' && selectedToolIds.size === 0) {
-      toast.error('도구를 1개 이상 선택해 주세요'); return;
-    }
-    if (mode === 'direct' && directSelectedIds.size === 0) {
-      toast.error('문제를 1개 이상 선택해 주세요'); return;
-    }
-    if (selectedProblems.length === 0) { toast.error('출제할 문제가 없어요'); return; }
+    if (!selectedGrade) { toast.error('학년을 선택해 주세요'); return; }
+    if (!selectedDomainId) { toast.error('단원을 선택해 주세요'); return; }
+    if (selectedProblems.size === 0) { toast.error('출제할 문제를 1개 이상 추가해 주세요'); return; }
 
     setSaving(true);
     try {
       const me = await base44.auth.me();
-      const criteria = {
-        mode,
-        grade: selectedGrade,
-        domain: selectedDomainId,
-        tools: mode === 'tool' ? [...selectedToolIds] : [],
-      };
       const data = {
         title: title.trim(),
         description: description.trim() || null,
         class_id: classId,
         created_by: me.id,
-        problem_ids: JSON.stringify(selectedProblems),
+        problem_ids: JSON.stringify([...selectedProblems]),
         deadline: deadline || null,
         status: assignment?.status || 'active',
-        selection_criteria: JSON.stringify(criteria),
       };
       await onSave(data);
       onClose();
@@ -439,7 +445,7 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
 
                 {/* 학년 */}
                 <div>
-                  <label className="block text-sm font-semibold mb-2">학년 {!assignment && '*'}</label>
+                  <label className="block text-sm font-semibold mb-2">학년 *</label>
                   <Select value={selectedGrade} onValueChange={handleGradeChange}>
                     <SelectTrigger><SelectValue placeholder="학년을 선택하세요" /></SelectTrigger>
                     <SelectContent>
@@ -450,7 +456,7 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
 
                 {/* 단원 */}
                 <div>
-                  <label className="block text-sm font-semibold mb-2">단원 {!assignment && '*'}</label>
+                  <label className="block text-sm font-semibold mb-2">단원 *</label>
                   <Select value={selectedDomainId} onValueChange={handleDomainChange} disabled={!selectedGrade}>
                     <SelectTrigger>
                       <SelectValue placeholder={selectedGrade ? '단원을 선택하세요' : '학년을 먼저 선택해 주세요'} />
@@ -461,49 +467,23 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
                   </Select>
                 </div>
 
-                {/* 탭: 도구로 출제 vs 직접 선택 */}
+                {/* 3탭 문제 선택 */}
                 {selectedDomainId && (
-                  <Tabs value={mode} onValueChange={setMode}>
-                    <TabsList className="grid grid-cols-2 w-full">
+                  <Tabs value={activeTab} onValueChange={setActiveTab}>
+                    <TabsList className="grid grid-cols-3 w-full">
                       <TabsTrigger value="tool">도구로 출제</TabsTrigger>
-                      <TabsTrigger value="direct">단원 전체에서 직접 선택</TabsTrigger>
+                      <TabsTrigger value="direct">단원 전체</TabsTrigger>
+                      <TabsTrigger value="bookmark">즐겨찾기</TabsTrigger>
                     </TabsList>
 
                     {/* 탭 A: 도구로 출제 */}
                     <TabsContent value="tool" className="mt-3 space-y-4">
-                      {/* 유형 chip */}
-                      {domainTypeChips.length > 0 && (
-                        <div>
-                          <label className="block text-sm font-semibold mb-2">유형 필터 <span className="text-xs font-normal text-muted-foreground">(선택 사항)</span></label>
-                          <div className="flex flex-wrap gap-2">
-                            {domainTypeChips.map(t => (
-                              <button key={t.type_id} type="button"
-                                onClick={() => setSelectedTypeIds(prev => {
-                                  const next = new Set(prev);
-                                  next.has(t.type_id) ? next.delete(t.type_id) : next.add(t.type_id);
-                                  return next;
-                                })}
-                                className={`rounded-full text-xs px-3 py-1.5 border transition-colors ${
-                                  selectedTypeIds.has(t.type_id)
-                                    ? 'bg-primary text-primary-foreground border-primary'
-                                    : 'bg-card text-foreground border-border hover:bg-muted'
-                                }`}
-                              >{t.name}</button>
-                            ))}
-                            {selectedTypeIds.size > 0 && (
-                              <button type="button" onClick={() => setSelectedTypeIds(new Set())}
-                                className="rounded-full text-xs px-3 py-1.5 border border-dashed border-muted-foreground text-muted-foreground hover:bg-muted transition-colors">
-                                전체 해제
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      )}
+                      <TypeChips chips={domainTypeChips} selectedTypeIds={selectedTypeIds} setSelectedTypeIds={setSelectedTypeIds} />
 
                       {/* 도구 목록 */}
                       <div>
                         <label className="block text-sm font-semibold mb-2">
-                          도구 선택 * <span className="text-xs font-normal text-muted-foreground">({selectedToolIds.size}개 선택됨)</span>
+                          도구 선택 <span className="text-xs font-normal text-muted-foreground">({selectedToolIds.size}개 선택됨)</span>
                         </label>
                         {filteredTools.length === 0 ? (
                           <p className="text-sm text-muted-foreground text-center py-4">이 단원에 연결된 도구가 없어요</p>
@@ -526,87 +506,183 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
                         )}
                       </div>
 
-                      {/* 자동 문제 미리보기 */}
-                      {selectedToolIds.size > 0 && (
-                        <div>
-                          <label className="block text-sm font-semibold mb-2">
-                            출제 문제 <span className="text-xs font-normal text-muted-foreground">총 {selectedProblems.length}문제</span>
+                      {/* 도구 풀 — 임시 선택 */}
+                      {toolPool.length > 0 && (
+                        <div className="space-y-2">
+                          <label className="block text-sm font-semibold">
+                            이 도구의 문제 풀 <span className="text-xs font-normal text-muted-foreground">({toolPool.length}개)</span>
                           </label>
-                          {selectedProblems.length === 0 ? (
-                            <p className="text-sm text-muted-foreground text-center py-4">선택된 도구에 해당하는 문제가 없어요</p>
-                          ) : (
-                            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                              {selectedProblemObjects.map(p => (
-                                <div key={p.id} className="flex items-start justify-between gap-2 p-2 bg-secondary rounded-lg">
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-mono text-muted-foreground">{p.id.slice(0, 8)}</p>
-                                    <p className="text-sm truncate">{parseProblemText(p.content).substring(0, 70)}...</p>
-                                    {p.domain_name && <Badge variant="outline" className="text-xs mt-1">{p.domain_name}</Badge>}
-                                  </div>
-                                  <div className="flex items-center gap-1 flex-shrink-0">
-                                    <button onClick={() => setPreviewProblem(p)}
-                                      className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground">
-                                      <Eye className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button onClick={() => excludeProblem(p.id)}
-                                      className="text-destructive hover:bg-destructive/10 p-1 rounded">
-                                      <X className="w-4 h-4" />
-                                    </button>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
+                          <RandomPicker
+                            poolSize={toolPool.length}
+                            onPick={(n) => {
+                              const shuffled = [...toolPool].sort(() => Math.random() - 0.5);
+                              setToolPickedIds(new Set(shuffled.slice(0, n).map(p => p.id)));
+                            }}
+                            onClear={() => setToolPickedIds(new Set())}
+                          />
+                          <div className="space-y-2 max-h-64 overflow-y-auto overflow-x-hidden pr-1">
+                            {toolPool.map(p => (
+                              <ProblemCard
+                                key={p.id}
+                                problem={p}
+                                checked={toolPickedIds.has(p.id)}
+                                onToggle={(id) => setToolPickedIds(prev => {
+                                  const next = new Set(prev);
+                                  next.has(id) ? next.delete(id) : next.add(id);
+                                  return next;
+                                })}
+                                onPreview={setPreviewProblem}
+                              />
+                            ))}
+                          </div>
+                          <Button
+                            type="button" className="w-full"
+                            disabled={toolPickedIds.size === 0}
+                            onClick={() => handleAddPicked(toolPickedIds, setToolPickedIds)}
+                          >
+                            선택한 {toolPickedIds.size}개 추가
+                          </Button>
                         </div>
                       )}
                     </TabsContent>
 
                     {/* 탭 B: 단원 전체에서 직접 선택 */}
                     <TabsContent value="direct" className="mt-3 space-y-3">
+                      <TypeChips chips={domainTypeChips} selectedTypeIds={selectedTypeIds} setSelectedTypeIds={setSelectedTypeIds} />
+
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input
-                          placeholder="문제 내용 검색..."
-                          className="pl-10"
+                        <Input placeholder="문제 내용 검색..." className="pl-10"
                           value={directSearchQuery}
-                          onChange={e => setDirectSearchQuery(e.target.value)}
-                        />
+                          onChange={e => setDirectSearchQuery(e.target.value)} />
                       </div>
 
                       {(() => {
-                        const domainProblems = allProblems.filter(p => p.domain_id === selectedDomainId);
+                        let pool = allProblems.filter(p => p.domain_id === selectedDomainId);
+                        if (typeFilteredProblemIds) pool = pool.filter(p => typeFilteredProblemIds.has(p.problem_id));
                         const q = directSearchQuery.toLowerCase();
                         const filtered = q
-                          ? domainProblems.filter(p => parseProblemText(p.content).toLowerCase().includes(q))
-                          : domainProblems;
-                        return filtered.length === 0 ? (
+                          ? pool.filter(p => parseProblemText(p.content).toLowerCase().includes(q))
+                          : pool;
+                        if (filtered.length === 0) return (
                           <p className="text-sm text-muted-foreground text-center py-6">
                             {q ? '검색 결과가 없어요' : '이 단원에 문제가 없어요'}
                           </p>
-                        ) : (
-                          <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-                            {filtered.map(p => (
-                              <ProblemCard
-                                key={p.id}
-                                problem={p}
-                                checked={directSelectedIds.has(p.id)}
-                                onToggle={(id) => {
-                                  setDirectSelectedIds(prev => {
+                        );
+                        return (
+                          <>
+                            <RandomPicker
+                              poolSize={filtered.length}
+                              onPick={(n) => {
+                                const shuffled = [...filtered].sort(() => Math.random() - 0.5);
+                                setDirectPickedIds(new Set(shuffled.slice(0, n).map(p => p.id)));
+                              }}
+                              onClear={() => setDirectPickedIds(new Set())}
+                            />
+                            <div className="space-y-2 max-h-96 overflow-y-auto overflow-x-hidden pr-1">
+                              {filtered.map(p => (
+                                <ProblemCard
+                                  key={p.id}
+                                  problem={p}
+                                  checked={directPickedIds.has(p.id)}
+                                  onToggle={(id) => setDirectPickedIds(prev => {
                                     const next = new Set(prev);
                                     next.has(id) ? next.delete(id) : next.add(id);
                                     return next;
-                                  });
-                                }}
+                                  })}
+                                  onPreview={setPreviewProblem}
+                                />
+                              ))}
+                            </div>
+                            <Button
+                              type="button" className="w-full"
+                              disabled={directPickedIds.size === 0}
+                              onClick={() => handleAddPicked(directPickedIds, setDirectPickedIds)}
+                            >
+                              선택한 {directPickedIds.size}개 추가
+                            </Button>
+                          </>
+                        );
+                      })()}
+                    </TabsContent>
+
+                    {/* 탭 C: 즐겨찾기에서 선택 */}
+                    <TabsContent value="bookmark" className="mt-3 space-y-3">
+                      <TypeChips chips={domainTypeChips} selectedTypeIds={selectedTypeIds} setSelectedTypeIds={setSelectedTypeIds} />
+
+                      <p className="text-xs text-muted-foreground">
+                        내가 즐겨찾기한 문제 {filteredBookmarks.length}개 (학년/단원/유형 필터 적용됨)
+                      </p>
+                      {filteredBookmarks.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-6">
+                          이 학년/단원에 즐겨찾기한 문제가 없어요
+                        </p>
+                      ) : (
+                        <>
+                          <RandomPicker
+                            poolSize={filteredBookmarks.length}
+                            onPick={(n) => {
+                              const shuffled = [...filteredBookmarks].sort(() => Math.random() - 0.5);
+                              setBookmarkPickedIds(new Set(shuffled.slice(0, n).map(p => p.id)));
+                            }}
+                            onClear={() => setBookmarkPickedIds(new Set())}
+                          />
+                          <div className="space-y-2 max-h-96 overflow-y-auto overflow-x-hidden pr-1">
+                            {filteredBookmarks.map(p => (
+                              <ProblemCard
+                                key={p.id}
+                                problem={p}
+                                checked={bookmarkPickedIds.has(p.id)}
+                                onToggle={(id) => setBookmarkPickedIds(prev => {
+                                  const next = new Set(prev);
+                                  next.has(id) ? next.delete(id) : next.add(id);
+                                  return next;
+                                })}
                                 onPreview={setPreviewProblem}
                               />
                             ))}
                           </div>
-                        );
-                      })()}
-
-                      <p className="text-xs text-muted-foreground">선택된 문제: {directSelectedIds.size}개</p>
+                          <Button
+                            type="button" className="w-full"
+                            disabled={bookmarkPickedIds.size === 0}
+                            onClick={() => handleAddPicked(bookmarkPickedIds, setBookmarkPickedIds)}
+                          >
+                            선택한 {bookmarkPickedIds.size}개 추가
+                          </Button>
+                        </>
+                      )}
                     </TabsContent>
                   </Tabs>
+                )}
+
+                {/* 누적 출제 문제 — 탭 외부 항상 표시 */}
+                {selectedProblems.size > 0 && (
+                  <div className="space-y-2 border-t pt-4">
+                    <label className="block text-sm font-semibold">
+                      현재 출제 문제 <span className="text-xs font-normal text-muted-foreground">총 {selectedProblems.size}개</span>
+                    </label>
+                    <div className="space-y-2 max-h-64 overflow-y-auto overflow-x-hidden pr-1">
+                      {allProblems.filter(p => selectedProblems.has(p.id)).map(p => (
+                        <div key={p.id} className="flex items-start justify-between gap-2 p-2 bg-secondary rounded-lg min-w-0 max-w-full">
+                          <div className="flex-1 min-w-0 overflow-hidden">
+                            <p className="text-xs font-mono text-muted-foreground">{p.id.slice(0, 8)}</p>
+                            <p className="text-sm truncate">{parseProblemText(p.content).substring(0, 70)}...</p>
+                            {p.domain_name && <Badge variant="outline" className="text-xs mt-1">{p.domain_name}</Badge>}
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button onClick={() => setPreviewProblem(p)}
+                              className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground">
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => handleRemoveProblem(p.id)}
+                              className="text-destructive hover:bg-destructive/10 p-1 rounded">
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
             )}
@@ -614,7 +690,7 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
 
           <DialogFooter>
             <Button variant="outline" onClick={onClose} disabled={saving}>취소</Button>
-            <Button onClick={handleSave} disabled={!title.trim() || selectedProblems.length === 0 || saving}>
+            <Button onClick={handleSave} disabled={!title.trim() || selectedProblems.size === 0 || saving}>
               {saving ? '저장 중...' : assignment ? '수정 완료' : '숙제 출제'}
             </Button>
           </DialogFooter>
