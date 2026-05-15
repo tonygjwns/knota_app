@@ -2,7 +2,7 @@
  * RemediationResult — /remediation/result/:attemptId
  * ResultView와 동일한 본문, 보강 전용 액션 버튼만 다름.
  */
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import AppLayout from '@/components/AppLayout';
@@ -39,6 +39,24 @@ export default function RemediationResult() {
 
   const viewerIsOwner = attempt?.student_id === user?.id;
 
+  const [originalProblemId, setOriginalProblemId] = useState(null);
+  const [parentProblemId, setParentProblemId] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      if (originalAttemptId) {
+        const [orig] = await base44.entities.StudentAttempt.filter({ id: originalAttemptId }, '-created_date', 1);
+        if (orig) setOriginalProblemId(orig.problem_id);
+      }
+      if (parentAttemptId && parentAttemptId !== originalAttemptId) {
+        const [par] = await base44.entities.StudentAttempt.filter({ id: parentAttemptId }, '-created_date', 1);
+        if (par) setParentProblemId(par.problem_id);
+      }
+    })();
+  }, [originalAttemptId, parentAttemptId]);
+
+  const showParentButton = parentAttemptId && parentAttemptId !== originalAttemptId && parentProblemId;
+
   const handleRemediation = async (toolId) => {
     try {
       const allProblems = await base44.entities.Problem.list('-created_date', 1000);
@@ -67,9 +85,14 @@ export default function RemediationResult() {
           <ArrowLeft className="w-4 h-4 mr-1" /> 원래 채점결과로 돌아가기
         </Button>
       )}
-      {problem && (
-        <Button className="w-full" onClick={() => navigate(`/problem/${attempt.problem_id}`)}>
+      {originalProblemId && (
+        <Button className="w-full" onClick={() => navigate(`/problem/${originalProblemId}`)}>
           <RotateCcw className="w-4 h-4 mr-1" /> 원래 문제로 돌아가기 (다시 풀기)
+        </Button>
+      )}
+      {showParentButton && (
+        <Button variant="outline" className="w-full" onClick={() => navigate(`/problem/${parentProblemId}`)}>
+          <RotateCcw className="w-4 h-4 mr-1" /> 이전 문제로 돌아가기
         </Button>
       )}
       <div className="text-center">

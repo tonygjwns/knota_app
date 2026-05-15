@@ -24,6 +24,7 @@ import AdminStudents from './pages/admin/AdminStudents';
 import AdminProblems from './pages/admin/AdminProblems';
 import AdminAcademies from './pages/admin/AdminAcademies';
 import AdminInviteCodes from './pages/admin/AdminInviteCodes';
+import AdminReviewFeedback from './pages/admin/AdminReviewFeedback';
 import TeacherLayout from './pages/teacher/TeacherLayout';
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
 import TeacherStudents from './pages/teacher/TeacherStudents';
@@ -115,6 +116,7 @@ const AuthenticatedApp = () => {
         <Route path="problems/:problemId" element={<ProblemDetail mode="admin" />} />
         <Route path="academies" element={<AdminAcademies />} />
         <Route path="invite-codes" element={<AdminInviteCodes />} />
+        <Route path="review-feedback" element={<AdminReviewFeedback />} />
       </Route>
 
       {/* Teacher routes */}
