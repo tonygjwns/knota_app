@@ -423,7 +423,7 @@ Deno.serve(async (req) => {
     typeSumMapByClass.forEach((tcm, classId) => {
       const arr = [];
       tcm.forEach((entry, tid) => {
-        arr.push({ type_id: tid, name: typeNameMap.get(tid) || tid, avg: Math.round(entry.sum / entry.count), count: entry.count });
+        arr.push({ type_id: tid, name: typeNameMap.get(tid) || tid, avg: Math.round(entry.sum / entry.count), count: entry.count, type_id: tid });
       });
       arr.sort((a, b) => b.count - a.count);
       type_summary_by_class[classId] = arr;

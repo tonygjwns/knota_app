@@ -89,7 +89,7 @@ function ProblemCard({ problem, checked, onToggle, onPreview }) {
   );
 }
 
-export default function AssignmentForm({ classId, onSave, onClose, assignment, preselectedToolId }) {
+export default function AssignmentForm({ classId, onSave, onClose, assignment, preselectedToolId, initialTypeId }) {
   const [title, setTitle] = useState(assignment?.title || '');
   const [description, setDescription] = useState(assignment?.description || '');
   const [deadline, setDeadline] = useState(assignment?.deadline || '');
@@ -161,8 +161,38 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
         }
       }
 
+      // initialTypeId → grade/domain/type 자동 선택
+      if (initialTypeId && !assignment) {
+        try {
+          const types = await base44.entities.Type.filter({ type_id: initialTypeId }, '-created_date', 1);
+          const t = types[0];
+          if (t) {
+            // Type에 grade_range/domain_id가 없으면 ProblemType → Problem 역조회
+            if (t.grade_range && t.domain_id) {
+              setSelectedGrade(t.grade_range);
+              setSelectedDomainId(t.domain_id);
+            } else {
+              // ProblemType에서 이 type_id를 사용하는 problem_id 찾기
+              const pts = ptData.filter(pt => pt.type_id === initialTypeId);
+              if (pts.length > 0) {
+                const pid = pts[0].problem_id;
+                const prob = problemsData.find(p => p.problem_id === pid);
+                if (prob?.domain_id) {
+                  const domain = domainsData.find(d => d.domain_id === prob.domain_id);
+                  if (domain) {
+                    setSelectedGrade(domain.grade_range);
+                    setSelectedDomainId(domain.domain_id);
+                  }
+                }
+              }
+            }
+            setSelectedTypeIds(new Set([initialTypeId]));
+          }
+        } catch {}
+      }
+
       // 학급 grade_range default
-      if (classId && !preselectedToolId) {
+      if (classId && !preselectedToolId && !initialTypeId) {
         try {
           const cls = await base44.entities.Class.filter({ id: classId }, '', 1);
           if (cls[0]?.grade_range) {
@@ -185,7 +215,7 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
       } catch {}
     };
     init();
-  }, [classId, preselectedToolId]);
+  }, [classId, preselectedToolId, initialTypeId]);
 
   // 수정 진입 시 mode / 학년 / 단원 / 선택 문제 복원
   useEffect(() => {

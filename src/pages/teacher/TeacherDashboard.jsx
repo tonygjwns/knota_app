@@ -19,6 +19,7 @@ export default function TeacherDashboard() {
   const [selectedClassId, setSelectedClassId] = useState(null);
   const [pendingTool, setPendingTool] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [initialTypeId, setInitialTypeId] = useState(null);
 
   if (loading) return <InlineLoader message="대시보드 불러오는 중..." />;
   if (error) return (
@@ -178,7 +179,7 @@ export default function TeacherDashboard() {
             <Card className="p-5">
               <h2 className="font-semibold mb-1">단원별 평균 점수</h2>
               <p className="text-xs text-muted-foreground mb-4">
-                {data.my_classes.find(c => c.id === selectedClassId)?.name} 단원별 성취도
+                {data.my_classes.find(c => c.id === selectedClassId)?.name} 단원별 성취도 (막대 클릭 → 그 단원으로 숙제 출제)
               </p>
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={data.type_summary_by_class[selectedClassId]} margin={{ top: 5, right: 10, bottom: 80, left: 0 }}>
@@ -187,7 +188,16 @@ export default function TeacherDashboard() {
                   <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
                   <Tooltip formatter={(v) => [`${v}점`, '평균 점수']}
                     contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
-                  <Bar dataKey="avg" radius={[4, 4, 0, 0]}>
+                  <Bar
+                    dataKey="avg"
+                    radius={[4, 4, 0, 0]}
+                    cursor="pointer"
+                    onClick={(entry) => {
+                      if (!entry?.type_id) return;
+                      setInitialTypeId(entry.type_id);
+                      setShowForm(true);
+                    }}
+                  >
                     {data.type_summary_by_class[selectedClassId].map((entry, i) => (
                       <Cell key={i} fill={entry.avg < 50 ? '#ef4444' : entry.avg < 70 ? '#f59e0b' : '#10b981'} />
                     ))}
@@ -204,13 +214,15 @@ export default function TeacherDashboard() {
         <AssignmentForm
           classId={selectedClassId}
           preselectedToolId={pendingTool}
+          initialTypeId={initialTypeId}
           onSave={async (d) => {
             await base44.entities.Assignment.create(d);
             setShowForm(false);
             setPendingTool(null);
+            setInitialTypeId(null);
             toast.success('숙제가 출제됐어요');
           }}
-          onClose={() => { setShowForm(false); setPendingTool(null); }}
+          onClose={() => { setShowForm(false); setPendingTool(null); setInitialTypeId(null); }}
         />
       )}
     </div>
