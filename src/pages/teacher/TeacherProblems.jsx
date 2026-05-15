@@ -25,6 +25,8 @@ export default function TeacherProblems() {
   const [solutionCountMap, setSolutionCountMap] = useState(new Map()); // problem_id → count
   const [bookmarkedProblemIds, setBookmarkedProblemIds] = useState(new Set());
   const [bookmarkIdMap, setBookmarkIdMap] = useState(new Map());
+  const [bookmarkedToolIds, setBookmarkedToolIds] = useState(new Set());
+  const [toolBookmarkIdMap, setToolBookmarkIdMap] = useState(new Map());
   const [selectedTypeId, setSelectedTypeId] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -35,7 +37,7 @@ export default function TeacherProblems() {
   const loadBase = async () => {
     setLoading(true);
     try {
-      const [allDomains, allTools, allProblems, allSolutions, myBookmarks, allTypes, allPTs] = await Promise.all([
+      const [allDomains, allTools, allProblems, allSolutions, myBookmarks, allTypes, allPTs, myToolBookmarks] = await Promise.all([
         base44.entities.Domain.list('grade_range', 50),
         base44.entities.MathTool.list('name', 200),
         base44.entities.Problem.list('-created_date', 1000),
@@ -43,6 +45,7 @@ export default function TeacherProblems() {
         base44.entities.BookmarkedProblem.filter({ user_id: user.id }, '-created_date', 500),
         base44.entities.Type.list('name', 100),
         base44.entities.ProblemType.list('-created_date', 5000),
+        base44.entities.BookmarkedTool.filter({ user_id: user.id }),
       ]);
 
       // Domain: grade_range 기준 정렬 (숫자 먼저, 그 다음 나머지)
@@ -69,6 +72,8 @@ export default function TeacherProblems() {
       setSolutionCountMap(countMap);
       setBookmarkedProblemIds(new Set(myBookmarks.map(b => b.problem_id)));
       setBookmarkIdMap(new Map(myBookmarks.map(b => [b.problem_id, b.id])));
+      setBookmarkedToolIds(new Set(myToolBookmarks.map(b => b.tool_id)));
+      setToolBookmarkIdMap(new Map(myToolBookmarks.map(b => [b.tool_id, b.id])));
     } catch {
       toast.error('데이터를 불러오지 못했어요');
     } finally {
@@ -136,8 +141,29 @@ export default function TeacherProblems() {
     return base.filter(p => typeProblems.has(p.problem_id));
   };
 
+  const toggleToolBookmark = async (tool, e) => {
+    if (e) e.stopPropagation();
+    if (!user) return;
+    try {
+      if (bookmarkedToolIds.has(tool.tool_id)) {
+        const id = toolBookmarkIdMap.get(tool.tool_id);
+        if (!id) return;
+        await base44.entities.BookmarkedTool.delete(id);
+        setBookmarkedToolIds(prev => { const s = new Set(prev); s.delete(tool.tool_id); return s; });
+        toast.success('즐겨찾기 해제');
+      } else {
+        const created = await base44.entities.BookmarkedTool.create({ user_id: user.id, tool_id: tool.tool_id });
+        setBookmarkedToolIds(prev => new Set([...prev, tool.tool_id]));
+        setToolBookmarkIdMap(prev => new Map(prev).set(tool.tool_id, created.id));
+        toast.success('즐겨찾기에 추가');
+      }
+    } catch {
+      toast.error('즐겨찾기 처리 중 오류가 발생했어요');
+    }
+  };
+
   const toggleBookmark = async (problem) => {
-    const pid = problem.problem_id;
+    const pid = problem.id;
     try {
       if (bookmarkedProblemIds.has(pid)) {
         const bId = bookmarkIdMap.get(pid);
@@ -270,6 +296,13 @@ export default function TeacherProblems() {
                       {tool.goal && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{tool.goal}</p>}
                       <p className="text-xs text-primary mt-2">문제 {pCnt}개</p>
                     </div>
+                    <button
+                      onClick={(e) => toggleToolBookmark(tool, e)}
+                      className="p-1.5 rounded-full hover:bg-muted transition-colors flex-shrink-0"
+                      aria-label={bookmarkedToolIds.has(tool.tool_id) ? '즐겨찾기 해제' : '즐겨찾기에 추가'}
+                    >
+                      <Star className={`w-4 h-4 ${bookmarkedToolIds.has(tool.tool_id) ? 'fill-amber-500 text-amber-500' : 'text-muted-foreground'}`} />
+                    </button>
                     <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-1" />
                   </div>
                 </Card>
@@ -336,7 +369,7 @@ export default function TeacherProblems() {
               const blocks = JSON.parse(problem.content || '[]');
               preview = blocks.map(b => b.text || '').join(' ');
             } catch { preview = problem.content || ''; }
-            const isBookmarked = bookmarkedProblemIds.has(problem.problem_id);
+            const isBookmarked = bookmarkedProblemIds.has(problem.id);
             const solCount = solutionCountMap.get(problem.problem_id) || 0;
 
             return (

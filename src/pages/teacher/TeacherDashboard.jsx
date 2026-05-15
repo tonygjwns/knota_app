@@ -130,7 +130,7 @@ export default function TeacherDashboard() {
           <Card className="p-4">
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-semibold">📌 숙제로 낼 만한 도구</h2>
-              <Link to="/teacher/assignments" className="text-xs text-primary hover:underline">더 보기 →</Link>
+              <Link to="/teacher/problems" className="text-xs text-primary hover:underline">도구 더 보기 →</Link>
             </div>
             {(() => {
               const top3 = ((data.weak_or_unattempted_tools_by_class?.[selectedClassId]) || []).slice(0, 3);

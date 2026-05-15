@@ -318,6 +318,8 @@ export default function AttemptResultBody({
                 steps={(solutionSteps || []).filter(s => s.solution_id === matchedSolution.solution_id)}
                 toolMap={toolMapForSolution}
                 defaultOpen={true}
+                bookmarkedToolIds={bookmarkedToolIds}
+                onToggleToolBookmark={user && viewerIsOwner ? toggleBookmark : undefined}
               />
             </div>
           )}
@@ -337,6 +339,8 @@ export default function AttemptResultBody({
               <SolutionCard key={sol.id} solution={sol}
                 steps={(solutionSteps || []).filter(s => s.solution_id === sol.solution_id)}
                 toolMap={toolMapForSolution} defaultOpen={false}
+                bookmarkedToolIds={bookmarkedToolIds}
+                onToggleToolBookmark={user && viewerIsOwner ? toggleBookmark : undefined}
               />
             ))}
           </div>

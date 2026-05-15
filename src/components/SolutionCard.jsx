@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import MathRenderer from '@/components/MathRenderer';
-import { ChevronDown, ChevronUp, Wrench } from 'lucide-react';
+import { ChevronDown, ChevronUp, Wrench, Star } from 'lucide-react';
 
 export const parseContents = (c) => {
   try {
@@ -9,7 +9,7 @@ export const parseContents = (c) => {
   } catch { return c || ''; }
 };
 
-export default function SolutionCard({ solution, steps, toolMap, defaultOpen = false }) {
+export default function SolutionCard({ solution, steps, toolMap, defaultOpen = false, bookmarkedToolIds = new Set(), onToggleToolBookmark }) {
   const [open, setOpen] = useState(defaultOpen);
 
   const sortedSteps = [...(steps || [])].sort((a, b) => a.sequence_order - b.sequence_order);
@@ -50,9 +50,20 @@ export default function SolutionCard({ solution, steps, toolMap, defaultOpen = f
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-muted-foreground font-mono flex-shrink-0">Step {step.sequence_order}</span>
                         {tool && (
-                          <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                            <Wrench className="w-3 h-3" />
-                            {tool.name}
+                          <span className="inline-flex items-center gap-0 text-xs bg-primary/10 text-primary rounded-full">
+                            <span className="px-2 py-0.5 inline-flex items-center gap-1">
+                              <Wrench className="w-3 h-3" />
+                              {tool.name}
+                            </span>
+                            {onToggleToolBookmark && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); onToggleToolBookmark(tool); }}
+                                className="px-1.5 py-0.5 hover:bg-primary/20 rounded-r-full transition-colors"
+                                aria-label={bookmarkedToolIds.has(tool.tool_id) ? '즐겨찾기 해제' : '즐겨찾기에 추가'}
+                              >
+                                <Star className={`w-3 h-3 ${bookmarkedToolIds.has(tool.tool_id) ? 'fill-amber-500 text-amber-500' : ''}`} />
+                              </button>
+                            )}
                           </span>
                         )}
                         {!tool && step.tool_id && (

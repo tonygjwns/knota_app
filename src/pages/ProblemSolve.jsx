@@ -68,7 +68,10 @@ export default function ProblemSolve() {
   const loadProblem = async () => {
     setLoading(true);
     try {
-      const p = await base44.entities.Problem.filter({ id }, '-created_date', 1);
+      let p = await base44.entities.Problem.filter({ id }, '-created_date', 1);
+      if (p.length === 0) {
+        p = await base44.entities.Problem.filter({ problem_id: id }, '-created_date', 1);
+      }
       if (p.length > 0) {
         setProblem(p[0]);
         // Check bookmark status

@@ -65,64 +65,72 @@ export default function TeacherReviewDetail() {
 
       // Fetch student name
       if (a.student_id) {
-        const [stu] = await base44.entities.User.filter({ id: a.student_id }, '-created_date', 1);
-        if (stu) setStudent({ name: stu.full_name || null, email: a.student_email });
-        else setStudent({ name: null, email: a.student_email });
+        try {
+          const [stu] = await base44.entities.User.filter({ id: a.student_id }, '-created_date', 1);
+          if (stu) setStudent({ name: stu.full_name || null, email: a.student_email });
+          else setStudent({ name: null, email: a.student_email });
+        } catch (e) {
+          console.warn('Student fetch failed:', e);
+          setStudent({ name: null, email: a.student_email });
+        }
       }
 
       let prob = null;
       let allToolsList = [];
       if (a.problem_id) {
-        const [p] = await base44.entities.Problem.filter({ id: a.problem_id }, '-created_date', 1);
-        if (p) {
-          prob = p;
-          setProblem(p);
-          let toolIds = [];
-          try { toolIds = JSON.parse(p.tool_ids || '[]'); } catch {}
-          if (toolIds.length > 0) {
-            allToolsList = await base44.entities.MathTool.list('name', 100);
-            setTools(allToolsList.filter(t => toolIds.includes(t.tool_id)));
-          }
+        try {
+          const [p] = await base44.entities.Problem.filter({ id: a.problem_id }, '-created_date', 1);
+          if (p) {
+            prob = p;
+            setProblem(p);
+            let toolIds = [];
+            try { toolIds = JSON.parse(p.tool_ids || '[]'); } catch {}
+            if (toolIds.length > 0) {
+              allToolsList = await base44.entities.MathTool.list('name', 100);
+              setTools(allToolsList.filter(t => toolIds.includes(t.tool_id)));
+            }
 
-          // Fetch solutions + steps
-          const sols = await base44.entities.Solution.filter({ problem_id: p.problem_id }, 'priority', 20);
-          setSolutions(sols);
-          const solStepsMap = new Map();
-          if (sols.length > 0) {
-            const stepArrays = await Promise.all(
-              sols.map(s => base44.entities.SolutionStep.filter({ solution_id: s.solution_id }, 'sequence_order', 50))
-            );
-            sols.forEach((s, i) => solStepsMap.set(s.solution_id, stepArrays[i]));
-          }
-          setStepsBySol(solStepsMap);
+            // Fetch solutions + steps
+            const sols = await base44.entities.Solution.filter({ problem_id: p.problem_id }, 'priority', 20);
+            setSolutions(sols);
+            const solStepsMap = new Map();
+            if (sols.length > 0) {
+              const stepArrays = await Promise.all(
+                sols.map(s => base44.entities.SolutionStep.filter({ solution_id: s.solution_id }, 'sequence_order', 50))
+              );
+              sols.forEach((s, i) => solStepsMap.set(s.solution_id, stepArrays[i]));
+            }
+            setStepsBySol(solStepsMap);
 
-          // Determine initial selectedSolutionId
-          const defaultSolId = parsedGrading?.matched_solution_id || (sols[0]?.solution_id ?? null);
-          setSelectedSolutionId(defaultSolId);
+            // Determine initial selectedSolutionId
+            const defaultSolId = parsedGrading?.matched_solution_id || (sols[0]?.solution_id ?? null);
+            setSelectedSolutionId(defaultSolId);
 
-          // Load existing teacher_review_json or init from AI
-          if (a.teacher_review_json) {
-            try {
-              const tr = JSON.parse(a.teacher_review_json);
-              // New schema: step_judgments
-              if (tr.step_judgments) {
-                setStepJudgments(tr.step_judgments);
-              } else if (tr.step_edits) {
-                // backwards compat: rebuild from step_edits (index-based) → skip, init fresh
-                setStepJudgments(initStepJudgments(defaultSolId, solStepsMap, parsedGrading));
-              } else {
-                setStepJudgments(initStepJudgments(defaultSolId, solStepsMap, parsedGrading));
-              }
-              if (tr.selected_solution_id) setSelectedSolutionId(tr.selected_solution_id);
-              if (tr.final_score !== undefined) setFinalScore(tr.final_score);
-              else if (tr.score_adjustment !== undefined) {
-                setFinalScore(Math.max(0, Math.min(100, (a.score || 0) + tr.score_adjustment)));
-              }
-              setComment(tr.comment || '');
-            } catch {}
-          } else {
-            setStepJudgments(initStepJudgments(defaultSolId, solStepsMap, parsedGrading));
+            // Load existing teacher_review_json or init from AI
+            if (a.teacher_review_json) {
+              try {
+                const tr = JSON.parse(a.teacher_review_json);
+                if (tr.step_judgments) {
+                  setStepJudgments(tr.step_judgments);
+                } else if (tr.step_edits) {
+                  setStepJudgments(initStepJudgments(defaultSolId, solStepsMap, parsedGrading));
+                } else {
+                  setStepJudgments(initStepJudgments(defaultSolId, solStepsMap, parsedGrading));
+                }
+                if (tr.selected_solution_id) setSelectedSolutionId(tr.selected_solution_id);
+                if (tr.final_score !== undefined) setFinalScore(tr.final_score);
+                else if (tr.score_adjustment !== undefined) {
+                  setFinalScore(Math.max(0, Math.min(100, (a.score || 0) + tr.score_adjustment)));
+                }
+                setComment(tr.comment || '');
+              } catch {}
+            } else {
+              setStepJudgments(initStepJudgments(defaultSolId, solStepsMap, parsedGrading));
+            }
           }
+        } catch (e) {
+          console.error('Problem/solution fetch failed:', e);
+          toast.error('문제/별해 데이터를 불러오지 못했어요: ' + (e.message || ''));
         }
       }
     } finally {

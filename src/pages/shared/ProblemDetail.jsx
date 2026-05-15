@@ -279,6 +279,8 @@ export default function ProblemDetail({ mode = 'admin' }) {
                   steps={steps}
                   toolMap={toolMap}
                   defaultOpen={idx === 0}
+                  bookmarkedToolIds={bookmarkedToolIds}
+                  onToggleToolBookmark={mode === 'teacher' && user ? toggleToolBookmark : undefined}
                 />
               );
             })}

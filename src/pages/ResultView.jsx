@@ -187,11 +187,16 @@ export default function ResultView() {
           let isAuthorized = isOwn || isAdmin;
           if (!isAuthorized && user.role === 'teacher') {
             try {
-              const allClasses = await base44.entities.Class.filter({ main_teacher_id: user.id }, 'name', 100);
-              const classIds = new Set(allClasses.map(c => c.id));
-              if (classIds.size > 0) {
+              const allClasses = await base44.entities.Class.list('name', 500);
+              const myClassIds = new Set(
+                allClasses.filter(c =>
+                  c.main_teacher_id === user.id ||
+                  (c.assistant_teacher_ids || []).includes(user.id)
+                ).map(c => c.id)
+              );
+              if (myClassIds.size > 0) {
                 const allStudents = await base44.entities.User.list('full_name', 500);
-                isAuthorized = allStudents.some(s => s.id === a.student_id && classIds.has(s.class_id));
+                isAuthorized = allStudents.some(s => s.id === a.student_id && myClassIds.has(s.class_id));
               }
             } catch {}
           }
