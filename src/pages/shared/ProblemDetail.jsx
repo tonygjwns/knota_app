@@ -177,7 +177,6 @@ export default function ProblemDetail({ mode = 'admin' }) {
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div className="flex-1 min-w-0">
-          <p className="text-xs text-muted-foreground">문제 ID: {problem.problem_id}</p>
           <h1 className="text-xl font-bold">{problem.domain_name || '(도메인 없음)'}</h1>
           {toolNames.length > 0 && (
             <div className="flex gap-1 mt-1 flex-wrap">
@@ -215,9 +214,11 @@ export default function ProblemDetail({ mode = 'admin' }) {
       {/* 검증 정답 */}
       {problem.verified_answer && (
         <Card className="p-4">
-          <p className="font-semibold mb-3">검증 정답</p>
-          <div className="pt-3 border-t prose prose-sm max-w-none">
-            <MathRenderer content={parseProblemText(problem.verified_answer)} />
+          <div className="flex items-center gap-4">
+            <p className="font-semibold flex-shrink-0">정답</p>
+            <div className="prose prose-sm max-w-none flex-1">
+              <MathRenderer content={parseProblemText(problem.verified_answer)} />
+            </div>
           </div>
         </Card>
       )}

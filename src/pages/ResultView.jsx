@@ -582,7 +582,6 @@ JSON: {"markdown_text": "풀이 (LaTeX 포함)", "confidence": 0-100, "notes": "
 
   const steps = grading?.step_feedback || [];
   const gaps = grading?.gap_locations || [];
-  const errors = grading?.error_locations || [];
 
   // toolMap for SolutionCard
   const toolMapForSolution = new Map(tools.map(t => [t.tool_id, t]));

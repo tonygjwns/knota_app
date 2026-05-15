@@ -4,6 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
+import { toast } from 'sonner';
 import ScoreBadge from '@/components/ScoreBadge';
 import MathRenderer from '@/components/MathRenderer';
 
@@ -30,8 +31,8 @@ export default function AssignmentStudentDetail() {
       setLoading(true);
       try {
         const [assignments, allUsers] = await Promise.all([
-          base44.entities.Assignment.filter({ id: assignmentId }, '', 1),
-          base44.entities.User.filter({ id: studentId }, '', 1),
+          base44.entities.Assignment.filter({ id: assignmentId }),
+          base44.entities.User.filter({ id: studentId }),
         ]);
         const asgn = assignments[0];
         const stu = allUsers[0];
@@ -60,6 +61,9 @@ export default function AssignmentStudentDetail() {
           }
         }
         setAttemptsByProblem(byProblem);
+      } catch (e) {
+        console.error('AssignmentStudentDetail load failed:', e);
+        toast.error('데이터를 불러오지 못했어요: ' + (e.message || ''));
       } finally {
         setLoading(false);
       }

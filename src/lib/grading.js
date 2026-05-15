@@ -206,7 +206,10 @@ ${ocrText}
 - 판단 불확실 → "unclear"
 
 학생이 답안 input 에 오타를 적었더라도 풀이 자체가 정답에 도달했다면 reached.
-- extracted_answer: 풀이 OCR에서 학생 최종 답을 LaTeX로 추출. $ 없이. 못 찾으면 "".
+## extracted_answer 형식
+- 풀이 OCR에서 학생이 최종적으로 도달한 답을 LaTeX로 추출
+- $...$ wrapper 없이 식 자체만
+- 못 찾으면 ""
 
 JSON 만 응답.`;
 
@@ -245,30 +248,30 @@ export function buildGradingPrompt({ problemText, verifiedAnswer, solutionsBlock
 4. student_final_answer — 풀이 OCR에서 학생 최종 답을 LaTeX로 추출. $ 없이. 못 찾으면 "".
 5. 정답 처리 — 학생이 매칭 별해의 path와 일치하면서 verified_answer에 도달하면 score 80+ (correct).
    사소한 계산/표기 오류는 허용. 개념적 오류만 score 크게 차감.
-5. 오류 분류:
+6. 오류 분류:
    - calculation = 산수/부호 오류 (소소)
    - conceptual = 개념/공식 오류 (큼)
    - notation = 표기 오류 (작음)
-6. 할루시 방지 — 학생이 안 쓴 내용 추측 금지. 확신 없으면 confidence ↓
-7. OCR 검증 — 의심스러우면 ocr_quality_concern에 명시
-8. Actionable feedback — 모호한 표현 금지. 어느 자리/왜를 명시.
-9. 학생 step → 정해 step 매핑 (가장 중요):
+7. 할루시 방지 — 학생이 안 쓴 내용 추측 금지. 확신 없으면 confidence ↓
+8. OCR 검증 — 의심스러우면 ocr_quality_concern에 명시
+9. Actionable feedback — 모호한 표현 금지. 어느 자리/왜를 명시.
+10. 학생 step → 정해 step 매핑 (가장 중요):
     - 정해 path 는 N 개 step, 학생 풀이는 여러 줄로 구성됩니다.
     - **한 정해 step 에 대응하는 학생 풀이는 step_feedback 한 개로 합쳐서 출력하세요.**
       학생이 그 부분에 여러 줄을 썼다면 student_step 에 줄바꿈으로 합쳐 넣으세요.
       한 도구가 step_feedback 에 반복해서 등장하면 안 됩니다.
-    - 각 항목의 matched_solution_step_number 를 정확히 채우는 것이 가장 중요합니다.
-    - matched_solution_id 가 null 이면 모든 step 의 matched_solution_step_number 도 null.
-10. tool_id 채우기:
+      - 각 항목의 matched_solution_step_number 를 정확히 채우는 것이 가장 중요합니다.
+      - matched_solution_id 가 null 이면 모든 step 의 matched_solution_step_number 도 null.
+      11. tool_id 채우기:
     - tool_id 는 서버가 matched_solution_step_number 에서 자동으로 도출하므로,
       잘 모르겠으면 null 로 두세요.
     - matched_solution_id 가 null 인 케이스에서만 가장 가까운 도구를
       <available_tools> 에서 선택해 채워주세요.
-11. 학생이 정해 path 와 다른 순서로 풀었더라도 step_feedback 항목 자체는
-    학생이 쓴 순서로 출력하세요. matched_solution_step_number 만 정해 순서를 가리킵니다.
-12. 학생이 도구의 이름을 명시적으로 쓰지 않더라도, 그 도구의 결과
-    (공식·정리의 산물) 를 사용했다면 그 정해 step 에 매핑하세요.
-13. 학생이 답안 input 칸에 적은 답이 있다면 참고하되, 풀이 자체를 우선 분석하세요.
+      12. 학생이 정해 path 와 다른 순서로 풀었더라도 step_feedback 항목 자체는
+      학생이 쓴 순서로 출력하세요. matched_solution_step_number 만 정해 순서를 가리킵니다.
+      13. 학생이 도구의 이름을 명시적으로 쓰지 않더라도, 그 도구의 결과
+      (공식·정리의 산물) 를 사용했다면 그 정해 step 에 매핑하세요.
+      14. 학생이 답안 input 칸에 적은 답이 있다면 참고하되, 풀이 자체를 우선 분석하세요.
 
 ## 점수 기준
 - 100 = 정답 + 풀이 완전
