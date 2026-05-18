@@ -89,8 +89,19 @@ export default function TeacherLayout() {
   const navigate = useNavigate();
   const { user, isLoadingAuth } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [ownerByAcademy, setOwnerByAcademy] = useState(false);
 
-  const isOwner = user?.role === 'owner';
+  useEffect(() => {
+    if (!user?.academy_id) return;
+    (async () => {
+      try {
+        const [academy] = await base44.entities.Academy.filter({ id: user.academy_id }, '-created_date', 1);
+        if (academy?.owner_id === user.id) setOwnerByAcademy(true);
+      } catch {}
+    })();
+  }, [user?.id, user?.academy_id]);
+
+  const isOwner = user?.role === 'owner' || ownerByAcademy;
   const TEACHER_NAV = [
     { path: '/teacher', icon: BarChart2, label: '대시보드', exact: true },
     { path: '/teacher/classes', icon: BookOpen, label: '내 학급' },

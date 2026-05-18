@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,7 @@ import ClassFormModal from '@/components/ClassFormModal';
 
 export default function OwnerAcademy() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [academy, setAcademy] = useState(null);
   const [classes, setClasses] = useState([]);
@@ -26,7 +28,16 @@ export default function OwnerAcademy() {
         base44.entities.Class.filter({ academy_id: user.academy_id }, 'name', 200),
         base44.entities.User.filter({ academy_id: user.academy_id }, '-created_date', 500),
       ]);
-      setAcademy(academies[0] || null);
+      const acad = academies[0] || null;
+
+      const isAuthorized = user.role === 'owner' || acad?.owner_id === user.id;
+      if (!isAuthorized) {
+        toast.error('학원 관리 권한이 없어요');
+        navigate('/teacher');
+        return;
+      }
+
+      setAcademy(acad);
       setClasses(allClasses);
       setAcademyTeachers(allUsers.filter(u => u.role === 'teacher'));
     } catch (e) {
