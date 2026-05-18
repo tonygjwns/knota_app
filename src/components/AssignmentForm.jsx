@@ -504,8 +504,14 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
                                     onClick={e => e.stopPropagation()}
                                   />
                                   <div className="flex-1 min-w-0 overflow-hidden">
-                                    <p className="text-sm font-medium truncate">{t.name}</p>
-                                    {t.goal && <p className="text-xs text-muted-foreground truncate">{t.goal}</p>}
+                                    <p className="text-sm font-medium truncate" title={t.name}>
+                                      {t.name.length > 30 ? t.name.slice(0, 30) + '…' : t.name}
+                                    </p>
+                                    {t.goal && (
+                                      <p className="text-xs text-muted-foreground truncate" title={t.goal}>
+                                        {t.goal.length > 50 ? t.goal.slice(0, 50) + '…' : t.goal}
+                                      </p>
+                                    )}
                                   </div>
                                 </div>
                               </Card>
