@@ -8,6 +8,7 @@ import UserMenuDropdown from '@/components/UserMenuDropdown';
 
 const ADMIN_NAV = [
   { path: '/admin', icon: BarChart2, label: '대시보드', exact: true },
+  { path: '/admin/users', icon: Users, label: '사용자 목록' },
   { path: '/admin/academies', icon: Building, label: '학원/학급' },
   { path: '/admin/invite-codes', icon: KeyRound, label: '초대코드' },
   { path: '/admin/teachers', icon: GraduationCap, label: '강사' },
