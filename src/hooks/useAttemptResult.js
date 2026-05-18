@@ -34,6 +34,7 @@ export default function useAttemptResult({ attemptId, user, skipAuthCheck = fals
   const [reviewNote, setReviewNote] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
   const [feedbackSent, setFeedbackSent] = useState(false);
+  const [studentInfo, setStudentInfo] = useState(null);
 
   useEffect(() => { if (attemptId) loadAttempt(); }, [attemptId]);
 
@@ -86,6 +87,7 @@ export default function useAttemptResult({ attemptId, user, skipAuthCheck = fals
               navigate(redirectByRole(user));
               return;
             }
+            if (res?.data?.student) setStudentInfo(res.data.student);
           } catch (e) {
             toast.error('권한 확인 실패: ' + (e.message || ''));
             navigate(redirectByRole(user));
@@ -252,5 +254,6 @@ export default function useAttemptResult({ attemptId, user, skipAuthCheck = fals
     feedbackSent, setFeedbackSent,
     toggleBookmark, toggleProblemBookmark,
     remediationToolIds,
+    studentInfo,
   };
 }
