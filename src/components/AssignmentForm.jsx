@@ -393,7 +393,7 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
   return (
     <>
       <Dialog open onOpenChange={onClose}>
-        <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
             <DialogTitle>{assignment ? '숙제 수정' : '새 숙제 출제'}</DialogTitle>
           </DialogHeader>
@@ -488,19 +488,27 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
                         {filteredTools.length === 0 ? (
                           <p className="text-sm text-muted-foreground text-center py-4">이 단원에 연결된 도구가 없어요</p>
                         ) : (
-                          <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                          <div className="space-y-2 max-h-60 overflow-y-auto overflow-x-hidden pr-1">
                             {filteredTools.map(t => (
-                              <button key={t.tool_id} className="w-full text-left" onClick={() => toggleToolId(t.tool_id)}>
-                                <Card className={`p-3 transition-all ${selectedToolIds.has(t.tool_id) ? 'border-primary bg-primary/5' : 'hover:bg-muted'}`}>
-                                  <div className="flex items-center gap-2">
-                                    <input type="checkbox" readOnly checked={selectedToolIds.has(t.tool_id)} className="flex-shrink-0" />
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-sm font-medium">{t.name}</p>
-                                      {t.goal && <p className="text-xs text-muted-foreground truncate">{t.goal}</p>}
-                                    </div>
+                              <Card
+                                key={t.tool_id}
+                                className={`p-3 cursor-pointer transition-all ${selectedToolIds.has(t.tool_id) ? 'border-primary bg-primary/5' : 'hover:bg-muted'}`}
+                                onClick={() => toggleToolId(t.tool_id)}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <input
+                                    type="checkbox"
+                                    readOnly
+                                    checked={selectedToolIds.has(t.tool_id)}
+                                    className="flex-shrink-0"
+                                    onClick={e => e.stopPropagation()}
+                                  />
+                                  <div className="flex-1 min-w-0 overflow-hidden">
+                                    <p className="text-sm font-medium truncate">{t.name}</p>
+                                    {t.goal && <p className="text-xs text-muted-foreground truncate">{t.goal}</p>}
                                   </div>
-                                </Card>
-                              </button>
+                                </div>
+                              </Card>
                             ))}
                           </div>
                         )}
