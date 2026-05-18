@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { base44 } from '@/api/base44Client';
-import { BarChart2, Users, BookOpen, RefreshCw, ClipboardList, CheckSquare, Star, ChevronLeft, ChevronRight, Building2 } from 'lucide-react';
+import { BarChart2, BookOpen, RefreshCw, ClipboardList, CheckSquare, Star, ChevronLeft, ChevronRight, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { TeacherProvider, useTeacher } from '@/lib/TeacherContext';
 import UserMenuDropdown from '@/components/UserMenuDropdown';
