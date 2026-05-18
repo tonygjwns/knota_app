@@ -70,28 +70,44 @@ export default function Landing() {
         const codes = await base44.entities.InviteCode.filter(
           { code, is_active: true }, '-created_date', 1
         );
-        if (codes.length > 0) {
-          const c = codes[0];
-          userData.academy_id = c.academy_id;
-          if (c.class_id) userData.class_id = c.class_id;
-          if (c.role) userData.role = c.role;
-          if ((c.role === 'teacher') && c.class_id) {
-            userData.class_ids = [c.class_id];
-          }
-          const newUseCount = (c.use_count || 0) + 1;
-          const updateData = { use_count: newUseCount };
-          if (c.one_time) updateData.is_active = false;
-          await base44.entities.InviteCode.update(c.id, updateData);
-          if (c.role === 'owner' || c.role === 'teacher') {
-            userData.approval_status = 'approved';
-          }
-        } else {
+        if (codes.length === 0) {
           setError('유효하지 않은 코드예요. 코드를 확인해 주세요.');
           setLoading(false);
           return;
         }
+        const c = codes[0];
+        // role 일치 검증
+        if (c.role !== role) {
+          const roleLabel = { owner: '학원장', teacher: '강사', student: '학생' };
+          setError(`선택한 역할(${roleLabel[role]})과 코드의 역할(${roleLabel[c.role]})이 달라요`);
+          setLoading(false);
+          return;
+        }
+        userData.academy_id = c.academy_id;
+        if (c.class_id) userData.class_id = c.class_id;
+        if (c.role === 'teacher' && c.class_id) {
+          userData.class_ids = [c.class_id];
+        }
+        if (c.role === 'owner' || c.role === 'teacher') {
+          userData.approval_status = 'approved';
+        }
+        if (c.one_time) {
+          await base44.entities.InviteCode.delete(c.id);
+        } else {
+          await base44.entities.InviteCode.update(c.id, { use_count: (c.use_count || 0) + 1 });
+        }
       } catch (codeErr) {
-        // Code lookup failed silently
+        console.error('[회원가입] 코드 처리 오류:', codeErr);
+        setError('코드 처리 중 오류가 발생했어요. 다시 시도해 주세요');
+        setLoading(false);
+        return;
+      }
+    } else {
+      // 코드 없이 가입 — student만 허용
+      if (role === 'owner' || role === 'teacher') {
+        setError(`${role === 'owner' ? '학원장' : '강사'}으로 가입하려면 초대코드가 필요해요`);
+        setLoading(false);
+        return;
       }
     }
 
@@ -203,13 +219,11 @@ export default function Landing() {
 
             {/* Divider */}
             <div className="border-t border-border pt-2">
-              <p className="text-xs text-muted-foreground mb-3">학원/강사 초대코드가 있으신가요? (선택)</p>
-
               {/* Role selection */}
               <div className="mb-3">
                 <label className="text-sm font-medium block mb-2">가입 유형</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {[{ value: 'student', label: '🎒 학생' }, { value: 'teacher', label: '👩‍🏫 강사' }].map(r => (
+                <div className="grid grid-cols-3 gap-2">
+                  {[{ value: 'owner', label: '🏫 학원장' }, { value: 'teacher', label: '👩‍🏫 강사' }, { value: 'student', label: '🎒 학생' }].map(r => (
                     <button
                       key={r.value}
                       type="button"
@@ -224,7 +238,9 @@ export default function Landing() {
                     </button>
                   ))}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">코드 입력 시 코드에 설정된 역할이 자동 적용돼요</p>
+                {(role === 'owner' || role === 'teacher') && (
+                  <p className="text-xs text-amber-600 mt-1">초대코드가 필요해요</p>
+                )}
               </div>
 
               {/* Invite code */}

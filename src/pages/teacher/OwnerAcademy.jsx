@@ -18,6 +18,7 @@ export default function OwnerAcademy() {
   const [classes, setClasses] = useState([]);
   const [academyTeachers, setAcademyTeachers] = useState([]);
   const [classModal, setClassModal] = useState(null);
+  const [inviteCodes, setInviteCodes] = useState([]);
 
   const loadAll = async () => {
     if (!user?.id) { setLoading(false); return; }
@@ -37,6 +38,7 @@ export default function OwnerAcademy() {
       setAcademy(data?.academy || null);
       setClasses(data?.classes || []);
       setAcademyTeachers(data?.teachers || []);
+      setInviteCodes(data?.invite_codes || []);
     } catch (e) {
       toast.error('데이터를 불러오지 못했어요: ' + (e.message || ''));
     } finally {
@@ -59,6 +61,17 @@ export default function OwnerAcademy() {
       await loadAll();
     } catch (e) {
       toast.error('저장 실패: ' + (e.message || ''));
+    }
+  };
+
+  const handleDeleteCode = async (id) => {
+    if (!confirm('이 초대코드를 삭제할까요?')) return;
+    try {
+      await base44.entities.InviteCode.delete(id);
+      setInviteCodes(prev => prev.filter(c => c.id !== id));
+      toast.success('코드를 삭제했어요');
+    } catch (e) {
+      toast.error('삭제 실패: ' + (e.message || ''));
     }
   };
 
@@ -126,6 +139,40 @@ export default function OwnerAcademy() {
                     <Trash2 className="w-4 h-4 text-destructive" />
                   </Button>
                 </div>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 초대코드 관리 */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-semibold">초대코드 ({inviteCodes.length}개)</h2>
+        </div>
+        <div className="space-y-2">
+          {inviteCodes.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-6">발행된 코드가 없어요</p>
+          )}
+          {inviteCodes.map(c => {
+            const cls = c.class_id ? classes.find(x => x.id === c.class_id) : null;
+            const issuer = academyTeachers.find(t => t.id === c.issued_by);
+            const roleLabel = { owner: '학원장', teacher: '강사', student: '학생' }[c.role] || c.role;
+            return (
+              <Card key={c.id} className="p-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                  <span className="font-mono font-bold tracking-widest">{c.code}</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full border bg-violet-100 text-violet-700">{roleLabel}</span>
+                  {c.one_time && <span className="text-xs px-2 py-0.5 rounded-full border bg-amber-50 text-amber-600">일회용</span>}
+                  <span className="text-xs text-muted-foreground">
+                    {cls ? `학급: ${cls.name}` : '학원 코드'}
+                    · 발행: {issuer?.full_name || issuer?.email || '—'}
+                    · {c.use_count || 0}회 사용
+                  </span>
+                </div>
+                <Button size="sm" variant="ghost" onClick={() => handleDeleteCode(c.id)}>
+                  <Trash2 className="w-4 h-4 text-destructive" />
+                </Button>
               </Card>
             );
           })}

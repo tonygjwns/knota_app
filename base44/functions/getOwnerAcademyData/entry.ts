@@ -22,13 +22,14 @@ Deno.serve(async (req) => {
     const isAuthorized = caller.role === 'admin' || caller.role === 'owner' || academy.owner_id === caller.id;
     if (!isAuthorized) return Response.json({ error: 'forbidden' }, { status: 403 });
 
-    const [classes, users] = await Promise.all([
+    const [classes, users, inviteCodes] = await Promise.all([
       base44.asServiceRole.entities.Class.filter({ academy_id: academy.id }, 'name', 200),
       base44.asServiceRole.entities.User.filter({ academy_id: academy.id }, '-created_date', 500),
+      base44.asServiceRole.entities.InviteCode.filter({ academy_id: academy.id }, '-created_date', 200),
     ]);
     const teachers = users.filter(u => u.role === 'teacher');
 
-    return Response.json({ academy, classes, teachers });
+    return Response.json({ academy, classes, teachers, invite_codes: inviteCodes });
   } catch (e) {
     return Response.json({ error: e.message }, { status: 500 });
   }

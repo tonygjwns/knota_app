@@ -3,7 +3,6 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { InlineLoader } from '@/components/LoadingOverlay';
 import { Copy, Plus, Trash2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
@@ -83,10 +82,15 @@ export default function AdminInviteCodes() {
     setCreating(false);
   };
 
-  const deactivate = async (id) => {
-    await base44.entities.InviteCode.update(id, { is_active: false });
-    setCodes(prev => prev.map(c => c.id === id ? { ...c, is_active: false } : c));
-    toast.success('코드 비활성화됨');
+  const deleteCode = async (id) => {
+    if (!confirm('이 초대코드를 삭제할까요? 되돌릴 수 없어요.')) return;
+    try {
+      await base44.entities.InviteCode.delete(id);
+      setCodes(prev => prev.filter(c => c.id !== id));
+      toast.success('코드를 삭제했어요');
+    } catch (e) {
+      toast.error('삭제 실패: ' + (e.message || ''));
+    }
   };
 
   const copyCode = (code) => {
@@ -165,13 +169,12 @@ export default function AdminInviteCodes() {
         {codes.map(c => {
           const roleCfg = ROLE_CFG[c.role] || ROLE_CFG.student;
           return (
-            <Card key={c.id} className={`p-4 ${!c.is_active ? 'opacity-50' : ''}`}>
+            <Card key={c.id} className="p-4">
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-3 flex-wrap">
                   <span className="font-mono font-bold text-lg tracking-widest">{c.code}</span>
                   <span className={`text-xs px-2 py-0.5 rounded-full border ${roleCfg.color}`}>{roleCfg.label}</span>
                   {c.one_time && <span className="text-xs px-2 py-0.5 rounded-full border bg-amber-50 text-amber-600 border-amber-200">일회용</span>}
-                  {!c.is_active && <Badge variant="outline" className="text-xs">비활성</Badge>}
                   <div className="text-xs text-muted-foreground">
                     {getAcademyName(c.academy_id)}
                     {c.class_id && ` › ${getClassName(c.class_id)}`}
@@ -179,16 +182,12 @@ export default function AdminInviteCodes() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground">{c.use_count || 0}회 사용</span>
-                  {c.is_active && (
-                    <>
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => copyCode(c.code)}>
-                        <Copy className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => deactivate(c.id)}>
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </>
-                  )}
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => copyCode(c.code)}>
+                    <Copy className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => deleteCode(c.id)}>
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
                 </div>
               </div>
             </Card>
