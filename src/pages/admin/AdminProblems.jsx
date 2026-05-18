@@ -21,6 +21,7 @@ export default function AdminProblems() {
   const [selectedGrade, setSelectedGrade] = useState('');
   const [selectedDomain, setSelectedDomain] = useState('');
   const [problems, setProblems] = useState([]);
+  const [domainProblemIds, setDomainProblemIds] = useState(new Set());
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
@@ -28,13 +29,19 @@ export default function AdminProblems() {
   const [loading, setLoading] = useState(false);
   const [domainsLoading, setDomainsLoading] = useState(true);
   const [pageLoading, setPageLoading] = useState(false);
+  const [allTypes, setAllTypes] = useState([]);
+  const [allProblemTypes, setAllProblemTypes] = useState([]);
+  const [selectedTypeId, setSelectedTypeId] = useState(null);
 
   // 최초 도메인 목록 + 각 도메인의 실제 문제 수 로드
   useEffect(() => {
     (async () => {
       try {
-        const d = await base44.entities.Domain.list('name', 100);
-        // 각 도메인의 실제 문제 수를 병렬로 조회
+        const [d, types, pts] = await Promise.all([
+          base44.entities.Domain.list('name', 100),
+          base44.entities.Type.list('name', 500),
+          base44.entities.ProblemType.list('-created_date', 10000),
+        ]);
         const counts = await Promise.all(
           d.map(domain =>
             base44.entities.Problem.filter({ domain_id: domain.domain_id }, '-created_date', 1000, 0)
@@ -44,6 +51,8 @@ export default function AdminProblems() {
         );
         const countMap = new Map(counts.map(c => [c.id, c.count]));
         setDomains(d.map(domain => ({ ...domain, problem_count: countMap.get(domain.domain_id) ?? 0 })));
+        setAllTypes(types);
+        setAllProblemTypes(pts);
       } finally {
         setDomainsLoading(false);
       }
@@ -60,15 +69,18 @@ export default function AdminProblems() {
     setSelectedGrade(grade);
     setSelectedDomain('');
     setProblems([]);
+    setDomainProblemIds(new Set());
     setTotalCount(0);
     setPage(0);
     setSearch('');
     setExpanded(null);
+    setSelectedTypeId(null);
   };
 
-  // 단원 선택 시 문제 로딩
+  // 영역 선택 시 문제 로딩
   const handleDomainSelect = async (domainId) => {
     setSelectedDomain(domainId);
+    setSelectedTypeId(null);
     setPage(0);
     setSearch('');
     setExpanded(null);
@@ -76,6 +88,7 @@ export default function AdminProblems() {
     try {
       const all = await base44.entities.Problem.filter({ domain_id: domainId }, '-created_date', 1000, 0);
       setTotalCount(all.length);
+      setDomainProblemIds(new Set(all.map(p => p.problem_id).filter(Boolean)));
       setProblems(all.slice(0, PAGE_SIZE));
     } finally {
       setLoading(false);
@@ -107,21 +120,39 @@ export default function AdminProblems() {
     }
   };
 
-  const filtered = search
-    ? problems.filter(p => {
-        const q = search.toLowerCase();
-        return parseProblemText(p.content).toLowerCase().includes(q) ||
-               (p.domain_name || '').toLowerCase().includes(q);
-      })
-    : problems;
+  const domainTypeChips = useMemo(() => {
+    if (!selectedDomain || domainProblemIds.size === 0) return [];
+    const typeIdsInDomain = new Set(
+      allProblemTypes.filter(pt => domainProblemIds.has(pt.problem_id)).map(pt => pt.type_id)
+    );
+    return allTypes.filter(t => typeIdsInDomain.has(t.type_id));
+  }, [selectedDomain, domainProblemIds, allProblemTypes, allTypes]);
 
-  if (domainsLoading) return <InlineLoader message="단원 목록 불러오는 중..." />;
+  const filtered = (() => {
+    let list = problems;
+    if (selectedTypeId) {
+      const typeProblemIds = new Set(
+        allProblemTypes.filter(pt => pt.type_id === selectedTypeId).map(pt => pt.problem_id)
+      );
+      list = list.filter(p => typeProblemIds.has(p.problem_id));
+    }
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(p =>
+        parseProblemText(p.content).toLowerCase().includes(q) ||
+        (p.domain_name || '').toLowerCase().includes(q)
+      );
+    }
+    return list;
+  })();
+
+  if (domainsLoading) return <InlineLoader message="영역 목록 불러오는 중..." />;
 
   return (
     <div className="space-y-5" ref={topRef}>
       <div>
         <h1 className="text-2xl font-bold">문제 목록</h1>
-        <p className="text-muted-foreground text-sm mt-1">학년을 선택하면 단원이 표시됩니다</p>
+        <p className="text-muted-foreground text-sm mt-1">학년을 선택하면 영역이 표시됩니다</p>
       </div>
 
       {/* 학년 선택 */}
@@ -152,12 +183,12 @@ export default function AdminProblems() {
         </div>
       )}
 
-      {/* 단원 선택 (학년 선택 후) */}
+      {/* 영역 선택 (학년 선택 후) */}
       {selectedGrade && (
         <div>
-          <label className="text-xs font-medium block mb-2 text-muted-foreground">단원</label>
+          <label className="text-xs font-medium block mb-2 text-muted-foreground">영역</label>
           {gradeFilteredDomains.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">이 학년에 등록된 단원이 없어요</p>
+            <p className="text-sm text-muted-foreground py-4 text-center">이 학년에 등록된 영역이 없어요</p>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
               {gradeFilteredDomains.map(d => (
@@ -183,14 +214,42 @@ export default function AdminProblems() {
         </div>
       )}
 
-      {/* 단원 미선택 안내 */}
+      {/* 영역 미선택 안내 */}
       {selectedGrade && !selectedDomain && gradeFilteredDomains.length > 0 && (
         <div className="flex flex-col items-center justify-center py-12 gap-2 text-muted-foreground">
-          <p className="text-sm">단원을 선택해 주세요</p>
+          <p className="text-sm">영역을 선택해 주세요</p>
         </div>
       )}
 
       {selectedDomain && loading && <InlineLoader message="문제 불러오는 중..." />}
+
+      {selectedDomain && !loading && domainTypeChips.length > 0 && (
+        <div>
+          <label className="text-xs font-medium block mb-2 text-muted-foreground">단원 필터 (선택)</label>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setSelectedTypeId(null)}
+              className={`rounded-full text-xs px-3 py-1.5 border transition-colors ${
+                selectedTypeId === null
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-card text-foreground border-border hover:bg-muted'
+              }`}
+            >전체</button>
+            {domainTypeChips.map(t => (
+              <button
+                key={t.type_id}
+                onClick={() => setSelectedTypeId(selectedTypeId === t.type_id ? null : t.type_id)}
+                title={t.name}
+                className={`rounded-full text-xs px-3 py-1.5 border transition-colors ${
+                  selectedTypeId === t.type_id
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-card text-foreground border-border hover:bg-muted'
+                }`}
+              >{t.name.length > 18 ? t.name.slice(0, 18) + '…' : t.name}</button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {selectedDomain && !loading && (
         <>
@@ -246,7 +305,7 @@ export default function AdminProblems() {
             )}
           </div>
 
-          {!search && (
+          {!search && !selectedTypeId && (
             <PaginationBar page={page} totalCount={totalCount} pageSize={PAGE_SIZE}
               onPage={handlePageChange} loading={pageLoading} />
           )}
