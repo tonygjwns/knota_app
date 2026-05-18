@@ -92,11 +92,15 @@ export default function TeacherLayout() {
   const [ownerByAcademy, setOwnerByAcademy] = useState(false);
 
   useEffect(() => {
-    if (!user?.academy_id) return;
+    if (!user?.id) return;
     (async () => {
       try {
-        const [academy] = await base44.entities.Academy.filter({ id: user.academy_id }, '-created_date', 1);
-        if (academy?.owner_id === user.id) setOwnerByAcademy(true);
+        if (user.academy_id) {
+          const [academy] = await base44.entities.Academy.filter({ id: user.academy_id }, '-created_date', 1);
+          if (academy?.owner_id === user.id) { setOwnerByAcademy(true); return; }
+        }
+        const ownedAcademies = await base44.entities.Academy.filter({ owner_id: user.id }, '-created_date', 1);
+        if (ownedAcademies.length > 0) setOwnerByAcademy(true);
       } catch {}
     })();
   }, [user?.id, user?.academy_id]);

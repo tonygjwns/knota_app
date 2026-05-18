@@ -20,23 +20,32 @@ export default function OwnerAcademy() {
   const [classModal, setClassModal] = useState(null);
 
   const loadAll = async () => {
-    if (!user?.academy_id) { setLoading(false); return; }
+    if (!user?.id) { setLoading(false); return; }
     setLoading(true);
     try {
-      const [academies, allClasses, allUsers] = await Promise.all([
-        base44.entities.Academy.filter({ id: user.academy_id }),
-        base44.entities.Class.filter({ academy_id: user.academy_id }, 'name', 200),
-        base44.entities.User.filter({ academy_id: user.academy_id }, '-created_date', 500),
-      ]);
-      const acad = academies[0] || null;
+      let acad = null;
+      if (user.academy_id) {
+        const [a] = await base44.entities.Academy.filter({ id: user.academy_id });
+        acad = a || null;
+      }
+      if (!acad) {
+        const owned = await base44.entities.Academy.filter({ owner_id: user.id }, '-created_date', 1);
+        acad = owned[0] || null;
+      }
+      if (!acad) { setLoading(false); return; }
 
-      const isAuthorized = user.role === 'owner' || acad?.owner_id === user.id;
+      const isAuthorized = user.role === 'owner' || acad.owner_id === user.id;
       if (!isAuthorized) {
         toast.error('학원 관리 권한이 없어요');
         navigate('/teacher');
         return;
       }
 
+      const academyId = acad.id;
+      const [allClasses, allUsers] = await Promise.all([
+        base44.entities.Class.filter({ academy_id: academyId }, 'name', 200),
+        base44.entities.User.filter({ academy_id: academyId }, '-created_date', 500),
+      ]);
       setAcademy(acad);
       setClasses(allClasses);
       setAcademyTeachers(allUsers.filter(u => u.role === 'teacher'));

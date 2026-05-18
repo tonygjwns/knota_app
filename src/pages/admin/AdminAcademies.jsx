@@ -149,8 +149,16 @@ export default function AdminAcademies() {
   const saveAcademy = async (data) => {
     if (academyModal && academyModal !== 'new') {
       await base44.entities.Academy.update(academyModal.id, data);
+      if (data.owner_id && data.owner_id !== academyModal.owner_id) {
+        try { await base44.entities.User.update(data.owner_id, { academy_id: academyModal.id }); }
+        catch (e) { console.warn('owner academy_id 동기화 실패:', e); }
+      }
     } else {
-      await base44.entities.Academy.create(data);
+      const savedAcademy = await base44.entities.Academy.create(data);
+      if (data.owner_id && savedAcademy?.id) {
+        try { await base44.entities.User.update(data.owner_id, { academy_id: savedAcademy.id }); }
+        catch (e) { console.warn('owner academy_id 동기화 실패:', e); }
+      }
     }
     setAcademyModal(null);
     await loadAll();
