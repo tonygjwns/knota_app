@@ -24,7 +24,8 @@ export default function ProblemDetail({ mode = 'admin' }) {
   const { problemId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data: teacherData } = useTeacher();
+  const teacherContext = useTeacher();
+  const teacherData = teacherContext?.data ?? null;
 
   const [problem, setProblems] = useState(null);
   const [attempts, setAttempts] = useState([]);
