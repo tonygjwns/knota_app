@@ -86,7 +86,7 @@ export default function OwnerAcademy() {
   };
 
   if (loading) return <InlineLoader message="학원 정보 불러오는 중..." />;
-  if (!user?.academy_id || !academy) {
+  if (!academy) {
     return (
       <div className="text-center py-20 text-muted-foreground">
         소속된 학원이 없어요
@@ -147,7 +147,7 @@ export default function OwnerAcademy() {
       {classModal && (
         <ClassFormModal
           cls={classModal === 'new' ? null : classModal}
-          academyId={user.academy_id}
+          academyId={academy.id}
           teachers={academyTeachers}
           onSave={saveClass}
           onClose={() => setClassModal(null)}
