@@ -56,7 +56,7 @@ export default function OwnerAcademy() {
     }
   };
 
-  useEffect(() => { loadAll(); }, [user?.academy_id]);
+  useEffect(() => { loadAll(); }, [user?.id, user?.academy_id]);
 
   const saveClass = async (data) => {
     try {
