@@ -112,6 +112,14 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('pending_signup_data');
       } catch {}
 
+      // base44 디폴트 회원가입으로 가입한 경우 approval_status가 없으므로 pending으로 초기화
+      if (!currentUser.approval_status && currentUser.role !== 'admin') {
+        try {
+          await base44.auth.updateMe({ approval_status: 'pending' });
+          currentUser.approval_status = 'pending';
+        } catch {}
+      }
+
       setUser(currentUser);
       setIsAuthenticated(true);
       setIsLoadingAuth(false);
