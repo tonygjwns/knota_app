@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import PaginationBar from '@/components/ui/PaginationBar';
-import { Search, User, Clock, CheckCircle, XCircle, ShieldCheck, X, Settings } from 'lucide-react';
+import { Search, User, Clock, CheckCircle, XCircle, ShieldCheck, X, Settings, UserPlus } from 'lucide-react';
 
 const STATUS_CONFIG = {
   pending:  { label: '승인 대기', color: 'bg-amber-100 text-amber-700 border-amber-200' },
@@ -112,6 +112,69 @@ function UserManageModal({ target, allAcademies, allClasses, onSave, onClose }) 
   );
 }
 
+// ── InviteModal ────────────────────────────────────────────────────────────
+function InviteModal({ onClose, onDone }) {
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState('user');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleInvite = async (e) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setLoading(true);
+    setError('');
+    try {
+      await base44.users.inviteUser(email.trim(), role);
+      onDone();
+    } catch (err) {
+      setError(err?.response?.data?.detail || err?.message || '초대에 실패했어요.');
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-card rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-bold text-lg">사용자 초대</h3>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
+        </div>
+        <form onSubmit={handleInvite} className="space-y-3">
+          <div>
+            <label className="text-xs font-medium block mb-1">이메일</label>
+            <Input
+              type="email"
+              placeholder="초대할 이메일 주소"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium block mb-1">역할</label>
+            <select
+              value={role}
+              onChange={e => setRole(e.target.value)}
+              className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
+            >
+              <option value="user">user (일반)</option>
+              <option value="admin">admin (관리자)</option>
+            </select>
+          </div>
+          {error && <p className="text-sm text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+          <div className="flex gap-2 pt-1">
+            <Button type="submit" className="flex-1" disabled={loading}>
+              {loading ? '초대 중...' : '초대 보내기'}
+            </Button>
+            <Button type="button" variant="outline" onClick={onClose}>취소</Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────
 export default function AdminUsers() {
   const { user: me } = useAuth();
@@ -128,6 +191,7 @@ export default function AdminUsers() {
   const [totalCount, setTotalCount] = useState(0);
   const [pendingCount, setPendingCount] = useState(0);
   const [manageTarget, setManageTarget] = useState(null);
+  const [showInvite, setShowInvite] = useState(false);
   const topRef = useRef(null);
 
   useEffect(() => { loadInitial(); }, []);
@@ -240,9 +304,14 @@ export default function AdminUsers() {
 
   return (
     <div className="space-y-5" ref={topRef}>
-      <div>
-        <h1 className="text-2xl font-bold">사용자 목록</h1>
-        <p className="text-muted-foreground text-sm mt-1">총 {totalCount.toLocaleString()}명의 사용자</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">사용자 목록</h1>
+          <p className="text-muted-foreground text-sm mt-1">총 {totalCount.toLocaleString()}명의 사용자</p>
+        </div>
+        <Button size="sm" className="gap-1.5" onClick={() => setShowInvite(true)}>
+          <UserPlus className="w-4 h-4" /> 사용자 초대
+        </Button>
       </div>
 
       {pendingCount > 0 && (
@@ -360,6 +429,13 @@ export default function AdminUsers() {
         <PaginationBar
           page={page} totalCount={totalCount} pageSize={PAGE_SIZE}
           onPage={(p) => loadPage(p, filter)} loading={pageLoading}
+        />
+      )}
+
+      {showInvite && (
+        <InviteModal
+          onClose={() => setShowInvite(false)}
+          onDone={() => { setShowInvite(false); loadInitial(); }}
         />
       )}
 
