@@ -111,15 +111,24 @@ export default function Landing() {
       }
     }
 
-    // Step 2: register 후 이미 세션이 생성되므로 바로 프로필 업데이트
+    // Step 2: 세션이 없을 수 있으므로 updateMe 먼저 시도, 실패 시 localStorage에 저장 후 로그인 리다이렉트
+    let updateSuccess = false;
     try {
       await base44.auth.updateMe(userData);
+      updateSuccess = true;
     } catch (updateErr) {
-      console.error('[회원가입] 프로필 업데이트 오류:', updateErr);
-      // 프로필 업데이트 실패해도 계속 진행
+      console.error('[회원가입] 프로필 업데이트 오류 (로그인 후 처리):', updateErr);
     }
+
     setLoading(false);
-    navigate('/home', { replace: true });
+
+    if (updateSuccess) {
+      navigate('/home', { replace: true });
+    } else {
+      // 로그인 후 checkUserAuth에서 처리
+      localStorage.setItem('pending_signup_data', JSON.stringify(userData));
+      base44.auth.redirectToLogin('/home');
+    }
   };
 
   if (mode === 'signup') {

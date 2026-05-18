@@ -98,7 +98,7 @@ export const AuthProvider = ({ children }) => {
       // 회원가입 후 플랫폼 로그인 페이지를 거친 경우 프로필 업데이트 처리
       try {
         const pending = localStorage.getItem('pending_signup_data');
-        if (pending && !currentUser.full_name) {
+        if (pending) {
           const userData = JSON.parse(pending);
           await base44.auth.updateMe(userData);
           localStorage.removeItem('pending_signup_data');
