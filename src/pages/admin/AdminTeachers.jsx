@@ -203,6 +203,11 @@ export default function AdminTeachers() {
                     })()}
                   </div>
                 </div>
+                <div className="text-right flex-shrink-0">
+                  <p className="text-xs text-muted-foreground">
+                    가입: {u.created_date ? new Date(u.created_date).toLocaleDateString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
+                  </p>
+                </div>
               </div>
               <div className="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-border">
                 <Button size="sm" className="gap-1 w-full" disabled={u.approval_status === 'approved'} onClick={() => handleApprove(u)}>

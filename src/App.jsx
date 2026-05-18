@@ -111,7 +111,6 @@ const AuthenticatedApp = () => {
         <Route path="users" element={<AdminUsers />} />
         <Route path="teachers" element={<AdminTeachers />} />
         <Route path="students" element={<AdminStudents />} />
-        <Route path="students/:userId" element={<StudentDetail mode="admin" />} />
         <Route path="problems" element={<AdminProblems />} />
         <Route path="problems/:problemId" element={<ProblemDetail mode="admin" />} />
         <Route path="academies" element={<AdminAcademies />} />
