@@ -95,19 +95,15 @@ export default function Landing() {
       }
     }
 
-    // Step 2: 가입 후 바로 로그인 시도, 실패 시 플랫폼 로그인 페이지로 이동
-    // (register 직후 즉시 loginViaEmailPassword가 실패하는 경우 대비)
+    // Step 2: register 후 이미 세션이 생성되므로 바로 프로필 업데이트
     try {
-      await base44.auth.loginViaEmailPassword(email, password);
       await base44.auth.updateMe(userData);
-      navigate('/home', { replace: true });
-    } catch (loginErr) {
-      console.error('[회원가입] 자동 로그인 실패, 플랫폼 로그인으로 이동:', loginErr);
-      // 로그인 성공 후 프로필 업데이트를 위해 userData를 임시 저장
-      try { localStorage.setItem('pending_signup_data', JSON.stringify(userData)); } catch {}
-      base44.auth.redirectToLogin('/home');
+    } catch (updateErr) {
+      console.error('[회원가입] 프로필 업데이트 오류:', updateErr);
+      // 프로필 업데이트 실패해도 계속 진행
     }
     setLoading(false);
+    navigate('/home', { replace: true });
   };
 
   if (mode === 'signup') {
