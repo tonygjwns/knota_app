@@ -20,46 +20,24 @@ export default function OwnerAcademy() {
   const [classModal, setClassModal] = useState(null);
 
   const loadAll = async () => {
-    console.log('[OwnerAcademy] loadAll start, user:', user);
-    if (!user?.id) { console.log('[OwnerAcademy] abort: no user.id'); setLoading(false); return; }
+    if (!user?.id) { setLoading(false); return; }
     setLoading(true);
     try {
-      let acad = null;
-      if (user.academy_id) {
-        console.log('[OwnerAcademy] fetching by user.academy_id:', user.academy_id);
-        const [a] = await base44.entities.Academy.filter({ id: user.academy_id });
-        console.log('[OwnerAcademy] result by id:', a);
-        acad = a || null;
-      } else {
-        console.log('[OwnerAcademy] user.academy_id is empty');
-      }
-      if (!acad) {
-        console.log('[OwnerAcademy] trying owner_id fallback:', user.id);
-        const owned = await base44.entities.Academy.filter({ owner_id: user.id }, '-created_date', 1);
-        console.log('[OwnerAcademy] result by owner_id:', owned);
-        acad = owned[0] || null;
-      }
-      if (!acad) { console.log('[OwnerAcademy] abort: no academy found'); setLoading(false); return; }
-
-      const isAuthorized = user.role === 'owner' || acad.owner_id === user.id;
-      console.log('[OwnerAcademy] isAuthorized:', isAuthorized, '| user.role:', user.role, '| acad.owner_id:', acad.owner_id, '| user.id:', user.id);
-      if (!isAuthorized) {
+      const res = await base44.functions.invoke('getOwnerAcademyData', {});
+      const data = res?.data;
+      if (data?.error === 'forbidden') {
         toast.error('학원 관리 권한이 없어요');
         navigate('/teacher');
         return;
       }
-
-      const academyId = acad.id;
-      const [allClasses, allUsers] = await Promise.all([
-        base44.entities.Class.filter({ academy_id: academyId }, 'name', 200),
-        base44.entities.User.filter({ academy_id: academyId }, '-created_date', 500),
-      ]);
-      console.log('[OwnerAcademy] setting academy:', acad, '| classes:', allClasses.length, '| users:', allUsers.length);
-      setAcademy(acad);
-      setClasses(allClasses);
-      setAcademyTeachers(allUsers.filter(u => u.role === 'teacher'));
+      if (data?.error) {
+        toast.error('데이터를 불러오지 못했어요: ' + data.error);
+        return;
+      }
+      setAcademy(data?.academy || null);
+      setClasses(data?.classes || []);
+      setAcademyTeachers(data?.teachers || []);
     } catch (e) {
-      console.error('[OwnerAcademy] error:', e);
       toast.error('데이터를 불러오지 못했어요: ' + (e.message || ''));
     } finally {
       setLoading(false);
