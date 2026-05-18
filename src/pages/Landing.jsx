@@ -42,10 +42,33 @@ export default function Landing() {
     if (password.length < 6) { setError('비밀번호는 6자 이상이어야 해요.'); return; }
     setLoading(true);
     setError('');
+
+    // Step 1: Register
     try {
-      // Register
       await base44.auth.register({ email, password });
+    } catch (registerErr) {
+      console.error('[회원가입] register 오류:', registerErr);
+      const msg = registerErr?.response?.data?.detail || registerErr?.message || '';
+      if (msg.toLowerCase().includes('already') || msg.toLowerCase().includes('exist') || msg.toLowerCase().includes('duplicate')) {
+        setError('이미 사용 중인 이메일이에요. 로그인을 시도해 보세요.');
+      } else if (msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('password')) {
+        setError('이메일 또는 비밀번호 형식이 올바르지 않아요. 비밀번호는 6자 이상이어야 해요.');
+      } else {
+        setError(msg || '회원가입에 실패했어요. 다시 시도해 주세요.');
+      }
+      setLoading(false);
+      return;
+    }
+
+    // Step 2: Login
+    try {
       await base44.auth.loginViaEmailPassword(email, password);
+    } catch (loginErr) {
+      console.error('[회원가입] 로그인 오류:', loginErr);
+      setError('계정은 생성되었으나 로그인에 실패했어요. 로그인 페이지에서 다시 시도해 주세요.');
+      setLoading(false);
+      return;
+    }
 
       // Build user data
       const userData = { full_name: fullName, role, approval_status: 'pending' };
@@ -85,11 +108,14 @@ export default function Landing() {
       }
       }
 
+    // Step 3: Update user profile
+    try {
       await base44.auth.updateMe(userData);
-      navigate('/home', { replace: true });
-    } catch (err) {
-      setError(err?.response?.data?.detail || err?.message || '회원가입에 실패했어요. 다시 시도해 주세요.');
+    } catch (updateErr) {
+      console.error('[회원가입] 프로필 업데이트 오류:', updateErr);
+      // 프로필 업데이트 실패해도 계정은 생성되었으므로 홈으로 이동
     }
+    navigate('/home', { replace: true });
     setLoading(false);
   };
 
