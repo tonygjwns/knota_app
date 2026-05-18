@@ -60,62 +60,53 @@ export default function Landing() {
       return;
     }
 
-    // Step 2: Login
-    try {
-      await base44.auth.loginViaEmailPassword(email, password);
-    } catch (loginErr) {
-      console.error('[회원가입] 로그인 오류:', loginErr);
-      setError('계정은 생성되었으나 로그인에 실패했어요. 로그인 페이지에서 다시 시도해 주세요.');
-      setLoading(false);
-      return;
-    }
+    // Build user data
+    const userData = { full_name: fullName, role, approval_status: 'pending' };
 
-      // Build user data
-      const userData = { full_name: fullName, role, approval_status: 'pending' };
-
-      // Process invite code if provided
-      if (inviteCode.trim()) {
+    // Process invite code if provided
+    if (inviteCode.trim()) {
       const code = inviteCode.trim().toUpperCase();
       try {
-      const codes = await base44.entities.InviteCode.filter(
-        { code, is_active: true }, '-created_date', 1
-      );
-      if (codes.length > 0) {
-        const c = codes[0];
-        userData.academy_id = c.academy_id;
-        if (c.class_id) userData.class_id = c.class_id;
-        if (c.role) userData.role = c.role;
-        // 강사는 class_ids에도 추가
-        if ((c.role === 'teacher') && c.class_id) {
-          userData.class_ids = [c.class_id];
+        const codes = await base44.entities.InviteCode.filter(
+          { code, is_active: true }, '-created_date', 1
+        );
+        if (codes.length > 0) {
+          const c = codes[0];
+          userData.academy_id = c.academy_id;
+          if (c.class_id) userData.class_id = c.class_id;
+          if (c.role) userData.role = c.role;
+          if ((c.role === 'teacher') && c.class_id) {
+            userData.class_ids = [c.class_id];
+          }
+          const newUseCount = (c.use_count || 0) + 1;
+          const updateData = { use_count: newUseCount };
+          if (c.one_time) updateData.is_active = false;
+          await base44.entities.InviteCode.update(c.id, updateData);
+          if (c.role === 'owner' || c.role === 'teacher') {
+            userData.approval_status = 'approved';
+          }
+        } else {
+          setError('유효하지 않은 코드예요. 코드를 확인해 주세요.');
+          setLoading(false);
+          return;
         }
-        // 일회용 코드는 사용 즉시 비활성화
-        const newUseCount = (c.use_count || 0) + 1;
-        const updateData = { use_count: newUseCount };
-        if (c.one_time) updateData.is_active = false;
-        await base44.entities.InviteCode.update(c.id, updateData);
-        // owner/teacher는 바로 approved
-        if (c.role === 'owner' || c.role === 'teacher') {
-          userData.approval_status = 'approved';
-        }
-      } else {
-        setError('유효하지 않은 코드예요. 코드를 확인해 주세요.');
-        setLoading(false);
-        return;
-      }
       } catch (codeErr) {
-      // Code lookup failed silently
+        // Code lookup failed silently
       }
-      }
-
-    // Step 3: Update user profile
-    try {
-      await base44.auth.updateMe(userData);
-    } catch (updateErr) {
-      console.error('[회원가입] 프로필 업데이트 오류:', updateErr);
-      // 프로필 업데이트 실패해도 계정은 생성되었으므로 홈으로 이동
     }
-    navigate('/home', { replace: true });
+
+    // Step 2: 가입 후 바로 로그인 시도, 실패 시 플랫폼 로그인 페이지로 이동
+    // (register 직후 즉시 loginViaEmailPassword가 실패하는 경우 대비)
+    try {
+      await base44.auth.loginViaEmailPassword(email, password);
+      await base44.auth.updateMe(userData);
+      navigate('/home', { replace: true });
+    } catch (loginErr) {
+      console.error('[회원가입] 자동 로그인 실패, 플랫폼 로그인으로 이동:', loginErr);
+      // 로그인 성공 후 프로필 업데이트를 위해 userData를 임시 저장
+      try { localStorage.setItem('pending_signup_data', JSON.stringify(userData)); } catch {}
+      base44.auth.redirectToLogin('/home');
+    }
     setLoading(false);
   };
 
