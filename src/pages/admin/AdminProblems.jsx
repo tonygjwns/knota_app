@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { InlineLoader } from '@/components/LoadingOverlay';
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import PaginationBar from '@/components/ui/PaginationBar';
 import { Search, ChevronDown, ChevronUp, BookOpen } from 'lucide-react';
+import { gradeLabel, extractGradeOptions } from '@/lib/grade-labels';
 
 const PAGE_SIZE = 50;
 
@@ -17,6 +18,7 @@ export default function AdminProblems() {
   const topRef = useRef(null);
 
   const [domains, setDomains] = useState([]);
+  const [selectedGrade, setSelectedGrade] = useState('');
   const [selectedDomain, setSelectedDomain] = useState('');
   const [problems, setProblems] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -47,6 +49,22 @@ export default function AdminProblems() {
       }
     })();
   }, []);
+
+  const gradeOptions = useMemo(() => extractGradeOptions(domains), [domains]);
+  const gradeFilteredDomains = useMemo(
+    () => selectedGrade ? domains.filter(d => d.grade_range === selectedGrade) : [],
+    [domains, selectedGrade]
+  );
+
+  const handleGradeChange = (grade) => {
+    setSelectedGrade(grade);
+    setSelectedDomain('');
+    setProblems([]);
+    setTotalCount(0);
+    setPage(0);
+    setSearch('');
+    setExpanded(null);
+  };
 
   // 단원 선택 시 문제 로딩
   const handleDomainSelect = async (domainId) => {
@@ -103,35 +121,71 @@ export default function AdminProblems() {
     <div className="space-y-5" ref={topRef}>
       <div>
         <h1 className="text-2xl font-bold">문제 목록</h1>
-        <p className="text-muted-foreground text-sm mt-1">단원을 선택하면 문제를 불러옵니다</p>
+        <p className="text-muted-foreground text-sm mt-1">학년을 선택하면 단원이 표시됩니다</p>
       </div>
 
-      {/* 단원 선택 */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-        {domains.map(d => (
-          <button
-            key={d.id}
-            onClick={() => handleDomainSelect(d.domain_id)}
-            className={`p-3 rounded-xl border text-left transition-colors ${
-              selectedDomain === d.domain_id
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'bg-card hover:bg-muted border-border'
-            }`}
-          >
-            <p className="text-sm font-medium">{d.name}</p>
-            {d.problem_count != null && (
-              <p className={`text-xs mt-0.5 ${selectedDomain === d.domain_id ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
-                {d.problem_count.toLocaleString()}문제
-              </p>
-            )}
-          </button>
-        ))}
+      {/* 학년 선택 */}
+      <div>
+        <label className="text-xs font-medium block mb-2 text-muted-foreground">학년</label>
+        <div className="flex gap-2 flex-wrap">
+          {gradeOptions.map(g => (
+            <button
+              key={g}
+              onClick={() => handleGradeChange(g)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                selectedGrade === g
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+              }`}
+            >
+              {gradeLabel(g)}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* 문제 목록 */}
-      {!selectedDomain && (
+      {/* 학년 미선택 안내 */}
+      {!selectedGrade && (
         <div className="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
           <BookOpen className="w-10 h-10 opacity-30" />
+          <p className="text-sm">학년을 선택해 주세요</p>
+        </div>
+      )}
+
+      {/* 단원 선택 (학년 선택 후) */}
+      {selectedGrade && (
+        <div>
+          <label className="text-xs font-medium block mb-2 text-muted-foreground">단원</label>
+          {gradeFilteredDomains.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">이 학년에 등록된 단원이 없어요</p>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+              {gradeFilteredDomains.map(d => (
+                <button
+                  key={d.id}
+                  onClick={() => handleDomainSelect(d.domain_id)}
+                  className={`p-3 rounded-xl border text-left transition-colors ${
+                    selectedDomain === d.domain_id
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-card hover:bg-muted border-border'
+                  }`}
+                >
+                  <p className="text-sm font-medium">{d.name}</p>
+                  {d.problem_count != null && (
+                    <p className={`text-xs mt-0.5 ${selectedDomain === d.domain_id ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+                      {d.problem_count.toLocaleString()}문제
+                    </p>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 단원 미선택 안내 */}
+      {selectedGrade && !selectedDomain && gradeFilteredDomains.length > 0 && (
+        <div className="flex flex-col items-center justify-center py-12 gap-2 text-muted-foreground">
           <p className="text-sm">단원을 선택해 주세요</p>
         </div>
       )}
