@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,9 @@ const statusLabel = (s) => ({ correct: '정답', partial: '부분', missing: '�
 export default function TeacherReviewDetail() {
   const { attemptId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isAdminMode = location.pathname.startsWith('/admin');
+  const backPath = isAdminMode ? '/admin/review' : '/teacher/review';
   const [attempt, setAttempt] = useState(null);
   const [student, setStudent] = useState(null);
   const [problem, setProblem] = useState(null);
@@ -50,7 +53,7 @@ export default function TeacherReviewDetail() {
     setLoading(true);
     try {
       const [a] = await base44.entities.StudentAttempt.filter({ id: attemptId }, '-created_date', 1);
-      if (!a) { toast.error('찾을 수 없어요'); navigate('/teacher/review'); return; }
+      if (!a) { toast.error('찾을 수 없어요'); navigate(backPath); return; }
       setAttempt(a);
       setFinalScore(a.score || 0);
 
@@ -168,7 +171,7 @@ export default function TeacherReviewDetail() {
         score: finalScore,
       });
       toast.success('검토 결과가 저장됐어요');
-      navigate('/teacher/review');
+      navigate(backPath);
     } catch {
       toast.error('저장 실패');
     } finally {
@@ -184,7 +187,7 @@ export default function TeacherReviewDetail() {
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/teacher/review')}>
+        <Button variant="ghost" size="sm" onClick={() => navigate(backPath)}>
           <ArrowLeft className="w-4 h-4 mr-1" /> 검토 큐
         </Button>
         <h1 className="text-xl font-bold">검토 상세</h1>
@@ -345,7 +348,7 @@ export default function TeacherReviewDetail() {
       </Card>
 
       <div className="flex gap-2 sticky bottom-0 bg-background pt-3 pb-2">
-        <Button variant="outline" className="flex-1" onClick={() => navigate('/teacher/review')}>
+        <Button variant="outline" className="flex-1" onClick={() => navigate(backPath)}>
           취소
         </Button>
         <Button className="flex-1" onClick={handleSave} disabled={saving}>

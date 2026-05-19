@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { Users, BookOpen, BarChart2, Building, GraduationCap, KeyRound, ChevronLeft, ChevronRight, MessageSquare } from 'lucide-react';
+import { Users, BookOpen, BarChart2, Building, GraduationCap, KeyRound, ChevronLeft, ChevronRight, MessageSquare, ClipboardCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import UserMenuDropdown from '@/components/UserMenuDropdown';
 
@@ -15,6 +15,7 @@ const ADMIN_NAV = [
   { path: '/admin/students', icon: Users, label: '학생' },
   { path: '/admin/problems', icon: BookOpen, label: '문제' },
   { path: '/admin/review-feedback', icon: MessageSquare, label: '검토 피드백' },
+  { path: '/admin/review', icon: ClipboardCheck, label: '검토 요청' },
 ];
 
 export default function AdminLayout() {
