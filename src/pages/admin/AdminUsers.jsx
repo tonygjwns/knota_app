@@ -115,7 +115,7 @@ function UserManageModal({ target, allAcademies, allClasses, onSave, onClose }) 
 // ── InviteModal ────────────────────────────────────────────────────────────
 function InviteModal({ onClose, onDone }) {
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState('student');
+  const [role, setRole] = useState('user');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -158,9 +158,7 @@ function InviteModal({ onClose, onDone }) {
               onChange={e => setRole(e.target.value)}
               className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
             >
-              <option value="student">student (학생)</option>
-              <option value="teacher">teacher (강사)</option>
-              <option value="owner">owner (학원장)</option>
+              <option value="user">user (일반 사용자)</option>
               <option value="admin">admin (관리자)</option>
             </select>
           </div>
