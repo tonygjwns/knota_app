@@ -16,11 +16,14 @@ import { aggregateToolMastery, topWeakTools, topStrongTools } from '@/lib/toolMa
 
 const PAGE_SIZE = 20;
 
-function ToolMasteryCard({ tool, variant }) {
+function ToolMasteryCard({ tool, variant, onPractice }) {
   const isWeak = variant === 'weak';
   const barColor = isWeak ? 'bg-red-400' : 'bg-emerald-400';
   return (
-    <div className="flex items-center gap-3 py-2">
+    <button
+      className="flex items-center gap-3 py-2 w-full text-left hover:bg-muted/30 rounded-lg px-1 transition-colors"
+      onClick={() => onPractice && onPractice(tool.tool_id)}
+    >
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-foreground truncate">{tool.name}</p>
         <div className="flex items-center gap-2 mt-1">
@@ -32,8 +35,11 @@ function ToolMasteryCard({ tool, variant }) {
           </span>
         </div>
       </div>
-      <span className="text-xs text-muted-foreground flex-shrink-0">{tool.attempts}회</span>
-    </div>
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <span className="text-xs text-muted-foreground">{tool.attempts}회</span>
+        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+      </div>
+    </button>
   );
 }
 
@@ -113,7 +119,9 @@ export default function History() {
     try {
       const query = { student_id: user.id };
       if (filters.correctness !== 'all') query.correctness = filters.correctness;
-      const sortField = filters.sort === 'score' ? '-score' : '-submitted_at';
+      const sortField = filters.sort === 'score' ? '-score'
+                      : filters.sort === 'scoreAsc' ? 'score'
+                      : '-submitted_at';
       const data = await base44.entities.StudentAttempt.filter(
         query, sortField, PAGE_SIZE, pageNum * PAGE_SIZE
       );
@@ -180,6 +188,22 @@ export default function History() {
     } catch { return String(content || ''); }
   };
 
+  const handlePracticeWithTool = async (toolId) => {
+    try {
+      const allProblems = await base44.entities.Problem.list('-created_date', 1000);
+      const matching = allProblems.filter(p => {
+        try { return JSON.parse(p.tool_ids || '[]').includes(toolId); }
+        catch { return false; }
+      });
+      if (matching.length === 0) {
+        // toast 없이 조용히 처리
+        return;
+      }
+      const pick = matching[Math.floor(Math.random() * matching.length)];
+      navigate(`/problem/${pick.id}`);
+    } catch { /* ignore */ }
+  };
+
   const fmt = (n, capped) => capped && n >= 1000 ? '1000+' : String(n);
   const showMastery = !masteryLoading && (weakTools.length > 0 || strongTools.length > 0);
 
@@ -221,7 +245,7 @@ export default function History() {
                 </div>
                 <div className="divide-y divide-border">
                   {weakTools.map(tool => (
-                    <ToolMasteryCard key={tool.tool_id} tool={tool} variant="weak" />
+                    <ToolMasteryCard key={tool.tool_id} tool={tool} variant="weak" onPractice={handlePracticeWithTool} />
                   ))}
                 </div>
               </Card>
@@ -234,7 +258,7 @@ export default function History() {
                 </div>
                 <div className="divide-y divide-border">
                   {strongTools.map(tool => (
-                    <ToolMasteryCard key={tool.tool_id} tool={tool} variant="strong" />
+                    <ToolMasteryCard key={tool.tool_id} tool={tool} variant="strong" onPractice={handlePracticeWithTool} />
                   ))}
                 </div>
               </Card>
@@ -267,7 +291,8 @@ export default function History() {
               <SelectTrigger className="flex-1 min-w-[120px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="recent">최근 순</SelectItem>
-                <SelectItem value="score">점수 순</SelectItem>
+                <SelectItem value="score">점수 높은 순</SelectItem>
+                <SelectItem value="scoreAsc">점수 낮은 순</SelectItem>
               </SelectContent>
             </Select>
             <Select value={filters.correctness} onValueChange={v => setFilters(f => ({ ...f, correctness: v }))}>

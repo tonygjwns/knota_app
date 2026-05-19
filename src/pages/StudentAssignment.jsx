@@ -161,13 +161,22 @@ export default function StudentAssignment() {
           className="w-full"
           variant={isClosed ? 'outline' : 'default'}
           onClick={() => {
-            if (nextUnfinishedProblem && !isClosed) {
+            if (isClosed) {
+              const firstDoneAttempt = problems
+                .map(p => attemptMap.get(p.id))
+                .find(Boolean);
+              if (firstDoneAttempt) {
+                navigate(`/result/${firstDoneAttempt.id}?from=assignment`);
+              }
+              return;
+            }
+            if (nextUnfinishedProblem) {
               navigate(`/problem/${nextUnfinishedProblem.id}?assignment_id=${assignment.id}`);
             } else if (problems.length > 0) {
               navigate(`/problem/${problems[0].id}?assignment_id=${assignment.id}`);
             }
           }}
-          disabled={isClosed && !allDone}
+          disabled={isClosed && doneCount === 0}
         >
           {isClosed ? '결과 보기' : allDone ? '다시 풀기' : nextUnfinishedProblem ? '이어 풀기' : '문제 풀기'}
         </Button>
