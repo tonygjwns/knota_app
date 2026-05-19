@@ -13,10 +13,6 @@
     "context_attempt_id": {
       "type": "string",
       "description": "\ubcf4\uac15 \uc911\uc774\ub358 attempt id"
-    },
-    "note": {
-      "type": "string",
-      "description": "\uba54\ubaa8 (\uc120\ud0dd)"
     }
   },
   "required": [

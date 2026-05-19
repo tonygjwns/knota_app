@@ -147,9 +147,6 @@ export default function Bookmarks() {
                           {tool?.goal && <p className="text-sm text-muted-foreground mt-0.5">{tool.goal}</p>}
                           {tool?.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{tool.description}</p>}
                           {contextDate && <p className="text-xs text-muted-foreground mt-1">{contextDate}에 풀던 문제에서 추가했어요</p>}
-                          {bookmark.note && (
-                            <p className="text-xs bg-amber-50 text-amber-700 rounded-lg px-2 py-1 mt-1 border border-amber-200">{bookmark.note}</p>
-                          )}
                         </div>
                       </div>
                       <div className="flex gap-2">

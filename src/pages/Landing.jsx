@@ -85,9 +85,6 @@ export default function Landing() {
         }
         userData.academy_id = c.academy_id;
         if (c.class_id) userData.class_id = c.class_id;
-        if (c.role === 'teacher' && c.class_id) {
-          userData.class_ids = [c.class_id];
-        }
         if (c.role === 'owner' || c.role === 'teacher') {
           userData.approval_status = 'approved';
         }

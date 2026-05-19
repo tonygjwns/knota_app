@@ -113,18 +113,9 @@ export default function TeacherReviewDetail() {
             if (a.teacher_review_json) {
               try {
                 const tr = JSON.parse(a.teacher_review_json);
-                if (tr.step_judgments) {
-                  setStepJudgments(tr.step_judgments);
-                } else if (tr.step_edits) {
-                  setStepJudgments(initStepJudgments(defaultSolId, solStepsMap, parsedGrading));
-                } else {
-                  setStepJudgments(initStepJudgments(defaultSolId, solStepsMap, parsedGrading));
-                }
+                setStepJudgments(tr.step_judgments || initStepJudgments(defaultSolId, solStepsMap, parsedGrading));
                 if (tr.selected_solution_id) setSelectedSolutionId(tr.selected_solution_id);
                 if (tr.final_score !== undefined) setFinalScore(tr.final_score);
-                else if (tr.score_adjustment !== undefined) {
-                  setFinalScore(Math.max(0, Math.min(100, (a.score || 0) + tr.score_adjustment)));
-                }
                 setComment(tr.comment || '');
               } catch {}
             } else {

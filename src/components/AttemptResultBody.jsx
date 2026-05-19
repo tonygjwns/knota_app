@@ -468,7 +468,7 @@ export default function AttemptResultBody({
       )}
 
       {/* OCR section */}
-      {showDetail && (attempt.ocr_text || attempt.ocr_corrected_text) && (
+      {showDetail && attempt.ocr_text && (
         <div>
           <button className="w-full flex items-center justify-between p-3 bg-muted rounded-xl"
             onClick={() => setShowOCR(o => !o)}>
@@ -479,7 +479,7 @@ export default function AttemptResultBody({
             <Card className="mt-2 p-4 bg-slate-50">
               <p className="text-xs text-muted-foreground mb-2">Gemini가 인식한 풀이</p>
               <pre className="text-sm whitespace-pre-wrap font-mono bg-white rounded-lg p-3 border">
-                {attempt.ocr_corrected_text || attempt.ocr_text}
+                {attempt.ocr_text}
               </pre>
               {viewerIsOwner && (
                 <Button variant="outline" size="sm" className="mt-3" onClick={() => setShowOcrComplainModal(true)}>

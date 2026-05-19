@@ -17,10 +17,6 @@
     "problem_domain": {
       "type": "string",
       "description": "Domain name (cached)"
-    },
-    "note": {
-      "type": "string",
-      "description": "\uba54\ubaa8 (\uc120\ud0dd)"
     }
   },
   "required": [

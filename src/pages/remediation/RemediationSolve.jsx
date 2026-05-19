@@ -193,7 +193,6 @@ export default function RemediationSolve() {
           ...(imageSource && activeTab === 'canvas' ? { canvas_image_url: solutionImageUrl } : {}),
           ...(imageSource && activeTab === 'photo' ? { photo_url: solutionImageUrl } : {}),
           student_answer: extractedAnswerText || null,
-          student_answer_image_url: answerImageUrl,
           answer_check_result: 'correct',
           score: 100, correctness: 'correct',
           tool_mapping_status: imageSource ? 'pending' : null,
@@ -208,7 +207,7 @@ export default function RemediationSolve() {
       if (!imageSource) {
         const attempt = await base44.entities.StudentAttempt.create({
           ...baseAttemptFields,
-          student_answer: extractedAnswerText, student_answer_image_url: answerImageUrl,
+          student_answer: extractedAnswerText,
           answer_check_result: 'wrong', score: 0, correctness: 'wrong',
           started_at: startedAt.current, submitted_at: submittedAt, duration_sec: durationSec,
         });
@@ -239,7 +238,6 @@ export default function RemediationSolve() {
           [activeTab === 'canvas' ? 'canvas_image_url' : 'photo_url']: imageUrl,
           ocr_text: ocrText,
           student_answer: extractedAnswerText || stage2Result?.extracted_answer?.trim() || null,
-          student_answer_image_url: answerImageUrl,
           answer_check_result: 'correct_via_solution', score: 100, correctness: 'correct',
           tool_mapping_status: 'pending',
           started_at: startedAt.current, submitted_at: submittedAt, duration_sec: durationSec,
@@ -257,7 +255,6 @@ export default function RemediationSolve() {
         [activeTab === 'canvas' ? 'canvas_image_url' : 'photo_url']: imageUrl,
         ocr_text: ocrText,
         student_answer: extractedAnswerText || gradeResult?.student_final_answer?.trim() || null,
-        student_answer_image_url: answerImageUrl,
         answer_check_result: 'wrong',
         claude_grade_json: JSON.stringify(gradeResult),
         score: gradeResult?.score || 0, correctness: gradeResult?.correctness || 'wrong',
