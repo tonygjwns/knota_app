@@ -31,13 +31,6 @@
       "type": "string",
       "description": "\uc8fc \uc18c\uc18d Class.id"
     },
-    "class_ids": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "description": "\ub2f4\ub2f9 \ud559\uae09 ID \ubc30\uc5f4 (\uac15\uc0ac\uc6a9: \ubcf5\uc218 \ud559\uae09 \ub2f4\ub2f9 \uac00\ub2a5)"
-    },
     "grade": {
       "type": "string",
       "description": "\ud559\ub144 (1~6: \ucd081~6, 7~9: \uc9111~3, 10~12: \uace01~3)"
