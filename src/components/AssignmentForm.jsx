@@ -88,12 +88,12 @@ function ProblemCard({ problem, checked, onToggle, onPreview }) {
   );
 }
 
-// 유형 chip 공통 컴포넌트
+// 단원 chip 공통 컴포넌트
 function TypeChips({ chips, selectedTypeIds, setSelectedTypeIds }) {
   if (chips.length === 0) return null;
   return (
     <div>
-      <label className="block text-sm font-semibold mb-2">유형 필터 <span className="text-xs font-normal text-muted-foreground">(선택 사항)</span></label>
+      <label className="block text-sm font-semibold mb-2">단원 필터 <span className="text-xs font-normal text-muted-foreground">(선택 사항)</span></label>
       <div className="flex flex-wrap gap-2">
         {chips.map(t => (
           <button key={t.type_id} type="button"
@@ -139,7 +139,7 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
   // 탭
   const [activeTab, setActiveTab] = useState('tool');
 
-  // 학년 / 단원 필터
+  // 학년 / 영역 필터
   const [selectedGrade, setSelectedGrade] = useState('');
   const [selectedDomainId, setSelectedDomainId] = useState('');
   const [grades, setGrades] = useState([]);
@@ -157,7 +157,7 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
   );
   const [selectedTypeIds, setSelectedTypeIds] = useState(new Set());
 
-  // 단원 탭 검색
+  // 영역 탭 검색
   const [directSearchQuery, setDirectSearchQuery] = useState('');
 
   // 즐겨찾기 풀
@@ -259,7 +259,7 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
     } catch {}
   }, [assignment]);
 
-  // 학년 선택 시 단원/도구/유형 리셋
+  // 학년 선택 시 영역/도구/단원 리셋
   const handleGradeChange = (g) => {
     setSelectedGrade(g);
     setSelectedDomainId('');
@@ -267,7 +267,7 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
     setSelectedTypeIds(new Set());
   };
 
-  // 단원 선택 시 도구/유형 리셋
+  // 영역 선택 시 도구/단원 리셋
   const handleDomainChange = (d) => {
     setSelectedDomainId(d);
     setSelectedToolIds(new Set());
@@ -337,7 +337,7 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
     return out;
   }, [allProblems, selectedToolIds, typeFilteredProblemIds]);
 
-  // 즐겨찾기 풀 필터 (학년/단원/유형)
+  // 즐겨찾기 풀 필터 (학년/영역/단원)
   const filteredBookmarks = useMemo(() => {
     let pool = bookmarkedProblemPool;
     if (selectedDomainId) pool = pool.filter(p => p.domain_id === selectedDomainId);
@@ -368,7 +368,7 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
   const handleSave = async () => {
     if (!title.trim()) { toast.error('제목을 입력해 주세요'); return; }
     if (!selectedGrade) { toast.error('학년을 선택해 주세요'); return; }
-    if (!selectedDomainId) { toast.error('단원을 선택해 주세요'); return; }
+    if (!selectedDomainId) { toast.error('영역을 선택해 주세요'); return; }
     if (selectedProblems.size === 0) { toast.error('출제할 문제를 1개 이상 추가해 주세요'); return; }
 
     setSaving(true);
@@ -434,7 +434,7 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
               )}
             </div>
 
-            {/* 학년 / 단원 / 문제 선택 */}
+            {/* 학년 / 영역 / 문제 선택 */}
             {dataLoading ? <InlineLoader message="데이터 불러오는 중..." /> : (
               <div className="space-y-4">
                 {classGradeNotice && (
@@ -454,12 +454,12 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
                   </Select>
                 </div>
 
-                {/* 단원 */}
+                {/* 영역 */}
                 <div>
-                  <label className="block text-sm font-semibold mb-2">단원 *</label>
+                  <label className="block text-sm font-semibold mb-2">영역 *</label>
                   <Select value={selectedDomainId} onValueChange={handleDomainChange} disabled={!selectedGrade}>
                     <SelectTrigger>
-                      <SelectValue placeholder={selectedGrade ? '단원을 선택하세요' : '학년을 먼저 선택해 주세요'} />
+                      <SelectValue placeholder={selectedGrade ? '영역을 선택하세요' : '학년을 먼저 선택해 주세요'} />
                     </SelectTrigger>
                     <SelectContent>
                       {filteredDomains.map(d => <SelectItem key={d.domain_id} value={d.domain_id}>{d.name}</SelectItem>)}
@@ -472,7 +472,7 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
                   <Tabs value={activeTab} onValueChange={setActiveTab}>
                     <TabsList className="grid grid-cols-3 w-full">
                       <TabsTrigger value="tool">도구로 출제</TabsTrigger>
-                      <TabsTrigger value="direct">단원 전체</TabsTrigger>
+                      <TabsTrigger value="direct">영역 전체</TabsTrigger>
                       <TabsTrigger value="bookmark">즐겨찾기</TabsTrigger>
                     </TabsList>
 
@@ -486,7 +486,7 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
                           도구 선택 <span className="text-xs font-normal text-muted-foreground">({selectedToolIds.size}개 선택됨)</span>
                         </label>
                         {filteredTools.length === 0 ? (
-                          <p className="text-sm text-muted-foreground text-center py-4">이 단원에 연결된 도구가 없어요</p>
+                          <p className="text-sm text-muted-foreground text-center py-4">이 영역에 연결된 도구가 없어요</p>
                         ) : (
                           <div className="space-y-2 max-h-60 overflow-y-auto overflow-x-hidden pr-1">
                             {filteredTools.map(t => (
@@ -560,7 +560,7 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
                       )}
                     </TabsContent>
 
-                    {/* 탭 B: 단원 전체에서 직접 선택 */}
+                    {/* 탭 B: 영역 전체에서 직접 선택 */}
                     <TabsContent value="direct" className="mt-3 space-y-3">
                       <TypeChips chips={domainTypeChips} selectedTypeIds={selectedTypeIds} setSelectedTypeIds={setSelectedTypeIds} />
 
@@ -580,7 +580,7 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
                           : pool;
                         if (filtered.length === 0) return (
                           <p className="text-sm text-muted-foreground text-center py-6">
-                            {q ? '검색 결과가 없어요' : '이 단원에 문제가 없어요'}
+                            {q ? '검색 결과가 없어요' : '이 영역에 문제가 없어요'}
                           </p>
                         );
                         return (
@@ -625,11 +625,11 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
                       <TypeChips chips={domainTypeChips} selectedTypeIds={selectedTypeIds} setSelectedTypeIds={setSelectedTypeIds} />
 
                       <p className="text-xs text-muted-foreground">
-                        내가 즐겨찾기한 문제 {filteredBookmarks.length}개 (학년/단원/유형 필터 적용됨)
+                        내가 즐겨찾기한 문제 {filteredBookmarks.length}개 (학년/영역/단원 필터 적용됨)
                       </p>
                       {filteredBookmarks.length === 0 ? (
                         <p className="text-sm text-muted-foreground text-center py-6">
-                          이 학년/단원에 즐겨찾기한 문제가 없어요
+                          이 학년/영역에 즐겨찾기한 문제가 없어요
                         </p>
                       ) : (
                         <>
