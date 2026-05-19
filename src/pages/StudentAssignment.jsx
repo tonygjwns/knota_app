@@ -8,7 +8,7 @@ import { InlineLoader } from '@/components/LoadingOverlay';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, CheckCircle, Circle, Clock } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Circle, Clock, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import MathRenderer from '@/components/MathRenderer';
 
@@ -152,34 +152,35 @@ export default function StudentAssignment() {
               <Clock className="w-4 h-4" />
               이 숙제는 마감됐어요
             </p>
+            {doneCount > 0 && (
+              <p className="text-xs text-muted-foreground mt-2">
+                아래 문제 카드를 눌러 풀이 결과를 확인하세요
+              </p>
+            )}
+            {doneCount === 0 && (
+              <p className="text-xs text-muted-foreground mt-2">
+                이 숙제는 한 문제도 풀지 못한 채 마감됐어요
+              </p>
+            )}
           </Card>
         )}
 
-        {/* Continue / View Results button */}
-        <Button
-          size="lg"
-          className="w-full"
-          variant={isClosed ? 'outline' : 'default'}
-          onClick={() => {
-            if (isClosed) {
-              const firstDoneAttempt = problems
-                .map(p => attemptMap.get(p.id))
-                .find(Boolean);
-              if (firstDoneAttempt) {
-                navigate(`/result/${firstDoneAttempt.id}?from=assignment`);
+        {/* Continue button — hidden when closed */}
+        {!isClosed && (
+          <Button
+            size="lg"
+            className="w-full"
+            onClick={() => {
+              if (nextUnfinishedProblem) {
+                navigate(`/problem/${nextUnfinishedProblem.id}?assignment_id=${assignment.id}`);
+              } else if (problems.length > 0) {
+                navigate(`/problem/${problems[0].id}?assignment_id=${assignment.id}`);
               }
-              return;
-            }
-            if (nextUnfinishedProblem) {
-              navigate(`/problem/${nextUnfinishedProblem.id}?assignment_id=${assignment.id}`);
-            } else if (problems.length > 0) {
-              navigate(`/problem/${problems[0].id}?assignment_id=${assignment.id}`);
-            }
-          }}
-          disabled={isClosed && doneCount === 0}
-        >
-          {isClosed ? '결과 보기' : allDone ? '다시 풀기' : nextUnfinishedProblem ? '이어 풀기' : '문제 풀기'}
-        </Button>
+            }}
+          >
+            {allDone ? '다시 풀기' : nextUnfinishedProblem ? '이어 풀기' : '문제 풀기'}
+          </Button>
+        )}
 
         {/* Problem list */}
         <div>
@@ -196,11 +197,16 @@ export default function StudentAssignment() {
                     isDisabled
                       ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
                       : isDone
-                        ? 'border-emerald-200 bg-emerald-50/30 hover:bg-emerald-50 cursor-pointer'
-                        : 'border-border hover:bg-muted cursor-pointer'
+                        ? 'border-emerald-200 bg-emerald-50/30 hover:bg-emerald-50 hover:shadow-md cursor-pointer'
+                        : 'border-border hover:bg-muted hover:shadow-md cursor-pointer'
                   }`}
                   onClick={() => {
-                    if (!isDisabled) navigate(`/problem/${p.id}?assignment_id=${assignment.id}`);
+                    if (isDisabled) return;
+                    if (isDone && attempt) {
+                      navigate(`/result/${attempt.id}?from=assignment`);
+                    } else {
+                      navigate(`/problem/${p.id}?assignment_id=${assignment.id}`);
+                    }
                   }}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -213,9 +219,15 @@ export default function StudentAssignment() {
                     </div>
                     <div className="flex-shrink-0">
                       {isDone ? (
-                        <div className="flex items-center gap-1 text-emerald-600">
-                          <CheckCircle className="w-5 h-5" />
-                          <span className="text-xs font-bold">{attempt.score}점</span>
+                        <div className="flex flex-col items-end gap-0.5">
+                          <div className="flex items-center gap-1 text-emerald-600">
+                            <CheckCircle className="w-4 h-4" />
+                            <span className="text-xs font-bold">{attempt.score}점</span>
+                          </div>
+                          <div className="flex items-center gap-0.5 text-muted-foreground">
+                            <span className="text-xs">결과 보기</span>
+                            <ChevronRight className="w-3 h-3" />
+                          </div>
                         </div>
                       ) : isDisabled ? (
                         <div className="flex items-center gap-1 text-gray-400">
