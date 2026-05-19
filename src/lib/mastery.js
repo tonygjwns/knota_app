@@ -25,10 +25,11 @@ export function buildMasteryMap(attempts, problemMap) {
     if (attempt.teacher_review_json) {
       try {
         const tr = JSON.parse(attempt.teacher_review_json);
-        const edits = tr.step_edits || {};
-        Object.values(edits).forEach(edit => {
-          if ((edit.status === 'wrong' || edit.status === 'partial') && edit.tool_id) {
-            toolIds.push(edit.tool_id);
+        // step_judgments 가 신 형식, step_edits 는 레거시 fallback
+        const judgments = tr.step_judgments || tr.step_edits || {};
+        Object.values(judgments).forEach(j => {
+          if ((j.status === 'wrong' || j.status === 'partial' || j.status === 'missing') && j.tool_id) {
+            toolIds.push(j.tool_id);
           }
         });
         if (toolIds.length > 0) toolIds = [...new Set(toolIds)];

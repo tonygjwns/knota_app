@@ -22,10 +22,52 @@ import ScoreBadge, { ScoreSummaryText, StepStatusBadge } from '@/components/Scor
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { ChevronDown, ChevronUp, AlertTriangle, RotateCcw, ChevronRight, Wrench, Star, BookOpen } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle, RotateCcw, ChevronRight, Wrench, Star, BookOpen, MessageSquare } from 'lucide-react';
 import SolutionCard from '@/components/SolutionCard';
 import { toast } from 'sonner';
 import { base44 } from '@/api/base44Client';
+
+// 강사 step_judgments 기반 단계 카드
+function TeacherStepCard({ seq, judgment, getToolName, onToolClick, onBookmarkTool, bookmarkedToolIds }) {
+  const { status, tool_id } = judgment;
+  const [open, setOpen] = useState(status !== 'correct');
+  const toolName = getToolName ? getToolName(tool_id) : null;
+
+  const statusLabel = { correct: '정답', partial: '부분 정답', missing: '누락', wrong: '다시 살펴보기' }[status] || status;
+  const borderColor = status === 'correct' ? 'border-emerald-200 bg-emerald-50/30'
+    : status === 'partial' ? 'border-amber-200 bg-amber-50/30'
+    : status === 'missing' ? 'border-slate-200 bg-slate-50/30'
+    : 'border-red-200 bg-red-50/30';
+
+  return (
+    <div className={`rounded-xl border overflow-hidden ${borderColor}`}>
+      <button className="w-full p-4 flex items-start justify-between gap-3 text-left" onClick={() => setOpen(o => !o)}>
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <span className="text-xs font-mono text-muted-foreground flex-shrink-0">{seq}단계</span>
+          {toolName && tool_id ? (
+            <div className="inline-flex items-center gap-0 flex-shrink-0">
+              <button onClick={e => { e.stopPropagation(); onToolClick && onToolClick(tool_id); }}
+                className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-l-full inline-flex items-center gap-1 hover:bg-primary/20 transition-colors">
+                <Wrench className="w-3 h-3" />{toolName}
+              </button>
+              <button onClick={e => { e.stopPropagation(); onBookmarkTool && onBookmarkTool(tool_id); }}
+                className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-r-full hover:bg-primary/20 transition-colors">
+                <Star className={`w-3 h-3 ${bookmarkedToolIds?.has(tool_id) ? 'fill-amber-500 text-amber-500' : ''}`} />
+              </button>
+            </div>
+          ) : null}
+          <StepStatusBadge status={status} />
+        </div>
+        {open ? <ChevronUp className="w-4 h-4 flex-shrink-0 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 flex-shrink-0 text-muted-foreground" />}
+      </button>
+      {open && status === 'missing' && (
+        <div className="px-4 pb-4 border-t border-current/10">
+          <p className="text-sm text-slate-500 mt-3">이 단계가 풀이에서 빠진 것 같아요. 다시 한번 살펴볼까요?</p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function StepCard({ step, getToolName, onToolClick, onBookmarkTool, bookmarkedToolIds }) {
   const [open, setOpen] = React.useState(step.status !== 'correct');
@@ -107,6 +149,14 @@ export default function AttemptResultBody({
                      score >= 40 ? 'from-amber-50 to-amber-100/50 border-amber-200' :
                      'from-red-50 to-red-100/50 border-red-200';
 
+  // 강사 검토 완료 여부
+  const teacherReview = (() => {
+    if (!attempt.teacher_review_json || !attempt.review_resolved_at) return null;
+    try { return JSON.parse(attempt.teacher_review_json); } catch { return null; }
+  })();
+  const isTeacherReviewed = !!teacherReview;
+  const [showAIGrade, setShowAIGrade] = useState(viewerIsOwner && !isTeacherReviewed ? true : false);
+
   const toolNameMap = new Map((tools || []).map(t => [t.tool_id, t.name]));
   const toolEntityMap = new Map((tools || []).map(t => [t.tool_id, t]));
   const getToolName = (toolId) => toolId ? (toolNameMap.get(toolId) || null) : null;
@@ -122,6 +172,28 @@ export default function AttemptResultBody({
 
   return (
     <div className="space-y-5 pb-8">
+
+      {/* 강사 검토 완료 배너 */}
+      {isTeacherReviewed && (
+        <Card className="p-4 border-blue-200 bg-blue-50 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">✏️</span>
+            <p className="text-sm font-medium text-blue-800">선생님께서 채점을 보완해 주셨어요</p>
+          </div>
+          <Button size="sm" variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-100 flex-shrink-0"
+            onClick={() => setShowAIGrade(v => !v)}>
+            {showAIGrade ? 'AI 채점 접기' : 'AI 채점도 보기'}
+          </Button>
+        </Card>
+      )}
+
+      {/* 검토 요청 처리 중 배너 (검토 완료 전) */}
+      {viewerIsOwner && attempt.review_requested && !attempt.review_resolved_at && !isTeacherReviewed && (
+        <Card className="p-3 bg-emerald-50 border-emerald-200">
+          <p className="text-sm text-emerald-700">✓ 선생님께 전달됐어요. 검토 결과를 기다리고 있어요.</p>
+        </Card>
+      )}
+
       {/* Score card */}
       <Card className={`p-6 bg-gradient-to-br ${scoreColor} border text-center`}>
         <div className="text-6xl font-bold mb-2" style={{ color: score >= 80 ? '#059669' : score >= 40 ? '#d97706' : '#dc2626' }}>
@@ -136,7 +208,7 @@ export default function AttemptResultBody({
             {attempt.student_answer ? '풀이가 정답에 도달했어요! (답안 인식에 오타가 있었나봐요)' : '풀이가 정답에 도달했어요! (답란을 비우고 제출했나봐요)'}
           </p>
         )}
-        {grading?.summary && <p className="text-muted-foreground text-sm mt-3 leading-relaxed">{grading.summary}</p>}
+        {grading?.summary && !isTeacherReviewed && <p className="text-muted-foreground text-sm mt-3 leading-relaxed">{grading.summary}</p>}
       </Card>
 
       {/* 학생 답안 표시 */}
@@ -150,8 +222,50 @@ export default function AttemptResultBody({
         </div>
       )}
 
+      {/* 강사 보정 단계별 피드백 */}
+      {isTeacherReviewed && teacherReview.step_judgments && Object.keys(teacherReview.step_judgments).length > 0 && (
+        <div>
+          <h2 className="text-lg font-semibold mb-3">단계별 피드백 <span className="text-xs font-normal text-blue-600 ml-1">✏️ 선생님 보완</span></h2>
+          <div className="space-y-2">
+            {Object.entries(teacherReview.step_judgments)
+              .sort((a, b) => Number(a[0]) - Number(b[0]))
+              .map(([seq, judgment]) => (
+                <TeacherStepCard
+                  key={seq}
+                  seq={seq}
+                  judgment={judgment}
+                  getToolName={getToolName}
+                  onToolClick={(tid) => { const t = getToolEntity(tid); if (t) setTooltipTool(t); }}
+                  onBookmarkTool={(tid) => { const t = getToolEntity(tid); if (t) toggleBookmark(t); }}
+                  bookmarkedToolIds={bookmarkedToolIds}
+                />
+              ))}
+          </div>
+        </div>
+      )}
+
+      {/* 강사 코멘트 카드 */}
+      {isTeacherReviewed && teacherReview.comment && (
+        <Card className="p-4 border-blue-200 bg-blue-50/60">
+          <div className="flex items-center gap-2 mb-2">
+            <MessageSquare className="w-4 h-4 text-blue-600" />
+            <p className="text-sm font-semibold text-blue-800">선생님 메시지</p>
+          </div>
+          <p className="text-sm text-foreground leading-relaxed">{teacherReview.comment}</p>
+        </Card>
+      )}
+
+      {/* AI 채점 구분선 (강사 검토 후 AI 채점도 보기 토글) */}
+      {isTeacherReviewed && showAIGrade && (
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <div className="flex-1 h-px bg-border" />
+          AI 원본 채점
+          <div className="flex-1 h-px bg-border" />
+        </div>
+      )}
+
       {/* AI 상세 채점 카드 */}
-      {isFastGrade && !showDetail && (
+      {isFastGrade && !showDetail && (!isTeacherReviewed || showAIGrade) && (
         <Card className="p-4 border-primary/30 bg-primary/5">
           {!grading ? (
             <div className="space-y-2">
@@ -182,7 +296,7 @@ export default function AttemptResultBody({
       )}
 
       {/* Tools used chips */}
-      {showDetail && tools.length > 0 && grading && (
+      {showDetail && tools.length > 0 && grading && (!isTeacherReviewed || showAIGrade) && (
         <div>
           <p className="text-xs text-muted-foreground mb-2 font-medium">
             {grading.matched_solution_id
@@ -210,15 +324,15 @@ export default function AttemptResultBody({
       )}
 
       {/* Low confidence warning */}
-      {showDetail && grading?.confidence !== undefined && grading.confidence < 70 && (
+      {showDetail && grading?.confidence !== undefined && grading.confidence < 70 && (!isTeacherReviewed || showAIGrade) && (
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex gap-3">
           <AlertTriangle className="w-5 h-5 text-slate-400 flex-shrink-0 mt-0.5" />
           <p className="text-slate-600 text-sm">채점 자신감이 낮아요 ({grading.confidence}점). 관리자가 검토할 거예요.</p>
         </div>
       )}
 
-      {/* Step feedback */}
-      {showDetail && steps.length > 0 && (
+      {/* Step feedback (AI 원본 — 강사 검토 시 showAIGrade일 때만) */}
+      {showDetail && steps.length > 0 && (!isTeacherReviewed || showAIGrade) && (
         <div>
           <h2 className="text-lg font-semibold mb-3">단계별 피드백</h2>
           <div className="space-y-2">
@@ -258,7 +372,7 @@ export default function AttemptResultBody({
       )}
 
       {/* Gap locations */}
-      {showDetail && gaps.length > 0 && (
+      {showDetail && gaps.length > 0 && (!isTeacherReviewed || showAIGrade) && (
         <div>
           <h2 className="text-base font-semibold mb-2 text-amber-700">빠진 단계</h2>
           <div className="space-y-2">
@@ -377,8 +491,9 @@ export default function AttemptResultBody({
         </div>
       )}
 
-      {/* 검토 요청 카드 */}
-      {viewerIsOwner && !attempt.review_requested && !isFastGrade && (
+
+      {/* 검토 요청하기 버튼 — 강사 검토 완료 시 숨김 */}
+      {viewerIsOwner && !attempt.review_requested && !isFastGrade && !isTeacherReviewed && (
         <Card className="p-3 border-dashed">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
@@ -387,29 +502,6 @@ export default function AttemptResultBody({
             </div>
             <Button size="sm" variant="outline" onClick={() => setShowReviewRequestModal(true)}>검토 요청하기</Button>
           </div>
-        </Card>
-      )}
-      {viewerIsOwner && attempt.review_requested && !attempt.review_resolved_at && (
-        <Card className="p-3 bg-emerald-50 border-emerald-200">
-          <p className="text-sm text-emerald-700">✓ 선생님께 다시 봐달라고 요청했어요</p>
-        </Card>
-      )}
-      {viewerIsOwner && attempt.teacher_review_json && (
-        <Card className="p-4 bg-primary/5 border-primary/30">
-          <p className="text-sm font-medium mb-2">📝 선생님이 다시 채점했어요</p>
-          {(() => {
-            try {
-              const tr = JSON.parse(attempt.teacher_review_json);
-              return (
-                <>
-                  {tr.score_adjustment !== undefined && (
-                    <p className="text-sm">점수 보정: {tr.score_adjustment > 0 ? '+' : ''}{tr.score_adjustment}점</p>
-                  )}
-                  {tr.comment && <p className="text-sm text-foreground mt-2">{tr.comment}</p>}
-                </>
-              );
-            } catch { return null; }
-          })()}
         </Card>
       )}
 

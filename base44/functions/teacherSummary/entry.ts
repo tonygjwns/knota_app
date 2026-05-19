@@ -10,7 +10,20 @@ function aggregateToolMastery(attempts, problemMap) {
 
     let toolIds = [];
 
-    if (attempt.claude_grade_json) {
+    if (attempt.teacher_review_json) {
+      try {
+        const tr = JSON.parse(attempt.teacher_review_json);
+        const judgments = tr.step_judgments || tr.step_edits || {};
+        Object.values(judgments).forEach(j => {
+          if ((j.status === 'wrong' || j.status === 'partial' || j.status === 'missing') && j.tool_id) {
+            toolIds.push(j.tool_id);
+          }
+        });
+        if (toolIds.length > 0) toolIds = [...new Set(toolIds)];
+      } catch {}
+    }
+
+    if (toolIds.length === 0 && attempt.claude_grade_json) {
       try {
         const grading = JSON.parse(attempt.claude_grade_json);
         const g = grading?.response ?? grading;
@@ -438,7 +451,19 @@ Deno.serve(async (req) => {
       const problem = problemMap.get(attempt.problem_id);
       if (!problem) continue;
       let toolIds = [];
-      if (attempt.claude_grade_json) {
+      if (attempt.teacher_review_json) {
+        try {
+          const tr = JSON.parse(attempt.teacher_review_json);
+          const judgments = tr.step_judgments || tr.step_edits || {};
+          Object.values(judgments).forEach(j => {
+            if ((j.status === 'wrong' || j.status === 'partial' || j.status === 'missing') && j.tool_id) {
+              toolIds.push(j.tool_id);
+            }
+          });
+          if (toolIds.length > 0) toolIds = [...new Set(toolIds)];
+        } catch {}
+      }
+      if (toolIds.length === 0 && attempt.claude_grade_json) {
         try {
           const grading = JSON.parse(attempt.claude_grade_json);
           const g = grading?.response ?? grading;
