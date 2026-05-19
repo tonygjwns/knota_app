@@ -121,12 +121,18 @@ function TypeChips({ chips, selectedTypeIds, setSelectedTypeIds }) {
   );
 }
 
-export default function AssignmentForm({ classId, onSave, onClose, assignment, preselectedToolId, initialTypeId }) {
-  const [title, setTitle] = useState(assignment?.title || '');
-  const [description, setDescription] = useState(assignment?.description || '');
+export default function AssignmentForm({ classId, onSave, onClose, assignment, preselectedToolId, initialTypeId, duplicateFrom, availableClasses }) {
+  const [title, setTitle] = useState(
+    duplicateFrom ? `${duplicateFrom.title} (복사본)` : (assignment?.title || '')
+  );
+  const [description, setDescription] = useState(
+    duplicateFrom ? (duplicateFrom.description || '') : (assignment?.description || '')
+  );
   const [deadline, setDeadline] = useState(assignment?.deadline || '');
   const [saving, setSaving] = useState(false);
   const [previewProblem, setPreviewProblem] = useState(null);
+  // 복사 모드에서 학급 선택
+  const [selectedClassId, setSelectedClassId] = useState(duplicateFrom?.class_id || classId);
 
   // 누적 출제 문제 (Set<id>)
   const [selectedProblems, setSelectedProblems] = useState(new Set());
@@ -226,6 +232,24 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
         } catch {}
       }
 
+      // duplicateFrom → 첫 문제로부터 학년/영역 역추정
+      if (duplicateFrom && !preselectedToolId && !initialTypeId) {
+        try {
+          const dupIds = JSON.parse(duplicateFrom.problem_ids || '[]');
+          if (dupIds.length > 0) {
+            const firstProb = problemsData.find(p => p.id === dupIds[0]);
+            if (firstProb?.domain_id) {
+              const domain = domainsData.find(d => d.domain_id === firstProb.domain_id);
+              if (domain) {
+                setSelectedGrade(domain.grade_range);
+                setSelectedDomainId(domain.domain_id);
+              }
+            }
+          }
+        } catch {}
+        return; // 학급 grade_range default 는 건너뜀
+      }
+
       // 학급 grade_range default
       if (classId && !preselectedToolId && !initialTypeId) {
         try {
@@ -250,14 +274,15 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
     init();
   }, [classId, preselectedToolId, initialTypeId]);
 
-  // 수정 진입 시 문제 복원
+  // 수정 or 복사 진입 시 문제 복원
   useEffect(() => {
-    if (!assignment) return;
+    const source = assignment || duplicateFrom;
+    if (!source) return;
     try {
-      const ids = JSON.parse(assignment.problem_ids || '[]');
+      const ids = JSON.parse(source.problem_ids || '[]');
       setSelectedProblems(new Set(ids));
     } catch {}
-  }, [assignment]);
+  }, [assignment, duplicateFrom]);
 
   // 학년 선택 시 영역/도구/단원 리셋
   const handleGradeChange = (g) => {
@@ -377,11 +402,11 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
       const data = {
         title: title.trim(),
         description: description.trim() || null,
-        class_id: classId,
+        class_id: duplicateFrom ? selectedClassId : classId,
         created_by: me.id,
         problem_ids: JSON.stringify([...selectedProblems]),
         deadline: deadline || null,
-        status: assignment?.status || 'active',
+        status: duplicateFrom ? 'active' : (assignment?.status || 'active'),
       };
       await onSave(data);
       onClose();
@@ -395,10 +420,28 @@ export default function AssignmentForm({ classId, onSave, onClose, assignment, p
       <Dialog open onOpenChange={onClose}>
         <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
-            <DialogTitle>{assignment ? '숙제 수정' : '새 숙제 출제'}</DialogTitle>
+            <DialogTitle>
+              {assignment ? '숙제 수정' : duplicateFrom ? '복사하여 새 숙제' : '새 숙제 출제'}
+            </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* 복사 모드: 학급 선택 */}
+            {duplicateFrom && availableClasses && availableClasses.length > 0 && (
+              <div>
+                <label className="block text-sm font-semibold mb-2">출제 학급 *</label>
+                <Select value={selectedClassId} onValueChange={setSelectedClassId}>
+                  <SelectTrigger><SelectValue placeholder="학급 선택" /></SelectTrigger>
+                  <SelectContent>
+                    {availableClasses.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  원본: "{duplicateFrom.title}" ({availableClasses.find(c => c.id === duplicateFrom.class_id)?.name || duplicateFrom.class_id})
+                </p>
+              </div>
+            )}
+
             {/* 제목 */}
             <div>
               <label className="block text-sm font-semibold mb-2">제목 *</label>

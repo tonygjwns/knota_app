@@ -69,6 +69,8 @@ export default function TeacherAssignments() {
   const [selectedDomainId, setSelectedDomainId] = useState(null);
   const [recTab, setRecTab] = useState('weak');
   const [pendingToolId, setPendingToolId] = useState(null);
+  const [duplicateFrom, setDuplicateFrom] = useState(null);
+  const [submittedCountMap, setSubmittedCountMap] = useState({});
 
   // 클래스 이름 맵 구성
   useEffect(() => {
@@ -119,6 +121,20 @@ export default function TeacherAssignments() {
       });
 
       setAssignments(allAssignments);
+
+      // 제출 카운트: 각 숙제별 unique 학생 수 병렬 fetch
+      const countResults = await Promise.all(
+        allAssignments.map(async (a) => {
+          const attempts = await base44.entities.StudentAttempt.filter(
+            { assignment_id: a.id }, '', 1000
+          );
+          const uniqueStudents = new Set(attempts.map(at => at.student_id)).size;
+          return [a.id, uniqueStudents];
+        })
+      );
+      const countMap = {};
+      countResults.forEach(([id, count]) => { countMap[id] = count; });
+      setSubmittedCountMap(countMap);
     } finally {
       setLoading(false);
     }
@@ -178,10 +194,10 @@ export default function TeacherAssignments() {
   };
 
   // 복사하여 새 숙제
-  const handleDuplicate = async assignment => {
+  const handleDuplicate = (assignment) => {
+    setDuplicateFrom(assignment);
     setSelectedClassForForm(assignment.class_id);
     setShowForm(true);
-    // 복사된 데이터는 폼에서 설정 (현재는 빈 폼)
   };
 
   if (teacherLoading || !data) {
@@ -300,7 +316,7 @@ export default function TeacherAssignments() {
                     <div className="flex gap-6 text-sm">
                       <span className="font-medium">총 {problemIds.length}문제</span>
                       <span className="text-muted-foreground">학생 {studentCount}명</span>
-                      <span className="text-muted-foreground">제출 0건</span>
+                      <span className="text-muted-foreground">제출 {submittedCountMap[assignment.id] || 0}건</span>
                     </div>
                   </div>
                 </CardContent>
@@ -415,11 +431,14 @@ export default function TeacherAssignments() {
       {showForm && selectedClassForForm && (
         <AssignmentForm
           classId={selectedClassForForm}
+          duplicateFrom={duplicateFrom}
+          availableClasses={my_classes}
           preselectedToolId={pendingToolId}
           onSave={handleSave}
           onClose={() => {
             setShowForm(false);
             setSelectedClassForForm(null);
+            setDuplicateFrom(null);
             setPendingToolId(null);
           }}
         />
