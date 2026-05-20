@@ -21,7 +21,7 @@ export default function TeacherClasses() {
 
   const [showForm, setShowForm] = useState(false);
   const [selectedClassId, setSelectedClassId] = useState(null);
-  const [expandedCodeClass, setExpandedCodeClass] = useState(null);
+  const [expandedCodeClasses, setExpandedCodeClasses] = useState(() => new Set());
 
   // Student search state
   const [classFilter, setClassFilter] = useState('all');
@@ -29,6 +29,10 @@ export default function TeacherClasses() {
   const [changingClass, setChangingClass] = useState({});
 
   const handleClassChange = async (student, newClassId) => {
+    if (!newClassId) {
+      const ok = window.confirm("이 학생을 학급에서 빼면 강사 시야에서 사라져요. 계속할까요?");
+      if (!ok) return;
+    }
     setChangingClass(prev => ({ ...prev, [student.id]: true }));
     try {
       await base44.entities.User.update(student.id, { class_id: newClassId || null });
@@ -91,7 +95,12 @@ export default function TeacherClasses() {
               </div>
               <div className="flex gap-2 flex-wrap justify-end">
                 <Button variant="outline" size="sm" className="gap-1"
-                  onClick={() => setExpandedCodeClass(expandedCodeClass === cls.id ? null : cls.id)}>
+                  onClick={() => setExpandedCodeClasses(prev => {
+                    const next = new Set(prev);
+                    if (next.has(cls.id)) next.delete(cls.id);
+                    else next.add(cls.id);
+                    return next;
+                  })}>
                   <Key className="w-4 h-4" />초대코드
                 </Button>
                 <Button variant="outline" size="sm" className="gap-1"
@@ -105,7 +114,7 @@ export default function TeacherClasses() {
             </div>
 
             {/* 초대코드 expanded */}
-            {expandedCodeClass === cls.id && (
+            {expandedCodeClasses.has(cls.id) && (
               <div className="mt-3 pt-3 border-t border-border">
                 <InviteCodeManager
                   classId={cls.id}
